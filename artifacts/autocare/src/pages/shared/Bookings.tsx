@@ -18,10 +18,11 @@ const STATUSES: { value: ListBookingsStatus | "all"; label: string }[] = [
 
 export default function Bookings() {
   const { role } = useRole();
+  const scopedRole: "owner" | "center" = role === "center" ? "center" : "owner";
   const [status, setStatus] = useState<ListBookingsStatus | "all">("all");
 
   const { data: bookings, isLoading } = useListBookings({
-    role,
+    role: scopedRole,
     ...(status !== "all" ? { status } : {})
   });
 
@@ -54,7 +55,7 @@ export default function Bookings() {
       ) : bookings && bookings.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {bookings.map(booking => (
-            <BookingCard key={booking.id} booking={booking} role={role} />
+            <BookingCard key={booking.id} booking={booking} role={scopedRole} />
           ))}
         </div>
       ) : (

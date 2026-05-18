@@ -1,0 +1,158 @@
+import { Router, type IRouter } from "express";
+import { and, asc, eq, inArray, ilike, or } from "drizzle-orm";
+import { db, partsTable, vendorsTable } from "@workspace/db";
+import {
+  ListPartsForVendorParams,
+  CreatePartParams,
+  CreatePartBody,
+  GetPartParams,
+  UpdatePartParams,
+  UpdatePartBody,
+  ListPartsQueryParams,
+} from "@workspace/api-zod";
+
+const router: IRouter = Router();
+
+async function hydrate(parts: (typeof partsTable.$inferSelect)[]) {
+  if (parts.length === 0) return [];
+  const vendorIds = [...new Set(parts.map((p) => p.vendorId))];
+  const vendors = await db
+    .select()
+    .from(vendorsTable)
+    .where(inArray(vendorsTable.id, vendorIds));
+  const vmap = new Map(vendors.map((v) => [v.id, v]));
+  return parts.map((p) => ({ ...p, vendor: vmap.get(p.vendorId) ?? null }));
+}
+
+router.get("/parts", async (req, res): Promise<void> => {
+  const q = ListPartsQueryParams.safeParse(req.query);
+  if (!q.success) {
+    res.status(400).json({ error: q.error.message });
+    return;
+  }
+  const conditions = [eq(partsTable.active, true)];
+  if (q.data.category) conditions.push(eq(partsTable.category, q.data.category));
+  if (q.data.brand) conditions.push(eq(partsTable.brand, q.data.brand));
+  if (q.data.search) {
+    const s = `%${q.data.search}%`;
+    const orExpr = or(
+      ilike(partsTable.name, s),
+      ilike(partsTable.description, s),
+      ilike(partsTable.sku, s),
+    );
+    if (orExpr) conditions.push(orExpr);
+  }
+  const rows = await db
+    .select()
+    .from(partsTable)
+    .where(and(...conditions))
+    .orderBy(asc(partsTable.name));
+  res.json(await hydrate(rows));
+});
+
+router.get("/parts/:partId", async (req, res): Promise<void> => {
+  const params = GetPartParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const [row] = await db
+    .select()
+    .from(partsTable)
+    .where(eq(partsTable.id, params.data.partId));
+  if (!row) {
+    res.status(404).json({ error: "Part not found" });
+    return;
+  }
+  const [hydrated] = await hydrate([row]);
+  res.json(hydrated);
+});
+
+router.patch("/parts/:partId", async (req, res): Promise<void> => {
+  const params = UpdatePartParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const parsed = UpdatePartBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const [row] = await db
+    .update(partsTable)
+    .set(parsed.data)
+    .where(eq(partsTable.id, params.data.partId))
+    .returning();
+  if (!row) {
+    res.status(404).json({ error: "Part not found" });
+    return;
+  }
+  const [hydrated] = await hydrate([row]);
+  res.json(hydrated);
+});
+
+router.get("/vendors/:vendorId/parts", async (req, res): Promise<void> => {
+  const params = ListPartsForVendorParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const rows = await db
+    .select()
+    .from(partsTable)
+    .where(eq(partsTable.vendorId, params.data.vendorId))
+    .orderBy(asc(partsTable.name));
+  res.json(await hydrate(rows));
+});
+
+router.post("/vendors/:vendorId/parts", async (req, res): Promise<void> => {
+  const params = CreatePartParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const parsed = CreatePartBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const [vendor] = await db
+    .select()
+    .from(vendorsTable)
+    .where(eq(vendorsTable.id, params.data.vendorId));
+  if (!vendor) {
+    res.status(404).json({ error: "Vendor not found" });
+    return;
+  }
+  const [row] = await db
+    .insert(partsTable)
+    .values({
+      vendorId: params.data.vendorId,
+      name: parsed.data.name,
+      description: parsed.data.description,
+      category: parsed.data.category,
+      brand: parsed.data.brand,
+      sku: parsed.data.sku,
+      price: parsed.data.price,
+      stock: parsed.data.stock,
+      imageUrl: parsed.data.imageUrl ?? null,
+      compatibleBrands: parsed.data.compatibleBrands ?? [],
+    })
+    .returning();
+  const [hydrated] = await hydrate([row]);
+  res.status(201).json(hydrated);
+});
+
+router.get("/catalog/part-categories", async (_req, res): Promise<void> => {
+  const rows = await db.select().from(partsTable).where(eq(partsTable.active, true));
+  const map = new Map<string, number>();
+  for (const r of rows) map.set(r.category, (map.get(r.category) ?? 0) + 1);
+  res.json(
+    [...map.entries()]
+      .map(([category, count]) => ({ category, count }))
+      .sort((a, b) => b.count - a.count),
+  );
+});
+
+export default router;

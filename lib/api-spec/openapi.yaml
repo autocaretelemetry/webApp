@@ -16,6 +16,9 @@ tags:
   - name: invoices
   - name: dashboard
   - name: catalog
+  - name: vendors
+  - name: parts
+  - name: orders
 paths:
   /healthz:
     get:
@@ -379,6 +382,209 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/ActivityEvent" }
 
+  /vendors:
+    get:
+      operationId: listVendors
+      tags: [vendors]
+      summary: List all vendors
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Vendor" }
+
+  /vendors/{vendorId}:
+    get:
+      operationId: getVendor
+      tags: [vendors]
+      summary: Get a vendor
+      parameters:
+        - { name: vendorId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Vendor" }
+
+  /vendors/{vendorId}/parts:
+    get:
+      operationId: listPartsForVendor
+      tags: [parts]
+      summary: List parts for a vendor (includes inactive)
+      parameters:
+        - { name: vendorId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Part" }
+    post:
+      operationId: createPart
+      tags: [parts]
+      summary: Add a new part to a vendor's catalog
+      parameters:
+        - { name: vendorId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreatePartInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Part" }
+
+  /parts:
+    get:
+      operationId: listParts
+      tags: [parts]
+      summary: Browse the marketplace catalog
+      parameters:
+        - { name: category, in: query, required: false, schema: { type: string } }
+        - { name: brand, in: query, required: false, schema: { type: string } }
+        - { name: search, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Part" }
+
+  /parts/{partId}:
+    get:
+      operationId: getPart
+      tags: [parts]
+      summary: Get a part by id
+      parameters:
+        - { name: partId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Part" }
+    patch:
+      operationId: updatePart
+      tags: [parts]
+      summary: Update part details, price, stock, or active state
+      parameters:
+        - { name: partId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdatePartInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Part" }
+
+  /catalog/part-categories:
+    get:
+      operationId: listPartCategories
+      tags: [catalog]
+      summary: Distinct part categories with counts
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CategoryCount" }
+
+  /orders:
+    get:
+      operationId: listOrders
+      tags: [orders]
+      summary: List orders, optionally scoped by vendor or buyer
+      parameters:
+        - { name: vendorId, in: query, required: false, schema: { type: string } }
+        - { name: buyerName, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Order" }
+    post:
+      operationId: createOrder
+      tags: [orders]
+      summary: Place a new order (one vendor per order)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateOrderInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderDetail" }
+
+  /orders/{orderId}:
+    get:
+      operationId: getOrder
+      tags: [orders]
+      summary: Get an order with line items
+      parameters:
+        - { name: orderId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderDetail" }
+
+  /orders/{orderId}/status:
+    patch:
+      operationId: updateOrderStatus
+      tags: [orders]
+      summary: Advance the order through its fulfillment lifecycle
+      parameters:
+        - { name: orderId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateOrderStatusInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+
+  /dashboard/vendor/{vendorId}:
+    get:
+      operationId: getVendorDashboard
+      tags: [dashboard]
+      summary: Headline numbers for a vendor
+      parameters:
+        - { name: vendorId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VendorDashboard" }
+
   /catalog/service-types:
     get:
       operationId: listServiceTypes
@@ -688,3 +894,189 @@ components:
         estimatedHours: { type: number }
         startingPrice: { type: number }
         icon: { type: string, nullable: true }
+
+    Vendor:
+      type: object
+      required: [id, name, address, phone, rating, reviewsCount, createdAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        bio: { type: string, nullable: true }
+        address: { type: string }
+        phone: { type: string }
+        rating: { type: number }
+        reviewsCount: { type: integer }
+        logoUrl: { type: string, nullable: true }
+        partsCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+
+    Part:
+      type: object
+      required: [id, vendorId, name, description, category, brand, sku, price, stock, compatibleBrands, active, createdAt]
+      properties:
+        id: { type: string }
+        vendorId: { type: string }
+        name: { type: string }
+        description: { type: string }
+        category: { type: string }
+        brand: { type: string }
+        sku: { type: string }
+        price: { type: number }
+        stock: { type: integer }
+        imageUrl: { type: string, nullable: true }
+        compatibleBrands:
+          type: array
+          items: { type: string }
+        active: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        vendor:
+          oneOf:
+            - { $ref: "#/components/schemas/Vendor" }
+            - { type: "null" }
+
+    CreatePartInput:
+      type: object
+      required: [name, description, category, brand, sku, price, stock]
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string, minLength: 1 }
+        category: { type: string, minLength: 1 }
+        brand: { type: string, minLength: 1 }
+        sku: { type: string, minLength: 1 }
+        price: { type: number, minimum: 0 }
+        stock: { type: integer, minimum: 0 }
+        imageUrl: { type: string, nullable: true }
+        compatibleBrands:
+          type: array
+          items: { type: string }
+
+    UpdatePartInput:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string }
+        category: { type: string }
+        brand: { type: string }
+        sku: { type: string }
+        price: { type: number, minimum: 0 }
+        stock: { type: integer, minimum: 0 }
+        imageUrl: { type: string, nullable: true }
+        compatibleBrands:
+          type: array
+          items: { type: string }
+        active: { type: boolean }
+
+    CategoryCount:
+      type: object
+      required: [category, count]
+      properties:
+        category: { type: string }
+        count: { type: integer }
+
+    Order:
+      type: object
+      required: [id, vendorId, buyerKind, buyerName, buyerPhone, shippingAddress, status, itemsTotal, shippingFee, total, placedAt]
+      properties:
+        id: { type: string }
+        vendorId: { type: string }
+        buyerKind:
+          type: string
+          enum: [owner, center]
+        buyerName: { type: string }
+        buyerPhone: { type: string }
+        shippingAddress: { type: string }
+        notes: { type: string, nullable: true }
+        status:
+          type: string
+          enum: [placed, confirmed, shipped, delivered, cancelled]
+        itemsTotal: { type: number }
+        shippingFee: { type: number }
+        total: { type: number }
+        placedAt: { type: string, format: date-time }
+        confirmedAt: { type: string, format: date-time, nullable: true }
+        shippedAt: { type: string, format: date-time, nullable: true }
+        deliveredAt: { type: string, format: date-time, nullable: true }
+        cancelledAt: { type: string, format: date-time, nullable: true }
+        trackingCode: { type: string, nullable: true }
+        itemsCount: { type: integer }
+        vendor:
+          oneOf:
+            - { $ref: "#/components/schemas/Vendor" }
+            - { type: "null" }
+
+    OrderLine:
+      type: object
+      required: [id, orderId, partId, quantity, unitPrice, lineTotal, snapshot]
+      properties:
+        id: { type: string }
+        orderId: { type: string }
+        partId: { type: string }
+        quantity: { type: integer }
+        unitPrice: { type: number }
+        lineTotal: { type: number }
+        snapshot:
+          type: object
+          required: [partId, name, sku, unitPrice, quantity]
+          properties:
+            partId: { type: string }
+            name: { type: string }
+            sku: { type: string }
+            unitPrice: { type: number }
+            quantity: { type: integer }
+            imageUrl: { type: string, nullable: true }
+
+    OrderDetail:
+      allOf:
+        - $ref: "#/components/schemas/Order"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/OrderLine" }
+
+    CreateOrderItemInput:
+      type: object
+      required: [partId, quantity]
+      properties:
+        partId: { type: string }
+        quantity: { type: integer, minimum: 1 }
+
+    CreateOrderInput:
+      type: object
+      required: [vendorId, buyerKind, buyerName, buyerPhone, shippingAddress, items]
+      properties:
+        vendorId: { type: string }
+        buyerKind:
+          type: string
+          enum: [owner, center]
+        buyerName: { type: string, minLength: 1 }
+        buyerPhone: { type: string, minLength: 1 }
+        shippingAddress: { type: string, minLength: 1 }
+        notes: { type: string, nullable: true }
+        items:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/CreateOrderItemInput" }
+
+    UpdateOrderStatusInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [placed, confirmed, shipped, delivered, cancelled]
+        trackingCode: { type: string, nullable: true }
+
+    VendorDashboard:
+      type: object
+      required: [vendorId, partsCount, lowStockCount, openOrders, revenueThisMonth, statusBreakdown]
+      properties:
+        vendorId: { type: string }
+        partsCount: { type: integer }
+        lowStockCount: { type: integer }
+        openOrders: { type: integer }
+        revenueThisMonth: { type: number }
+        statusBreakdown:
+          type: array
+          items: { $ref: "#/components/schemas/StatusCount" }

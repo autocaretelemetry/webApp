@@ -1,4 +1,4 @@
-import { BookingStatus, InvoiceStatus } from "@workspace/api-client-react";
+import { BookingStatus, InvoiceStatus, OrderStatus } from "@workspace/api-client-react";
 
 export const BOOKING_STATUS_CONFIG: Record<BookingStatus, { label: string; colorClass: string }> = {
   requested: { label: "Requested", colorClass: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800" },
@@ -15,4 +15,12 @@ export const INVOICE_STATUS_CONFIG: Record<InvoiceStatus, { label: string; color
   approved: { label: "Approved", colorClass: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800" },
   paid: { label: "Paid", colorClass: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800" },
   rejected: { label: "Rejected", colorClass: "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800" },
+};
+
+export const ORDER_STATUS_CONFIG: Record<OrderStatus, { label: string; colorClass: string }> = {
+  placed: { label: "Placed", colorClass: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800" },
+  confirmed: { label: "Confirmed", colorClass: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800" },
+  shipped: { label: "Shipped", colorClass: "bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800" },
+  delivered: { label: "Delivered", colorClass: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800" },
+  cancelled: { label: "Cancelled", colorClass: "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700" },
 };

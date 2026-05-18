@@ -1,9 +1,11 @@
-import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
+import type { ComponentType } from "react";
+import { Switch, Route, Router as WouterRouter, Link } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/AppShell";
-import { useRole } from "@/lib/role";
+import { useRole, type Role } from "@/lib/role";
 import NotFound from "@/pages/not-found";
 
 // Owner Pages
@@ -20,10 +22,22 @@ import CenterDashboard from "@/pages/center/Dashboard";
 import Jobs from "@/pages/center/Jobs";
 import Mechanics from "@/pages/center/Mechanics";
 
+// Vendor Pages
+import VendorDashboard from "@/pages/vendor/Dashboard";
+import VendorParts from "@/pages/vendor/Parts";
+import NewPart from "@/pages/vendor/NewPart";
+import VendorOrders from "@/pages/vendor/Orders";
+
 // Shared Pages
 import Bookings from "@/pages/shared/Bookings";
 import BookingDetail from "@/pages/shared/BookingDetail";
 import InvoiceDetail from "@/pages/shared/InvoiceDetail";
+import Marketplace from "@/pages/shared/Marketplace";
+import PartDetail from "@/pages/shared/PartDetail";
+import Cart from "@/pages/shared/Cart";
+import Checkout from "@/pages/shared/Checkout";
+import Orders from "@/pages/shared/Orders";
+import OrderDetail from "@/pages/shared/OrderDetail";
 import Settings from "@/pages/Settings";
 
 const queryClient = new QueryClient({
@@ -35,28 +49,72 @@ const queryClient = new QueryClient({
   },
 });
 
-function Router() {
+function HomeRoute() {
   const { role } = useRole();
+  if (role === "owner") return <OwnerDashboard />;
+  if (role === "center") return <CenterDashboard />;
+  return <VendorDashboard />;
+}
 
+function RoleGuard({
+  allow,
+  component: Component,
+}: {
+  allow: Role[];
+  component: ComponentType;
+}) {
+  const { role } = useRole();
+  if (!allow.includes(role)) {
+    return (
+      <div className="py-20 text-center space-y-4 animate-in fade-in-50">
+        <p className="text-lg font-medium">This page isn't available for your current role.</p>
+        <p className="text-sm text-muted-foreground">
+          Switch roles from the top bar, or head back home.
+        </p>
+        <Link href="/">
+          <Button>Go home</Button>
+        </Link>
+      </div>
+    );
+  }
+  return <Component />;
+}
+
+const ownerOnly = (c: ComponentType) => () => <RoleGuard allow={["owner"]} component={c} />;
+const centerOnly = (c: ComponentType) => () => <RoleGuard allow={["center"]} component={c} />;
+const vendorOnly = (c: ComponentType) => () => <RoleGuard allow={["vendor"]} component={c} />;
+const buyersOnly = (c: ComponentType) => () => <RoleGuard allow={["owner", "center"]} component={c} />;
+
+function Router() {
   return (
     <AppShell>
       <Switch>
-        {/* Dashboards conditionally render on root */}
-        <Route path="/">
-          {role === "owner" ? <OwnerDashboard /> : <CenterDashboard />}
-        </Route>
+        <Route path="/" component={HomeRoute} />
 
         {/* Owner Routes */}
-        <Route path="/vehicles" component={Vehicles} />
-        <Route path="/vehicles/new" component={NewVehicle} />
-        <Route path="/vehicles/:id" component={VehicleDetail} />
-        <Route path="/service-centers" component={ServiceCenters} />
-        <Route path="/service-centers/:id" component={ServiceCenterDetail} />
-        <Route path="/book" component={Book} />
+        <Route path="/vehicles" component={ownerOnly(Vehicles)} />
+        <Route path="/vehicles/new" component={ownerOnly(NewVehicle)} />
+        <Route path="/vehicles/:id" component={ownerOnly(VehicleDetail)} />
+        <Route path="/service-centers" component={ownerOnly(ServiceCenters)} />
+        <Route path="/service-centers/:id" component={ownerOnly(ServiceCenterDetail)} />
+        <Route path="/book" component={ownerOnly(Book)} />
 
         {/* Center Routes */}
-        <Route path="/jobs" component={Jobs} />
-        <Route path="/mechanics" component={Mechanics} />
+        <Route path="/jobs" component={centerOnly(Jobs)} />
+        <Route path="/mechanics" component={centerOnly(Mechanics)} />
+
+        {/* Vendor Routes */}
+        <Route path="/vendor/parts/new" component={vendorOnly(NewPart)} />
+        <Route path="/vendor/parts" component={vendorOnly(VendorParts)} />
+        <Route path="/vendor/orders" component={vendorOnly(VendorOrders)} />
+
+        {/* Marketplace (shared) */}
+        <Route path="/marketplace" component={Marketplace} />
+        <Route path="/marketplace/:id" component={PartDetail} />
+        <Route path="/cart" component={buyersOnly(Cart)} />
+        <Route path="/checkout" component={buyersOnly(Checkout)} />
+        <Route path="/orders" component={Orders} />
+        <Route path="/orders/:id" component={OrderDetail} />
 
         {/* Shared Routes */}
         <Route path="/bookings" component={Bookings} />

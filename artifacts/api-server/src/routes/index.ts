@@ -5,6 +5,9 @@ import serviceCentersRouter from "./serviceCenters";
 import bookingsRouter from "./bookings";
 import invoicesRouter from "./invoices";
 import dashboardRouter from "./dashboard";
+import vendorsRouter from "./vendors";
+import partsRouter from "./parts";
+import ordersRouter from "./orders";
 
 const router: IRouter = Router();
 
@@ -14,5 +17,8 @@ router.use(serviceCentersRouter);
 router.use(bookingsRouter);
 router.use(invoicesRouter);
 router.use(dashboardRouter);
+router.use(vendorsRouter);
+router.use(partsRouter);
+router.use(ordersRouter);
 
 export default router;

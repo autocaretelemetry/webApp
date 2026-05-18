@@ -724,6 +724,444 @@ export const ListActivityResponse = zod.array(ListActivityResponseItem)
 
 
 /**
+ * @summary List all vendors
+ */
+export const ListVendorsResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "bio": zod.string().nullish(),
+  "address": zod.string(),
+  "phone": zod.string(),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "logoUrl": zod.string().nullish(),
+  "partsCount": zod.number().optional(),
+  "createdAt": zod.coerce.date()
+})
+export const ListVendorsResponse = zod.array(ListVendorsResponseItem)
+
+
+/**
+ * @summary Get a vendor
+ */
+export const GetVendorParams = zod.object({
+  "vendorId": zod.coerce.string()
+})
+
+export const GetVendorResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "bio": zod.string().nullish(),
+  "address": zod.string(),
+  "phone": zod.string(),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "logoUrl": zod.string().nullish(),
+  "partsCount": zod.number().optional(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary List parts for a vendor (includes inactive)
+ */
+export const ListPartsForVendorParams = zod.object({
+  "vendorId": zod.coerce.string()
+})
+
+export const ListPartsForVendorResponseItem = zod.object({
+  "id": zod.string(),
+  "vendorId": zod.string(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "category": zod.string(),
+  "brand": zod.string(),
+  "sku": zod.string(),
+  "price": zod.number(),
+  "stock": zod.number(),
+  "imageUrl": zod.string().nullish(),
+  "compatibleBrands": zod.array(zod.string()),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "vendor": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "bio": zod.string().nullish(),
+  "address": zod.string(),
+  "phone": zod.string(),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "logoUrl": zod.string().nullish(),
+  "partsCount": zod.number().optional(),
+  "createdAt": zod.coerce.date()
+}),zod.null()]).optional()
+})
+export const ListPartsForVendorResponse = zod.array(ListPartsForVendorResponseItem)
+
+
+/**
+ * @summary Add a new part to a vendor's catalog
+ */
+export const CreatePartParams = zod.object({
+  "vendorId": zod.coerce.string()
+})
+
+
+
+
+
+
+export const createPartBodyPriceMin = 0;
+
+export const createPartBodyStockMin = 0;
+
+
+
+export const CreatePartBody = zod.object({
+  "name": zod.string().min(1),
+  "description": zod.string().min(1),
+  "category": zod.string().min(1),
+  "brand": zod.string().min(1),
+  "sku": zod.string().min(1),
+  "price": zod.number().min(createPartBodyPriceMin),
+  "stock": zod.number().min(createPartBodyStockMin),
+  "imageUrl": zod.string().nullish(),
+  "compatibleBrands": zod.array(zod.string()).optional()
+})
+
+
+/**
+ * @summary Browse the marketplace catalog
+ */
+export const ListPartsQueryParams = zod.object({
+  "category": zod.coerce.string().optional(),
+  "brand": zod.coerce.string().optional(),
+  "search": zod.coerce.string().optional()
+})
+
+export const ListPartsResponseItem = zod.object({
+  "id": zod.string(),
+  "vendorId": zod.string(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "category": zod.string(),
+  "brand": zod.string(),
+  "sku": zod.string(),
+  "price": zod.number(),
+  "stock": zod.number(),
+  "imageUrl": zod.string().nullish(),
+  "compatibleBrands": zod.array(zod.string()),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "vendor": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "bio": zod.string().nullish(),
+  "address": zod.string(),
+  "phone": zod.string(),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "logoUrl": zod.string().nullish(),
+  "partsCount": zod.number().optional(),
+  "createdAt": zod.coerce.date()
+}),zod.null()]).optional()
+})
+export const ListPartsResponse = zod.array(ListPartsResponseItem)
+
+
+/**
+ * @summary Get a part by id
+ */
+export const GetPartParams = zod.object({
+  "partId": zod.coerce.string()
+})
+
+export const GetPartResponse = zod.object({
+  "id": zod.string(),
+  "vendorId": zod.string(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "category": zod.string(),
+  "brand": zod.string(),
+  "sku": zod.string(),
+  "price": zod.number(),
+  "stock": zod.number(),
+  "imageUrl": zod.string().nullish(),
+  "compatibleBrands": zod.array(zod.string()),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "vendor": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "bio": zod.string().nullish(),
+  "address": zod.string(),
+  "phone": zod.string(),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "logoUrl": zod.string().nullish(),
+  "partsCount": zod.number().optional(),
+  "createdAt": zod.coerce.date()
+}),zod.null()]).optional()
+})
+
+
+/**
+ * @summary Update part details, price, stock, or active state
+ */
+export const UpdatePartParams = zod.object({
+  "partId": zod.coerce.string()
+})
+
+export const updatePartBodyPriceMin = 0;
+
+export const updatePartBodyStockMin = 0;
+
+
+
+export const UpdatePartBody = zod.object({
+  "name": zod.string().optional(),
+  "description": zod.string().optional(),
+  "category": zod.string().optional(),
+  "brand": zod.string().optional(),
+  "sku": zod.string().optional(),
+  "price": zod.number().min(updatePartBodyPriceMin).optional(),
+  "stock": zod.number().min(updatePartBodyStockMin).optional(),
+  "imageUrl": zod.string().nullish(),
+  "compatibleBrands": zod.array(zod.string()).optional(),
+  "active": zod.boolean().optional()
+})
+
+export const UpdatePartResponse = zod.object({
+  "id": zod.string(),
+  "vendorId": zod.string(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "category": zod.string(),
+  "brand": zod.string(),
+  "sku": zod.string(),
+  "price": zod.number(),
+  "stock": zod.number(),
+  "imageUrl": zod.string().nullish(),
+  "compatibleBrands": zod.array(zod.string()),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "vendor": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "bio": zod.string().nullish(),
+  "address": zod.string(),
+  "phone": zod.string(),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "logoUrl": zod.string().nullish(),
+  "partsCount": zod.number().optional(),
+  "createdAt": zod.coerce.date()
+}),zod.null()]).optional()
+})
+
+
+/**
+ * @summary Distinct part categories with counts
+ */
+export const ListPartCategoriesResponseItem = zod.object({
+  "category": zod.string(),
+  "count": zod.number()
+})
+export const ListPartCategoriesResponse = zod.array(ListPartCategoriesResponseItem)
+
+
+/**
+ * @summary List orders, optionally scoped by vendor or buyer
+ */
+export const ListOrdersQueryParams = zod.object({
+  "vendorId": zod.coerce.string().optional(),
+  "buyerName": zod.coerce.string().optional()
+})
+
+export const ListOrdersResponseItem = zod.object({
+  "id": zod.string(),
+  "vendorId": zod.string(),
+  "buyerKind": zod.enum(['owner', 'center']),
+  "buyerName": zod.string(),
+  "buyerPhone": zod.string(),
+  "shippingAddress": zod.string(),
+  "notes": zod.string().nullish(),
+  "status": zod.enum(['placed', 'confirmed', 'shipped', 'delivered', 'cancelled']),
+  "itemsTotal": zod.number(),
+  "shippingFee": zod.number(),
+  "total": zod.number(),
+  "placedAt": zod.coerce.date(),
+  "confirmedAt": zod.coerce.date().nullish(),
+  "shippedAt": zod.coerce.date().nullish(),
+  "deliveredAt": zod.coerce.date().nullish(),
+  "cancelledAt": zod.coerce.date().nullish(),
+  "trackingCode": zod.string().nullish(),
+  "itemsCount": zod.number().optional(),
+  "vendor": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "bio": zod.string().nullish(),
+  "address": zod.string(),
+  "phone": zod.string(),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "logoUrl": zod.string().nullish(),
+  "partsCount": zod.number().optional(),
+  "createdAt": zod.coerce.date()
+}),zod.null()]).optional()
+})
+export const ListOrdersResponse = zod.array(ListOrdersResponseItem)
+
+
+/**
+ * @summary Place a new order (one vendor per order)
+ */
+
+
+
+
+
+
+
+export const CreateOrderBody = zod.object({
+  "vendorId": zod.string(),
+  "buyerKind": zod.enum(['owner', 'center']),
+  "buyerName": zod.string().min(1),
+  "buyerPhone": zod.string().min(1),
+  "shippingAddress": zod.string().min(1),
+  "notes": zod.string().nullish(),
+  "items": zod.array(zod.object({
+  "partId": zod.string(),
+  "quantity": zod.number().min(1)
+})).min(1)
+})
+
+
+/**
+ * @summary Get an order with line items
+ */
+export const GetOrderParams = zod.object({
+  "orderId": zod.coerce.string()
+})
+
+export const GetOrderResponse = zod.object({
+  "id": zod.string(),
+  "vendorId": zod.string(),
+  "buyerKind": zod.enum(['owner', 'center']),
+  "buyerName": zod.string(),
+  "buyerPhone": zod.string(),
+  "shippingAddress": zod.string(),
+  "notes": zod.string().nullish(),
+  "status": zod.enum(['placed', 'confirmed', 'shipped', 'delivered', 'cancelled']),
+  "itemsTotal": zod.number(),
+  "shippingFee": zod.number(),
+  "total": zod.number(),
+  "placedAt": zod.coerce.date(),
+  "confirmedAt": zod.coerce.date().nullish(),
+  "shippedAt": zod.coerce.date().nullish(),
+  "deliveredAt": zod.coerce.date().nullish(),
+  "cancelledAt": zod.coerce.date().nullish(),
+  "trackingCode": zod.string().nullish(),
+  "itemsCount": zod.number().optional(),
+  "vendor": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "bio": zod.string().nullish(),
+  "address": zod.string(),
+  "phone": zod.string(),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "logoUrl": zod.string().nullish(),
+  "partsCount": zod.number().optional(),
+  "createdAt": zod.coerce.date()
+}),zod.null()]).optional()
+}).and(zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "orderId": zod.string(),
+  "partId": zod.string(),
+  "quantity": zod.number(),
+  "unitPrice": zod.number(),
+  "lineTotal": zod.number(),
+  "snapshot": zod.object({
+  "partId": zod.string(),
+  "name": zod.string(),
+  "sku": zod.string(),
+  "unitPrice": zod.number(),
+  "quantity": zod.number(),
+  "imageUrl": zod.string().nullish()
+})
+}))
+}))
+
+
+/**
+ * @summary Advance the order through its fulfillment lifecycle
+ */
+export const UpdateOrderStatusParams = zod.object({
+  "orderId": zod.coerce.string()
+})
+
+export const UpdateOrderStatusBody = zod.object({
+  "status": zod.enum(['placed', 'confirmed', 'shipped', 'delivered', 'cancelled']),
+  "trackingCode": zod.string().nullish()
+})
+
+export const UpdateOrderStatusResponse = zod.object({
+  "id": zod.string(),
+  "vendorId": zod.string(),
+  "buyerKind": zod.enum(['owner', 'center']),
+  "buyerName": zod.string(),
+  "buyerPhone": zod.string(),
+  "shippingAddress": zod.string(),
+  "notes": zod.string().nullish(),
+  "status": zod.enum(['placed', 'confirmed', 'shipped', 'delivered', 'cancelled']),
+  "itemsTotal": zod.number(),
+  "shippingFee": zod.number(),
+  "total": zod.number(),
+  "placedAt": zod.coerce.date(),
+  "confirmedAt": zod.coerce.date().nullish(),
+  "shippedAt": zod.coerce.date().nullish(),
+  "deliveredAt": zod.coerce.date().nullish(),
+  "cancelledAt": zod.coerce.date().nullish(),
+  "trackingCode": zod.string().nullish(),
+  "itemsCount": zod.number().optional(),
+  "vendor": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "bio": zod.string().nullish(),
+  "address": zod.string(),
+  "phone": zod.string(),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "logoUrl": zod.string().nullish(),
+  "partsCount": zod.number().optional(),
+  "createdAt": zod.coerce.date()
+}),zod.null()]).optional()
+})
+
+
+/**
+ * @summary Headline numbers for a vendor
+ */
+export const GetVendorDashboardParams = zod.object({
+  "vendorId": zod.coerce.string()
+})
+
+export const GetVendorDashboardResponse = zod.object({
+  "vendorId": zod.string(),
+  "partsCount": zod.number(),
+  "lowStockCount": zod.number(),
+  "openOrders": zod.number(),
+  "revenueThisMonth": zod.number(),
+  "statusBreakdown": zod.array(zod.object({
+  "status": zod.string(),
+  "count": zod.number()
+}))
+})
+
+
+/**
  * @summary Available service categories owners can book
  */
 export const ListServiceTypesResponseItem = zod.object({

@@ -299,6 +299,192 @@ export interface ServiceType {
   icon?: string | null;
 }
 
+export interface Vendor {
+  id: string;
+  name: string;
+  bio?: string | null;
+  address: string;
+  phone: string;
+  rating: number;
+  reviewsCount: number;
+  logoUrl?: string | null;
+  partsCount?: number;
+  createdAt: string;
+}
+
+export interface Part {
+  id: string;
+  vendorId: string;
+  name: string;
+  description: string;
+  category: string;
+  brand: string;
+  sku: string;
+  price: number;
+  stock: number;
+  imageUrl?: string | null;
+  compatibleBrands: string[];
+  active: boolean;
+  createdAt: string;
+  vendor?: Vendor | null;
+}
+
+export interface CreatePartInput {
+  /** @minLength 1 */
+  name: string;
+  /** @minLength 1 */
+  description: string;
+  /** @minLength 1 */
+  category: string;
+  /** @minLength 1 */
+  brand: string;
+  /** @minLength 1 */
+  sku: string;
+  /** @minimum 0 */
+  price: number;
+  /** @minimum 0 */
+  stock: number;
+  imageUrl?: string | null;
+  compatibleBrands?: string[];
+}
+
+export interface UpdatePartInput {
+  name?: string;
+  description?: string;
+  category?: string;
+  brand?: string;
+  sku?: string;
+  /** @minimum 0 */
+  price?: number;
+  /** @minimum 0 */
+  stock?: number;
+  imageUrl?: string | null;
+  compatibleBrands?: string[];
+  active?: boolean;
+}
+
+export interface CategoryCount {
+  category: string;
+  count: number;
+}
+
+export type OrderBuyerKind = typeof OrderBuyerKind[keyof typeof OrderBuyerKind];
+
+
+export const OrderBuyerKind = {
+  owner: 'owner',
+  center: 'center',
+} as const;
+
+export type OrderStatus = typeof OrderStatus[keyof typeof OrderStatus];
+
+
+export const OrderStatus = {
+  placed: 'placed',
+  confirmed: 'confirmed',
+  shipped: 'shipped',
+  delivered: 'delivered',
+  cancelled: 'cancelled',
+} as const;
+
+export interface Order {
+  id: string;
+  vendorId: string;
+  buyerKind: OrderBuyerKind;
+  buyerName: string;
+  buyerPhone: string;
+  shippingAddress: string;
+  notes?: string | null;
+  status: OrderStatus;
+  itemsTotal: number;
+  shippingFee: number;
+  total: number;
+  placedAt: string;
+  confirmedAt?: string | null;
+  shippedAt?: string | null;
+  deliveredAt?: string | null;
+  cancelledAt?: string | null;
+  trackingCode?: string | null;
+  itemsCount?: number;
+  vendor?: Vendor | null;
+}
+
+export type OrderLineSnapshot = {
+  partId: string;
+  name: string;
+  sku: string;
+  unitPrice: number;
+  quantity: number;
+  imageUrl?: string | null;
+};
+
+export interface OrderLine {
+  id: string;
+  orderId: string;
+  partId: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+  snapshot: OrderLineSnapshot;
+}
+
+export type OrderDetail = Order & {
+  items: OrderLine[];
+};
+
+export interface CreateOrderItemInput {
+  partId: string;
+  /** @minimum 1 */
+  quantity: number;
+}
+
+export type CreateOrderInputBuyerKind = typeof CreateOrderInputBuyerKind[keyof typeof CreateOrderInputBuyerKind];
+
+
+export const CreateOrderInputBuyerKind = {
+  owner: 'owner',
+  center: 'center',
+} as const;
+
+export interface CreateOrderInput {
+  vendorId: string;
+  buyerKind: CreateOrderInputBuyerKind;
+  /** @minLength 1 */
+  buyerName: string;
+  /** @minLength 1 */
+  buyerPhone: string;
+  /** @minLength 1 */
+  shippingAddress: string;
+  notes?: string | null;
+  /** @minItems 1 */
+  items: CreateOrderItemInput[];
+}
+
+export type UpdateOrderStatusInputStatus = typeof UpdateOrderStatusInputStatus[keyof typeof UpdateOrderStatusInputStatus];
+
+
+export const UpdateOrderStatusInputStatus = {
+  placed: 'placed',
+  confirmed: 'confirmed',
+  shipped: 'shipped',
+  delivered: 'delivered',
+  cancelled: 'cancelled',
+} as const;
+
+export interface UpdateOrderStatusInput {
+  status: UpdateOrderStatusInputStatus;
+  trackingCode?: string | null;
+}
+
+export interface VendorDashboard {
+  vendorId: string;
+  partsCount: number;
+  lowStockCount: number;
+  openOrders: number;
+  revenueThisMonth: number;
+  statusBreakdown: StatusCount[];
+}
+
 export type ListServiceCentersParams = {
 specialty?: string;
 };
@@ -341,4 +527,15 @@ export const ListActivityRole = {
   owner: 'owner',
   center: 'center',
 } as const;
+
+export type ListPartsParams = {
+category?: string;
+brand?: string;
+search?: string;
+};
+
+export type ListOrdersParams = {
+vendorId?: string;
+buyerName?: string;
+};
 
