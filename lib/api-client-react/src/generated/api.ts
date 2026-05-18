@@ -32,12 +32,14 @@ import type {
   CreateOrderInput,
   CreatePartInput,
   CreateVehicleInput,
+  DeleteConflict,
   DeliveryAgent,
   HealthStatus,
   Invoice,
   ListActivityParams,
   ListBookingsParams,
   ListDeliveryAgentsParams,
+  ListMechanicsParams,
   ListOrdersParams,
   ListPartsParams,
   ListServiceCentersParams,
@@ -52,6 +54,7 @@ import type {
   ServiceCenter,
   ServiceRecord,
   ServiceType,
+  UpdateActiveInput,
   UpdateBookingStatusInput,
   UpdateDeliveryAgentInput,
   UpdateOrderStatusInput,
@@ -809,20 +812,169 @@ export function useGetServiceCenter<TData = Awaited<ReturnType<typeof getService
 
 
 
-export const getListMechanicsUrl = () => {
+export const getUpdateServiceCenterUrl = (centerId: string,) => {
 
 
 
 
-  return `/api/mechanics`
+  return `/api/service-centers/${centerId}`
+}
+
+/**
+ * @summary Admin — suspend or reactivate a service center
+ */
+export const updateServiceCenter = async (centerId: string,
+    updateActiveInput: UpdateActiveInput, options?: RequestInit): Promise<ServiceCenter> => {
+
+  return customFetch<ServiceCenter>(getUpdateServiceCenterUrl(centerId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateActiveInput,)
+  }
+);}
+
+
+
+
+export const getUpdateServiceCenterMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateServiceCenter>>, TError,{centerId: string;data: BodyType<UpdateActiveInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateServiceCenter>>, TError,{centerId: string;data: BodyType<UpdateActiveInput>}, TContext> => {
+
+const mutationKey = ['updateServiceCenter'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateServiceCenter>>, {centerId: string;data: BodyType<UpdateActiveInput>}> = (props) => {
+          const {centerId,data} = props ?? {};
+
+          return  updateServiceCenter(centerId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateServiceCenterMutationResult = NonNullable<Awaited<ReturnType<typeof updateServiceCenter>>>
+    export type UpdateServiceCenterMutationBody = BodyType<UpdateActiveInput>
+    export type UpdateServiceCenterMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Admin — suspend or reactivate a service center
+ */
+export const useUpdateServiceCenter = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateServiceCenter>>, TError,{centerId: string;data: BodyType<UpdateActiveInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateServiceCenter>>,
+        TError,
+        {centerId: string;data: BodyType<UpdateActiveInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateServiceCenterMutationOptions(options));
+    }
+
+export const getDeleteServiceCenterUrl = (centerId: string,) => {
+
+
+
+
+  return `/api/service-centers/${centerId}`
+}
+
+/**
+ * @summary Admin — permanently delete a service center (only if it has no bookings)
+ */
+export const deleteServiceCenter = async (centerId: string, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteServiceCenterUrl(centerId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteServiceCenterMutationOptions = <TError = ErrorType<DeleteConflict>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteServiceCenter>>, TError,{centerId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteServiceCenter>>, TError,{centerId: string}, TContext> => {
+
+const mutationKey = ['deleteServiceCenter'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteServiceCenter>>, {centerId: string}> = (props) => {
+          const {centerId} = props ?? {};
+
+          return  deleteServiceCenter(centerId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteServiceCenterMutationResult = NonNullable<Awaited<ReturnType<typeof deleteServiceCenter>>>
+
+    export type DeleteServiceCenterMutationError = ErrorType<DeleteConflict>
+
+    /**
+ * @summary Admin — permanently delete a service center (only if it has no bookings)
+ */
+export const useDeleteServiceCenter = <TError = ErrorType<DeleteConflict>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteServiceCenter>>, TError,{centerId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteServiceCenter>>,
+        TError,
+        {centerId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteServiceCenterMutationOptions(options));
+    }
+
+export const getListMechanicsUrl = (params?: ListMechanicsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/mechanics?${stringifiedParams}` : `/api/mechanics`
 }
 
 /**
  * @summary List every mechanic across all service centers (used by admins)
  */
-export const listMechanics = async ( options?: RequestInit): Promise<Mechanic[]> => {
+export const listMechanics = async (params?: ListMechanicsParams, options?: RequestInit): Promise<Mechanic[]> => {
 
-  return customFetch<Mechanic[]>(getListMechanicsUrl(),
+  return customFetch<Mechanic[]>(getListMechanicsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -835,23 +987,23 @@ export const listMechanics = async ( options?: RequestInit): Promise<Mechanic[]>
 
 
 
-export const getListMechanicsQueryKey = () => {
+export const getListMechanicsQueryKey = (params?: ListMechanicsParams,) => {
     return [
-    `/api/mechanics`
+    `/api/mechanics`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListMechanicsQueryOptions = <TData = Awaited<ReturnType<typeof listMechanics>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMechanics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListMechanicsQueryOptions = <TData = Awaited<ReturnType<typeof listMechanics>>, TError = ErrorType<unknown>>(params?: ListMechanicsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMechanics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListMechanicsQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListMechanicsQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMechanics>>> = ({ signal }) => listMechanics({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMechanics>>> = ({ signal }) => listMechanics(params, { signal, ...requestOptions });
 
 
 
@@ -869,11 +1021,11 @@ export type ListMechanicsQueryError = ErrorType<unknown>
  */
 
 export function useListMechanics<TData = Awaited<ReturnType<typeof listMechanics>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMechanics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ListMechanicsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMechanics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListMechanicsQueryOptions(options)
+  const queryOptions = getListMechanicsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -1027,6 +1179,148 @@ export function useGetMechanic<TData = Awaited<ReturnType<typeof getMechanic>>, 
 
 
 
+
+export const getUpdateMechanicUrl = (mechanicId: string,) => {
+
+
+
+
+  return `/api/mechanics/${mechanicId}`
+}
+
+/**
+ * @summary Admin — suspend or reactivate a mechanic
+ */
+export const updateMechanic = async (mechanicId: string,
+    updateActiveInput: UpdateActiveInput, options?: RequestInit): Promise<Mechanic> => {
+
+  return customFetch<Mechanic>(getUpdateMechanicUrl(mechanicId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateActiveInput,)
+  }
+);}
+
+
+
+
+export const getUpdateMechanicMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMechanic>>, TError,{mechanicId: string;data: BodyType<UpdateActiveInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateMechanic>>, TError,{mechanicId: string;data: BodyType<UpdateActiveInput>}, TContext> => {
+
+const mutationKey = ['updateMechanic'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateMechanic>>, {mechanicId: string;data: BodyType<UpdateActiveInput>}> = (props) => {
+          const {mechanicId,data} = props ?? {};
+
+          return  updateMechanic(mechanicId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateMechanicMutationResult = NonNullable<Awaited<ReturnType<typeof updateMechanic>>>
+    export type UpdateMechanicMutationBody = BodyType<UpdateActiveInput>
+    export type UpdateMechanicMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Admin — suspend or reactivate a mechanic
+ */
+export const useUpdateMechanic = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMechanic>>, TError,{mechanicId: string;data: BodyType<UpdateActiveInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateMechanic>>,
+        TError,
+        {mechanicId: string;data: BodyType<UpdateActiveInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateMechanicMutationOptions(options));
+    }
+
+export const getDeleteMechanicUrl = (mechanicId: string,) => {
+
+
+
+
+  return `/api/mechanics/${mechanicId}`
+}
+
+/**
+ * @summary Admin — permanently delete a mechanic (only if not assigned to any booking)
+ */
+export const deleteMechanic = async (mechanicId: string, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteMechanicUrl(mechanicId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteMechanicMutationOptions = <TError = ErrorType<DeleteConflict>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMechanic>>, TError,{mechanicId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteMechanic>>, TError,{mechanicId: string}, TContext> => {
+
+const mutationKey = ['deleteMechanic'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteMechanic>>, {mechanicId: string}> = (props) => {
+          const {mechanicId} = props ?? {};
+
+          return  deleteMechanic(mechanicId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteMechanicMutationResult = NonNullable<Awaited<ReturnType<typeof deleteMechanic>>>
+
+    export type DeleteMechanicMutationError = ErrorType<DeleteConflict>
+
+    /**
+ * @summary Admin — permanently delete a mechanic (only if not assigned to any booking)
+ */
+export const useDeleteMechanic = <TError = ErrorType<DeleteConflict>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMechanic>>, TError,{mechanicId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteMechanic>>,
+        TError,
+        {mechanicId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteMechanicMutationOptions(options));
+    }
 
 export const getListBookingsUrl = (params?: ListBookingsParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -2079,6 +2373,148 @@ export function useGetVendor<TData = Awaited<ReturnType<typeof getVendor>>, TErr
 
 
 
+
+export const getUpdateVendorUrl = (vendorId: string,) => {
+
+
+
+
+  return `/api/vendors/${vendorId}`
+}
+
+/**
+ * @summary Admin — suspend or reactivate a vendor
+ */
+export const updateVendor = async (vendorId: string,
+    updateActiveInput: UpdateActiveInput, options?: RequestInit): Promise<Vendor> => {
+
+  return customFetch<Vendor>(getUpdateVendorUrl(vendorId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateActiveInput,)
+  }
+);}
+
+
+
+
+export const getUpdateVendorMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateVendor>>, TError,{vendorId: string;data: BodyType<UpdateActiveInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateVendor>>, TError,{vendorId: string;data: BodyType<UpdateActiveInput>}, TContext> => {
+
+const mutationKey = ['updateVendor'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateVendor>>, {vendorId: string;data: BodyType<UpdateActiveInput>}> = (props) => {
+          const {vendorId,data} = props ?? {};
+
+          return  updateVendor(vendorId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateVendorMutationResult = NonNullable<Awaited<ReturnType<typeof updateVendor>>>
+    export type UpdateVendorMutationBody = BodyType<UpdateActiveInput>
+    export type UpdateVendorMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Admin — suspend or reactivate a vendor
+ */
+export const useUpdateVendor = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateVendor>>, TError,{vendorId: string;data: BodyType<UpdateActiveInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateVendor>>,
+        TError,
+        {vendorId: string;data: BodyType<UpdateActiveInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateVendorMutationOptions(options));
+    }
+
+export const getDeleteVendorUrl = (vendorId: string,) => {
+
+
+
+
+  return `/api/vendors/${vendorId}`
+}
+
+/**
+ * @summary Admin — permanently delete a vendor (only if it has no orders or parts)
+ */
+export const deleteVendor = async (vendorId: string, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteVendorUrl(vendorId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteVendorMutationOptions = <TError = ErrorType<DeleteConflict>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteVendor>>, TError,{vendorId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteVendor>>, TError,{vendorId: string}, TContext> => {
+
+const mutationKey = ['deleteVendor'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteVendor>>, {vendorId: string}> = (props) => {
+          const {vendorId} = props ?? {};
+
+          return  deleteVendor(vendorId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteVendorMutationResult = NonNullable<Awaited<ReturnType<typeof deleteVendor>>>
+
+    export type DeleteVendorMutationError = ErrorType<DeleteConflict>
+
+    /**
+ * @summary Admin — permanently delete a vendor (only if it has no orders or parts)
+ */
+export const useDeleteVendor = <TError = ErrorType<DeleteConflict>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteVendor>>, TError,{vendorId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteVendor>>,
+        TError,
+        {vendorId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteVendorMutationOptions(options));
+    }
 
 export const getListPartsForVendorUrl = (vendorId: string,) => {
 
@@ -3299,6 +3735,76 @@ export const useUpdateDeliveryAgent = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateDeliveryAgentMutationOptions(options));
+    }
+
+export const getDeleteDeliveryAgentUrl = (agentId: string,) => {
+
+
+
+
+  return `/api/delivery-agents/${agentId}`
+}
+
+/**
+ * @summary Admin — permanently delete a delivery agent (only if not on any order)
+ */
+export const deleteDeliveryAgent = async (agentId: string, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteDeliveryAgentUrl(agentId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteDeliveryAgentMutationOptions = <TError = ErrorType<DeleteConflict>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDeliveryAgent>>, TError,{agentId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteDeliveryAgent>>, TError,{agentId: string}, TContext> => {
+
+const mutationKey = ['deleteDeliveryAgent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteDeliveryAgent>>, {agentId: string}> = (props) => {
+          const {agentId} = props ?? {};
+
+          return  deleteDeliveryAgent(agentId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteDeliveryAgentMutationResult = NonNullable<Awaited<ReturnType<typeof deleteDeliveryAgent>>>
+
+    export type DeleteDeliveryAgentMutationError = ErrorType<DeleteConflict>
+
+    /**
+ * @summary Admin — permanently delete a delivery agent (only if not on any order)
+ */
+export const useDeleteDeliveryAgent = <TError = ErrorType<DeleteConflict>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDeliveryAgent>>, TError,{agentId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteDeliveryAgent>>,
+        TError,
+        {agentId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteDeliveryAgentMutationOptions(options));
     }
 
 export const getListServiceTypesUrl = () => {

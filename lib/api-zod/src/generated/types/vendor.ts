@@ -18,5 +18,6 @@ export interface Vendor {
   reviewsCount: number;
   logoUrl?: string | null;
   partsCount?: number;
+  active?: boolean;
   createdAt: Date;
 }

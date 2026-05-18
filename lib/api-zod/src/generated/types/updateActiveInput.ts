@@ -6,7 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListServiceCentersParams = {
-specialty?: string;
-includeInactive?: boolean;
-};
+export interface UpdateActiveInput {
+  active: boolean;
+}

@@ -2,12 +2,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   useListDeliveryAgents,
   useUpdateDeliveryAgent,
+  useDeleteDeliveryAgent,
 } from "@workspace/api-client-react";
 import { getListDeliveryAgentsQueryKey, getGetDeliveryAgentQueryKey } from "@/lib/queryKeys";
+import { describeMutationError } from "@/lib/adminErrors";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Truck, Phone, MapPin, Star, ToggleLeft, ToggleRight } from "lucide-react";
+import { AdminEntityActions } from "@/components/admin/AdminEntityActions";
+import { Truck, Phone, MapPin, Star } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AdminDeliveryAgents() {
@@ -16,25 +18,41 @@ export default function AdminDeliveryAgents() {
     query: { queryKey: getListDeliveryAgentsQueryKey() },
   });
   const update = useUpdateDeliveryAgent();
+  const remove = useDeleteDeliveryAgent();
+
+  const invalidate = (agentId: string) =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: getListDeliveryAgentsQueryKey() }),
+      queryClient.invalidateQueries({ queryKey: getGetDeliveryAgentQueryKey(agentId) }),
+    ]);
 
   const toggleActive = async (agentId: string, nextActive: boolean) => {
     try {
       await update.mutateAsync({ agentId, data: { active: nextActive } });
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: getListDeliveryAgentsQueryKey() }),
-        queryClient.invalidateQueries({ queryKey: getGetDeliveryAgentQueryKey(agentId) }),
-      ]);
-      toast.success(nextActive ? "Agent reactivated." : "Agent deactivated.");
+      await invalidate(agentId);
+      toast.success(nextActive ? "Agent reactivated." : "Agent suspended.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update agent.");
+      toast.error(describeMutationError(err, "Failed to update agent."));
     }
   };
+
+  const deleteAgent = async (agentId: string, name: string) => {
+    try {
+      await remove.mutateAsync({ agentId });
+      await invalidate(agentId);
+      toast.success(`${name} deleted.`);
+    } catch (err) {
+      toast.error(describeMutationError(err, "Failed to delete agent."));
+    }
+  };
+
+  const busy = update.isPending || remove.isPending;
 
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-500">
       <PageHeader
         title="Delivery Agents"
-        description={`${agents?.length ?? 0} couriers registered. Deactivated agents are hidden from vendors when picking a courier.`}
+        description={`${agents?.length ?? 0} couriers registered. Suspended agents are hidden from vendors when picking a courier.`}
       />
 
       {isLoading && <p>Loading...</p>}
@@ -51,7 +69,7 @@ export default function AdminDeliveryAgents() {
                   <p className="font-semibold truncate">{a.name}</p>
                   {!a.active && (
                     <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-destructive/10 text-destructive">
-                      Inactive
+                      Suspended
                     </span>
                   )}
                 </div>
@@ -69,23 +87,13 @@ export default function AdminDeliveryAgents() {
                   <span>{a.completedDeliveries} deliveries</span>
                 </div>
               </div>
-              <Button
-                size="sm"
-                variant={a.active ? "outline" : "default"}
-                onClick={() => toggleActive(a.id, !a.active)}
-                disabled={update.isPending}
-                className="gap-1.5 flex-shrink-0"
-              >
-                {a.active ? (
-                  <>
-                    <ToggleRight className="h-4 w-4" /> Deactivate
-                  </>
-                ) : (
-                  <>
-                    <ToggleLeft className="h-4 w-4" /> Reactivate
-                  </>
-                )}
-              </Button>
+              <AdminEntityActions
+                entityLabel="Delivery Agent"
+                active={a.active}
+                busy={busy}
+                onToggleActive={(next) => toggleActive(a.id, next)}
+                onDelete={() => deleteAgent(a.id, a.name)}
+              />
             </CardContent>
           </Card>
         ))}

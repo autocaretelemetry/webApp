@@ -80,6 +80,7 @@ export interface ServiceCenter {
   openJobs: number;
   imageUrl?: string | null;
   bio?: string | null;
+  active?: boolean;
 }
 
 export interface Mechanic {
@@ -92,6 +93,7 @@ export interface Mechanic {
   rating: number;
   completedJobs: number;
   avatarUrl?: string | null;
+  active?: boolean;
 }
 
 export type BookingStatus = typeof BookingStatus[keyof typeof BookingStatus];
@@ -313,6 +315,7 @@ export interface Vendor {
   reviewsCount: number;
   logoUrl?: string | null;
   partsCount?: number;
+  active?: boolean;
   createdAt: string;
 }
 
@@ -518,6 +521,23 @@ export interface UpdateOrderStatusInput {
   deliveryAgentId?: string | null;
 }
 
+export interface UpdateActiveInput {
+  active: boolean;
+}
+
+export type DeleteConflictReason = typeof DeleteConflictReason[keyof typeof DeleteConflictReason];
+
+
+export const DeleteConflictReason = {
+  has_dependents: 'has_dependents',
+} as const;
+
+export interface DeleteConflict {
+  error: string;
+  reason: DeleteConflictReason;
+  details?: string;
+}
+
 export interface UpdateDeliveryAgentInput {
   active?: boolean;
   bio?: string | null;
@@ -576,6 +596,11 @@ export interface VendorDashboard {
 
 export type ListServiceCentersParams = {
 specialty?: string;
+includeInactive?: boolean;
+};
+
+export type ListMechanicsParams = {
+includeInactive?: boolean;
 };
 
 export type ListBookingsParams = {
@@ -620,6 +645,7 @@ export const ListActivityRole = {
 export type ListVendorsParams = {
 nearCity?: string;
 nearRegion?: string;
+includeInactive?: boolean;
 };
 
 export type ListPartsParams = {

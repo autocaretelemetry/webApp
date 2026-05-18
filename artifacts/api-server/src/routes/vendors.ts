@@ -1,7 +1,13 @@
 import { Router, type IRouter } from "express";
-import { eq, count, inArray } from "drizzle-orm";
-import { db, vendorsTable, partsTable } from "@workspace/db";
-import { GetVendorParams, ListVendorsQueryParams } from "@workspace/api-zod";
+import { eq, count, inArray, and } from "drizzle-orm";
+import { db, vendorsTable, partsTable, ordersTable } from "@workspace/db";
+import {
+  GetVendorParams,
+  ListVendorsQueryParams,
+  UpdateVendorBody,
+  UpdateVendorParams,
+  DeleteVendorParams,
+} from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
@@ -25,7 +31,14 @@ router.get("/vendors", async (req, res): Promise<void> => {
   }
   const nearCity = q.data.nearCity?.trim().toLowerCase() ?? "";
   const nearRegion = q.data.nearRegion?.trim().toLowerCase() ?? "";
-  const rows = await db.select().from(vendorsTable).orderBy(vendorsTable.name);
+  // Buyers should never see suspended vendors; admin pages opt in via
+  // `includeInactive=true` so the directory can show every record.
+  const includeInactive = req.query.includeInactive === "true";
+  const rows = await db
+    .select()
+    .from(vendorsTable)
+    .where(includeInactive ? undefined : eq(vendorsTable.active, true))
+    .orderBy(vendorsTable.name);
   // Proximity sort: same city first, then same region, then everywhere else; stable by name within each tier.
   const tiered = rows
     .map((v, idx) => {
@@ -55,6 +68,65 @@ router.get("/vendors/:vendorId", async (req, res): Promise<void> => {
   }
   const [hydrated] = await hydrate([row]);
   res.json(hydrated);
+});
+
+router.patch("/vendors/:vendorId", async (req, res): Promise<void> => {
+  const params = UpdateVendorParams.safeParse(req.params);
+  const body = UpdateVendorBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res
+      .status(400)
+      .json({ error: (params.success ? body : params).error!.message });
+    return;
+  }
+  const [row] = await db
+    .update(vendorsTable)
+    .set({ active: body.data.active })
+    .where(eq(vendorsTable.id, params.data.vendorId))
+    .returning();
+  if (!row) {
+    res.status(404).json({ error: "Vendor not found" });
+    return;
+  }
+  const [hydrated] = await hydrate([row]);
+  res.json(hydrated);
+});
+
+router.delete("/vendors/:vendorId", async (req, res): Promise<void> => {
+  const params = DeleteVendorParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  // Block hard-delete if the vendor has any parts or orders — those are the
+  // historical records buyers and the platform rely on. Admin should suspend.
+  const [partsRow] = await db
+    .select({ n: count() })
+    .from(partsTable)
+    .where(eq(partsTable.vendorId, params.data.vendorId));
+  const [ordersRow] = await db
+    .select({ n: count() })
+    .from(ordersTable)
+    .where(eq(ordersTable.vendorId, params.data.vendorId));
+  const partsN = Number(partsRow?.n ?? 0);
+  const ordersN = Number(ordersRow?.n ?? 0);
+  if (partsN > 0 || ordersN > 0) {
+    res.status(409).json({
+      error: "Vendor has dependent records",
+      reason: "has_dependents",
+      details: `${partsN} part(s) and ${ordersN} order(s) reference this vendor. Suspend instead.`,
+    });
+    return;
+  }
+  const deleted = await db
+    .delete(vendorsTable)
+    .where(eq(vendorsTable.id, params.data.vendorId))
+    .returning({ id: vendorsTable.id });
+  if (deleted.length === 0) {
+    res.status(404).json({ error: "Vendor not found" });
+    return;
+  }
+  res.status(204).end();
 });
 
 export default router;

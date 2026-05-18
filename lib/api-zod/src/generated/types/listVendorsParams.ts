@@ -9,4 +9,5 @@
 export type ListVendorsParams = {
 nearCity?: string;
 nearRegion?: string;
+includeInactive?: boolean;
 };

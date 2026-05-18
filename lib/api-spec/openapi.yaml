@@ -136,6 +136,7 @@ paths:
       summary: Browse service centers
       parameters:
         - { name: specialty, in: query, required: false, schema: { type: string } }
+        - { name: includeInactive, in: query, required: false, schema: { type: boolean } }
       responses:
         "200":
           description: OK
@@ -157,12 +158,44 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ServiceCenter" }
+    patch:
+      operationId: updateServiceCenter
+      tags: [serviceCenters]
+      summary: Admin — suspend or reactivate a service center
+      parameters:
+        - { name: centerId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateActiveInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServiceCenter" }
+    delete:
+      operationId: deleteServiceCenter
+      tags: [serviceCenters]
+      summary: Admin — permanently delete a service center (only if it has no bookings)
+      parameters:
+        - { name: centerId, in: path, required: true, schema: { type: string } }
+      responses:
+        "204": { description: Deleted }
+        "409":
+          description: Conflict — center has dependent records, suspend instead
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeleteConflict" }
 
   /mechanics:
     get:
       operationId: listMechanics
       tags: [mechanics]
       summary: List every mechanic across all service centers (used by admins)
+      parameters:
+        - { name: includeInactive, in: query, required: false, schema: { type: boolean } }
       responses:
         "200":
           description: OK
@@ -199,6 +232,36 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Mechanic" }
+    patch:
+      operationId: updateMechanic
+      tags: [mechanics]
+      summary: Admin — suspend or reactivate a mechanic
+      parameters:
+        - { name: mechanicId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateActiveInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Mechanic" }
+    delete:
+      operationId: deleteMechanic
+      tags: [mechanics]
+      summary: Admin — permanently delete a mechanic (only if not assigned to any booking)
+      parameters:
+        - { name: mechanicId, in: path, required: true, schema: { type: string } }
+      responses:
+        "204": { description: Deleted }
+        "409":
+          description: Conflict — mechanic has dependent records, suspend instead
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeleteConflict" }
 
   /bookings:
     get:
@@ -404,6 +467,7 @@ paths:
       parameters:
         - { name: nearCity, in: query, required: false, schema: { type: string } }
         - { name: nearRegion, in: query, required: false, schema: { type: string } }
+        - { name: includeInactive, in: query, required: false, schema: { type: boolean } }
       responses:
         "200":
           description: OK
@@ -426,6 +490,36 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Vendor" }
+    patch:
+      operationId: updateVendor
+      tags: [vendors]
+      summary: Admin — suspend or reactivate a vendor
+      parameters:
+        - { name: vendorId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateActiveInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Vendor" }
+    delete:
+      operationId: deleteVendor
+      tags: [vendors]
+      summary: Admin — permanently delete a vendor (only if it has no orders or parts)
+      parameters:
+        - { name: vendorId, in: path, required: true, schema: { type: string } }
+      responses:
+        "204": { description: Deleted }
+        "409":
+          description: Conflict — vendor has dependent records, suspend instead
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeleteConflict" }
 
   /vendors/{vendorId}/parts:
     get:
@@ -686,6 +780,19 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/DeliveryAgent" }
+    delete:
+      operationId: deleteDeliveryAgent
+      tags: [delivery]
+      summary: Admin — permanently delete a delivery agent (only if not on any order)
+      parameters:
+        - { name: agentId, in: path, required: true, schema: { type: string } }
+      responses:
+        "204": { description: Deleted }
+        "409":
+          description: Conflict — agent has dependent records, suspend instead
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeleteConflict" }
 
   /catalog/service-types:
     get:
@@ -780,6 +887,7 @@ components:
         openJobs: { type: integer }
         imageUrl: { type: string, nullable: true }
         bio: { type: string, nullable: true }
+        active: { type: boolean }
 
     Mechanic:
       type: object
@@ -796,6 +904,7 @@ components:
         rating: { type: number }
         completedJobs: { type: integer }
         avatarUrl: { type: string, nullable: true }
+        active: { type: boolean }
 
     Booking:
       type: object
@@ -1014,6 +1123,7 @@ components:
         reviewsCount: { type: integer }
         logoUrl: { type: string, nullable: true }
         partsCount: { type: integer }
+        active: { type: boolean }
         createdAt: { type: string, format: date-time }
 
     Part:
@@ -1226,6 +1336,20 @@ components:
         completedDeliveries: { type: integer }
         active: { type: boolean }
         createdAt: { type: string, format: date-time }
+
+    UpdateActiveInput:
+      type: object
+      required: [active]
+      properties:
+        active: { type: boolean }
+
+    DeleteConflict:
+      type: object
+      required: [error, reason]
+      properties:
+        error: { type: string }
+        reason: { type: string, enum: [has_dependents] }
+        details: { type: string }
 
     UpdateDeliveryAgentInput:
       type: object

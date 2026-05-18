@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, real, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, real, integer, timestamp, boolean } from "drizzle-orm/pg-core";
 
 export const vendorsTable = pgTable("vendors", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -11,6 +11,7 @@ export const vendorsTable = pgTable("vendors", {
   rating: real("rating").notNull().default(0),
   reviewsCount: integer("reviews_count").notNull().default(0),
   logoUrl: text("logo_url"),
+  active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

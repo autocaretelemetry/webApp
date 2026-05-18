@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, real, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, integer, real, timestamp, boolean } from "drizzle-orm/pg-core";
 
 export const serviceCentersTable = pgTable("service_centers", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -12,6 +12,7 @@ export const serviceCentersTable = pgTable("service_centers", {
   reviewsCount: integer("reviews_count").notNull().default(0),
   imageUrl: text("image_url"),
   bio: text("bio"),
+  active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

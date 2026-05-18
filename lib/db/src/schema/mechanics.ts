@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, real, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, integer, real, timestamp, boolean } from "drizzle-orm/pg-core";
 import { serviceCentersTable } from "./serviceCenters";
 
 export const mechanicsTable = pgTable("mechanics", {
@@ -13,6 +13,7 @@ export const mechanicsTable = pgTable("mechanics", {
   rating: real("rating").notNull().default(0),
   completedJobs: integer("completed_jobs").notNull().default(0),
   avatarUrl: text("avatar_url"),
+  active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

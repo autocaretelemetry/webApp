@@ -16,4 +16,5 @@ export interface Mechanic {
   rating: number;
   completedJobs: number;
   avatarUrl?: string | null;
+  active?: boolean;
 }

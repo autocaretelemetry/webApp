@@ -7,6 +7,7 @@ import {
   RegisterDeliveryAgentBody,
   UpdateDeliveryAgentBody,
   UpdateDeliveryAgentParams,
+  DeleteDeliveryAgentParams,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -96,6 +97,25 @@ router.patch("/delivery-agents/:agentId", async (req, res): Promise<void> => {
     return;
   }
   res.json(row);
+});
+
+router.delete("/delivery-agents/:agentId", async (req, res): Promise<void> => {
+  const params = DeleteDeliveryAgentParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  // orders.deliveryAgentId is ON DELETE SET NULL — safe to hard-delete; any
+  // orders the agent handled keep their record with a null courier.
+  const deleted = await db
+    .delete(deliveryAgentsTable)
+    .where(eq(deliveryAgentsTable.id, params.data.agentId))
+    .returning({ id: deliveryAgentsTable.id });
+  if (deleted.length === 0) {
+    res.status(404).json({ error: "Delivery agent not found" });
+    return;
+  }
+  res.status(204).end();
 });
 
 export default router;

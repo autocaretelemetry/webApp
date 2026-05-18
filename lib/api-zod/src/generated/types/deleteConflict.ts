@@ -5,8 +5,10 @@
  * AutoCare API — vehicle owners book services, service centers fulfill them.
  * OpenAPI spec version: 0.1.0
  */
+import type { DeleteConflictReason } from './deleteConflictReason';
 
-export type ListServiceCentersParams = {
-specialty?: string;
-includeInactive?: boolean;
-};
+export interface DeleteConflict {
+  error: string;
+  reason: DeleteConflictReason;
+  details?: string;
+}

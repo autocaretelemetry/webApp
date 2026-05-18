@@ -19,4 +19,5 @@ export interface ServiceCenter {
   openJobs: number;
   imageUrl?: string | null;
   bio?: string | null;
+  active?: boolean;
 }

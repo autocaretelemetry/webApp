@@ -179,7 +179,8 @@ export const GetVehicleRemindersResponse = zod.array(GetVehicleRemindersResponse
  * @summary Browse service centers
  */
 export const ListServiceCentersQueryParams = zod.object({
-  "specialty": zod.coerce.string().optional()
+  "specialty": zod.coerce.string().optional(),
+  "includeInactive": zod.coerce.boolean().optional()
 })
 
 export const ListServiceCentersResponseItem = zod.object({
@@ -194,7 +195,8 @@ export const ListServiceCentersResponseItem = zod.object({
   "reviewsCount": zod.number(),
   "openJobs": zod.number(),
   "imageUrl": zod.string().nullish(),
-  "bio": zod.string().nullish()
+  "bio": zod.string().nullish(),
+  "active": zod.boolean().optional()
 })
 export const ListServiceCentersResponse = zod.array(ListServiceCentersResponseItem)
 
@@ -215,13 +217,54 @@ export const GetServiceCenterResponse = zod.object({
   "reviewsCount": zod.number(),
   "openJobs": zod.number(),
   "imageUrl": zod.string().nullish(),
-  "bio": zod.string().nullish()
+  "bio": zod.string().nullish(),
+  "active": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Admin — suspend or reactivate a service center
+ */
+export const UpdateServiceCenterParams = zod.object({
+  "centerId": zod.coerce.string()
+})
+
+export const UpdateServiceCenterBody = zod.object({
+  "active": zod.boolean()
+})
+
+export const UpdateServiceCenterResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "address": zod.string(),
+  "city": zod.string().optional(),
+  "region": zod.string().optional(),
+  "phone": zod.string(),
+  "specialties": zod.array(zod.string()),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "openJobs": zod.number(),
+  "imageUrl": zod.string().nullish(),
+  "bio": zod.string().nullish(),
+  "active": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Admin — permanently delete a service center (only if it has no bookings)
+ */
+export const DeleteServiceCenterParams = zod.object({
+  "centerId": zod.coerce.string()
 })
 
 
 /**
  * @summary List every mechanic across all service centers (used by admins)
  */
+export const ListMechanicsQueryParams = zod.object({
+  "includeInactive": zod.coerce.boolean().optional()
+})
+
 export const ListMechanicsResponseItem = zod.object({
   "id": zod.string(),
   "serviceCenterId": zod.string(),
@@ -231,7 +274,8 @@ export const ListMechanicsResponseItem = zod.object({
   "certifications": zod.array(zod.string()).optional(),
   "rating": zod.number(),
   "completedJobs": zod.number(),
-  "avatarUrl": zod.string().nullish()
+  "avatarUrl": zod.string().nullish(),
+  "active": zod.boolean().optional()
 })
 export const ListMechanicsResponse = zod.array(ListMechanicsResponseItem)
 
@@ -249,7 +293,8 @@ export const ListMechanicsForCenterResponseItem = zod.object({
   "certifications": zod.array(zod.string()).optional(),
   "rating": zod.number(),
   "completedJobs": zod.number(),
-  "avatarUrl": zod.string().nullish()
+  "avatarUrl": zod.string().nullish(),
+  "active": zod.boolean().optional()
 })
 export const ListMechanicsForCenterResponse = zod.array(ListMechanicsForCenterResponseItem)
 
@@ -267,7 +312,41 @@ export const GetMechanicResponse = zod.object({
   "certifications": zod.array(zod.string()).optional(),
   "rating": zod.number(),
   "completedJobs": zod.number(),
-  "avatarUrl": zod.string().nullish()
+  "avatarUrl": zod.string().nullish(),
+  "active": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Admin — suspend or reactivate a mechanic
+ */
+export const UpdateMechanicParams = zod.object({
+  "mechanicId": zod.coerce.string()
+})
+
+export const UpdateMechanicBody = zod.object({
+  "active": zod.boolean()
+})
+
+export const UpdateMechanicResponse = zod.object({
+  "id": zod.string(),
+  "serviceCenterId": zod.string(),
+  "name": zod.string(),
+  "yearsExperience": zod.number(),
+  "specialization": zod.string(),
+  "certifications": zod.array(zod.string()).optional(),
+  "rating": zod.number(),
+  "completedJobs": zod.number(),
+  "avatarUrl": zod.string().nullish(),
+  "active": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Admin — permanently delete a mechanic (only if not assigned to any booking)
+ */
+export const DeleteMechanicParams = zod.object({
+  "mechanicId": zod.coerce.string()
 })
 
 
@@ -320,7 +399,8 @@ export const ListBookingsResponseItem = zod.object({
   "reviewsCount": zod.number(),
   "openJobs": zod.number(),
   "imageUrl": zod.string().nullish(),
-  "bio": zod.string().nullish()
+  "bio": zod.string().nullish(),
+  "active": zod.boolean().optional()
 }).optional(),
   "mechanic": zod.union([zod.object({
   "id": zod.string(),
@@ -331,7 +411,8 @@ export const ListBookingsResponseItem = zod.object({
   "certifications": zod.array(zod.string()).optional(),
   "rating": zod.number(),
   "completedJobs": zod.number(),
-  "avatarUrl": zod.string().nullish()
+  "avatarUrl": zod.string().nullish(),
+  "active": zod.boolean().optional()
 }),zod.null()]).optional(),
   "invoiceId": zod.string().nullish()
 })
@@ -395,7 +476,8 @@ export const GetBookingResponse = zod.object({
   "reviewsCount": zod.number(),
   "openJobs": zod.number(),
   "imageUrl": zod.string().nullish(),
-  "bio": zod.string().nullish()
+  "bio": zod.string().nullish(),
+  "active": zod.boolean().optional()
 }).optional(),
   "mechanic": zod.union([zod.object({
   "id": zod.string(),
@@ -406,7 +488,8 @@ export const GetBookingResponse = zod.object({
   "certifications": zod.array(zod.string()).optional(),
   "rating": zod.number(),
   "completedJobs": zod.number(),
-  "avatarUrl": zod.string().nullish()
+  "avatarUrl": zod.string().nullish(),
+  "active": zod.boolean().optional()
 }),zod.null()]).optional(),
   "invoiceId": zod.string().nullish()
 }).and(zod.object({
@@ -491,7 +574,8 @@ export const UpdateBookingStatusResponse = zod.object({
   "reviewsCount": zod.number(),
   "openJobs": zod.number(),
   "imageUrl": zod.string().nullish(),
-  "bio": zod.string().nullish()
+  "bio": zod.string().nullish(),
+  "active": zod.boolean().optional()
 }).optional(),
   "mechanic": zod.union([zod.object({
   "id": zod.string(),
@@ -502,7 +586,8 @@ export const UpdateBookingStatusResponse = zod.object({
   "certifications": zod.array(zod.string()).optional(),
   "rating": zod.number(),
   "completedJobs": zod.number(),
-  "avatarUrl": zod.string().nullish()
+  "avatarUrl": zod.string().nullish(),
+  "active": zod.boolean().optional()
 }),zod.null()]).optional(),
   "invoiceId": zod.string().nullish()
 })
@@ -560,7 +645,8 @@ export const AssignMechanicResponse = zod.object({
   "reviewsCount": zod.number(),
   "openJobs": zod.number(),
   "imageUrl": zod.string().nullish(),
-  "bio": zod.string().nullish()
+  "bio": zod.string().nullish(),
+  "active": zod.boolean().optional()
 }).optional(),
   "mechanic": zod.union([zod.object({
   "id": zod.string(),
@@ -571,7 +657,8 @@ export const AssignMechanicResponse = zod.object({
   "certifications": zod.array(zod.string()).optional(),
   "rating": zod.number(),
   "completedJobs": zod.number(),
-  "avatarUrl": zod.string().nullish()
+  "avatarUrl": zod.string().nullish(),
+  "active": zod.boolean().optional()
 }),zod.null()]).optional(),
   "invoiceId": zod.string().nullish()
 })
@@ -722,7 +809,8 @@ export const GetCenterDashboardResponse = zod.object({
   "certifications": zod.array(zod.string()).optional(),
   "rating": zod.number(),
   "completedJobs": zod.number(),
-  "avatarUrl": zod.string().nullish()
+  "avatarUrl": zod.string().nullish(),
+  "active": zod.boolean().optional()
 })),
   "statusBreakdown": zod.array(zod.object({
   "status": zod.string(),
@@ -757,7 +845,8 @@ export const ListActivityResponse = zod.array(ListActivityResponseItem)
  */
 export const ListVendorsQueryParams = zod.object({
   "nearCity": zod.coerce.string().optional(),
-  "nearRegion": zod.coerce.string().optional()
+  "nearRegion": zod.coerce.string().optional(),
+  "includeInactive": zod.coerce.boolean().optional()
 })
 
 export const ListVendorsResponseItem = zod.object({
@@ -772,6 +861,7 @@ export const ListVendorsResponseItem = zod.object({
   "reviewsCount": zod.number(),
   "logoUrl": zod.string().nullish(),
   "partsCount": zod.number().optional(),
+  "active": zod.boolean().optional(),
   "createdAt": zod.coerce.date()
 })
 export const ListVendorsResponse = zod.array(ListVendorsResponseItem)
@@ -796,7 +886,44 @@ export const GetVendorResponse = zod.object({
   "reviewsCount": zod.number(),
   "logoUrl": zod.string().nullish(),
   "partsCount": zod.number().optional(),
+  "active": zod.boolean().optional(),
   "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Admin — suspend or reactivate a vendor
+ */
+export const UpdateVendorParams = zod.object({
+  "vendorId": zod.coerce.string()
+})
+
+export const UpdateVendorBody = zod.object({
+  "active": zod.boolean()
+})
+
+export const UpdateVendorResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "bio": zod.string().nullish(),
+  "address": zod.string(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "phone": zod.string(),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "logoUrl": zod.string().nullish(),
+  "partsCount": zod.number().optional(),
+  "active": zod.boolean().optional(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Admin — permanently delete a vendor (only if it has no orders or parts)
+ */
+export const DeleteVendorParams = zod.object({
+  "vendorId": zod.coerce.string()
 })
 
 
@@ -833,6 +960,7 @@ export const ListPartsForVendorResponseItem = zod.object({
   "reviewsCount": zod.number(),
   "logoUrl": zod.string().nullish(),
   "partsCount": zod.number().optional(),
+  "active": zod.boolean().optional(),
   "createdAt": zod.coerce.date()
 }),zod.null()]).optional()
 })
@@ -905,6 +1033,7 @@ export const ListPartsResponseItem = zod.object({
   "reviewsCount": zod.number(),
   "logoUrl": zod.string().nullish(),
   "partsCount": zod.number().optional(),
+  "active": zod.boolean().optional(),
   "createdAt": zod.coerce.date()
 }),zod.null()]).optional()
 })
@@ -944,6 +1073,7 @@ export const GetPartResponse = zod.object({
   "reviewsCount": zod.number(),
   "logoUrl": zod.string().nullish(),
   "partsCount": zod.number().optional(),
+  "active": zod.boolean().optional(),
   "createdAt": zod.coerce.date()
 }),zod.null()]).optional()
 })
@@ -1001,6 +1131,7 @@ export const UpdatePartResponse = zod.object({
   "reviewsCount": zod.number(),
   "logoUrl": zod.string().nullish(),
   "partsCount": zod.number().optional(),
+  "active": zod.boolean().optional(),
   "createdAt": zod.coerce.date()
 }),zod.null()]).optional()
 })
@@ -1067,6 +1198,7 @@ export const ListOrdersResponseItem = zod.object({
   "reviewsCount": zod.number(),
   "logoUrl": zod.string().nullish(),
   "partsCount": zod.number().optional(),
+  "active": zod.boolean().optional(),
   "createdAt": zod.coerce.date()
 }),zod.null()]).optional(),
   "mechanic": zod.union([zod.object({
@@ -1078,7 +1210,8 @@ export const ListOrdersResponseItem = zod.object({
   "certifications": zod.array(zod.string()).optional(),
   "rating": zod.number(),
   "completedJobs": zod.number(),
-  "avatarUrl": zod.string().nullish()
+  "avatarUrl": zod.string().nullish(),
+  "active": zod.boolean().optional()
 }),zod.null()]).optional(),
   "deliveryAgent": zod.union([zod.object({
   "id": zod.string(),
@@ -1177,6 +1310,7 @@ export const GetOrderResponse = zod.object({
   "reviewsCount": zod.number(),
   "logoUrl": zod.string().nullish(),
   "partsCount": zod.number().optional(),
+  "active": zod.boolean().optional(),
   "createdAt": zod.coerce.date()
 }),zod.null()]).optional(),
   "mechanic": zod.union([zod.object({
@@ -1188,7 +1322,8 @@ export const GetOrderResponse = zod.object({
   "certifications": zod.array(zod.string()).optional(),
   "rating": zod.number(),
   "completedJobs": zod.number(),
-  "avatarUrl": zod.string().nullish()
+  "avatarUrl": zod.string().nullish(),
+  "active": zod.boolean().optional()
 }),zod.null()]).optional(),
   "deliveryAgent": zod.union([zod.object({
   "id": zod.string(),
@@ -1281,6 +1416,7 @@ export const UpdateOrderStatusResponse = zod.object({
   "reviewsCount": zod.number(),
   "logoUrl": zod.string().nullish(),
   "partsCount": zod.number().optional(),
+  "active": zod.boolean().optional(),
   "createdAt": zod.coerce.date()
 }),zod.null()]).optional(),
   "mechanic": zod.union([zod.object({
@@ -1292,7 +1428,8 @@ export const UpdateOrderStatusResponse = zod.object({
   "certifications": zod.array(zod.string()).optional(),
   "rating": zod.number(),
   "completedJobs": zod.number(),
-  "avatarUrl": zod.string().nullish()
+  "avatarUrl": zod.string().nullish(),
+  "active": zod.boolean().optional()
 }),zod.null()]).optional(),
   "deliveryAgent": zod.union([zod.object({
   "id": zod.string(),
@@ -1405,7 +1542,8 @@ export const GetAdminOverviewResponse = zod.object({
   "reviewsCount": zod.number(),
   "openJobs": zod.number(),
   "imageUrl": zod.string().nullish(),
-  "bio": zod.string().nullish()
+  "bio": zod.string().nullish(),
+  "active": zod.boolean().optional()
 }).optional(),
   "mechanic": zod.union([zod.object({
   "id": zod.string(),
@@ -1416,7 +1554,8 @@ export const GetAdminOverviewResponse = zod.object({
   "certifications": zod.array(zod.string()).optional(),
   "rating": zod.number(),
   "completedJobs": zod.number(),
-  "avatarUrl": zod.string().nullish()
+  "avatarUrl": zod.string().nullish(),
+  "active": zod.boolean().optional()
 }),zod.null()]).optional(),
   "invoiceId": zod.string().nullish()
 })),
@@ -1459,6 +1598,7 @@ export const GetAdminOverviewResponse = zod.object({
   "reviewsCount": zod.number(),
   "logoUrl": zod.string().nullish(),
   "partsCount": zod.number().optional(),
+  "active": zod.boolean().optional(),
   "createdAt": zod.coerce.date()
 }),zod.null()]).optional(),
   "mechanic": zod.union([zod.object({
@@ -1470,7 +1610,8 @@ export const GetAdminOverviewResponse = zod.object({
   "certifications": zod.array(zod.string()).optional(),
   "rating": zod.number(),
   "completedJobs": zod.number(),
-  "avatarUrl": zod.string().nullish()
+  "avatarUrl": zod.string().nullish(),
+  "active": zod.boolean().optional()
 }),zod.null()]).optional(),
   "deliveryAgent": zod.union([zod.object({
   "id": zod.string(),
@@ -1587,6 +1728,14 @@ export const UpdateDeliveryAgentResponse = zod.object({
   "completedDeliveries": zod.number(),
   "active": zod.boolean(),
   "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Admin — permanently delete a delivery agent (only if not on any order)
+ */
+export const DeleteDeliveryAgentParams = zod.object({
+  "agentId": zod.coerce.string()
 })
 
 
