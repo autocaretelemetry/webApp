@@ -186,6 +186,8 @@ export const ListServiceCentersResponseItem = zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "address": zod.string(),
+  "city": zod.string().optional(),
+  "region": zod.string().optional(),
   "phone": zod.string(),
   "specialties": zod.array(zod.string()),
   "rating": zod.number(),
@@ -205,6 +207,8 @@ export const GetServiceCenterResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "address": zod.string(),
+  "city": zod.string().optional(),
+  "region": zod.string().optional(),
   "phone": zod.string(),
   "specialties": zod.array(zod.string()),
   "rating": zod.number(),
@@ -291,6 +295,8 @@ export const ListBookingsResponseItem = zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "address": zod.string(),
+  "city": zod.string().optional(),
+  "region": zod.string().optional(),
   "phone": zod.string(),
   "specialties": zod.array(zod.string()),
   "rating": zod.number(),
@@ -364,6 +370,8 @@ export const GetBookingResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "address": zod.string(),
+  "city": zod.string().optional(),
+  "region": zod.string().optional(),
   "phone": zod.string(),
   "specialties": zod.array(zod.string()),
   "rating": zod.number(),
@@ -458,6 +466,8 @@ export const UpdateBookingStatusResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "address": zod.string(),
+  "city": zod.string().optional(),
+  "region": zod.string().optional(),
   "phone": zod.string(),
   "specialties": zod.array(zod.string()),
   "rating": zod.number(),
@@ -525,6 +535,8 @@ export const AssignMechanicResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "address": zod.string(),
+  "city": zod.string().optional(),
+  "region": zod.string().optional(),
   "phone": zod.string(),
   "specialties": zod.array(zod.string()),
   "rating": zod.number(),
@@ -724,13 +736,20 @@ export const ListActivityResponse = zod.array(ListActivityResponseItem)
 
 
 /**
- * @summary List all vendors
+ * @summary List all vendors, optionally sorted by proximity (same city first, then same region, then everywhere)
  */
+export const ListVendorsQueryParams = zod.object({
+  "nearCity": zod.coerce.string().optional(),
+  "nearRegion": zod.coerce.string().optional()
+})
+
 export const ListVendorsResponseItem = zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "bio": zod.string().nullish(),
   "address": zod.string(),
+  "city": zod.string(),
+  "region": zod.string(),
   "phone": zod.string(),
   "rating": zod.number(),
   "reviewsCount": zod.number(),
@@ -753,6 +772,8 @@ export const GetVendorResponse = zod.object({
   "name": zod.string(),
   "bio": zod.string().nullish(),
   "address": zod.string(),
+  "city": zod.string(),
+  "region": zod.string(),
   "phone": zod.string(),
   "rating": zod.number(),
   "reviewsCount": zod.number(),
@@ -788,6 +809,8 @@ export const ListPartsForVendorResponseItem = zod.object({
   "name": zod.string(),
   "bio": zod.string().nullish(),
   "address": zod.string(),
+  "city": zod.string(),
+  "region": zod.string(),
   "phone": zod.string(),
   "rating": zod.number(),
   "reviewsCount": zod.number(),
@@ -858,6 +881,8 @@ export const ListPartsResponseItem = zod.object({
   "name": zod.string(),
   "bio": zod.string().nullish(),
   "address": zod.string(),
+  "city": zod.string(),
+  "region": zod.string(),
   "phone": zod.string(),
   "rating": zod.number(),
   "reviewsCount": zod.number(),
@@ -895,6 +920,8 @@ export const GetPartResponse = zod.object({
   "name": zod.string(),
   "bio": zod.string().nullish(),
   "address": zod.string(),
+  "city": zod.string(),
+  "region": zod.string(),
   "phone": zod.string(),
   "rating": zod.number(),
   "reviewsCount": zod.number(),
@@ -950,6 +977,8 @@ export const UpdatePartResponse = zod.object({
   "name": zod.string(),
   "bio": zod.string().nullish(),
   "address": zod.string(),
+  "city": zod.string(),
+  "region": zod.string(),
   "phone": zod.string(),
   "rating": zod.number(),
   "reviewsCount": zod.number(),
@@ -971,26 +1000,38 @@ export const ListPartCategoriesResponse = zod.array(ListPartCategoriesResponseIt
 
 
 /**
- * @summary List orders, optionally scoped by vendor or buyer
+ * @summary List orders, optionally scoped by vendor, buyer, booking, mechanic, delivery agent, or status
  */
 export const ListOrdersQueryParams = zod.object({
   "vendorId": zod.coerce.string().optional(),
-  "buyerName": zod.coerce.string().optional()
+  "buyerName": zod.coerce.string().optional(),
+  "bookingId": zod.coerce.string().optional(),
+  "mechanicId": zod.coerce.string().optional(),
+  "deliveryAgentId": zod.coerce.string().optional(),
+  "status": zod.enum(['proposed', 'placed', 'confirmed', 'shipped', 'delivered', 'cancelled']).optional()
 })
 
 export const ListOrdersResponseItem = zod.object({
   "id": zod.string(),
   "vendorId": zod.string(),
+  "bookingId": zod.string().nullish(),
+  "mechanicId": zod.string().nullish(),
+  "deliveryAgentId": zod.string().nullish(),
   "buyerKind": zod.enum(['owner', 'center']),
   "buyerName": zod.string(),
   "buyerPhone": zod.string(),
   "shippingAddress": zod.string(),
+  "deliveryCity": zod.string().optional(),
+  "deliveryRegion": zod.string().optional(),
   "notes": zod.string().nullish(),
-  "status": zod.enum(['placed', 'confirmed', 'shipped', 'delivered', 'cancelled']),
+  "status": zod.enum(['proposed', 'placed', 'confirmed', 'shipped', 'delivered', 'cancelled']),
   "itemsTotal": zod.number(),
   "shippingFee": zod.number(),
   "total": zod.number(),
+  "proposedAt": zod.coerce.date().nullish(),
   "placedAt": zod.coerce.date(),
+  "approvedAt": zod.coerce.date().nullish(),
+  "rejectedAt": zod.coerce.date().nullish(),
   "confirmedAt": zod.coerce.date().nullish(),
   "shippedAt": zod.coerce.date().nullish(),
   "deliveredAt": zod.coerce.date().nullish(),
@@ -1002,12 +1043,44 @@ export const ListOrdersResponseItem = zod.object({
   "name": zod.string(),
   "bio": zod.string().nullish(),
   "address": zod.string(),
+  "city": zod.string(),
+  "region": zod.string(),
   "phone": zod.string(),
   "rating": zod.number(),
   "reviewsCount": zod.number(),
   "logoUrl": zod.string().nullish(),
   "partsCount": zod.number().optional(),
   "createdAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "mechanic": zod.union([zod.object({
+  "id": zod.string(),
+  "serviceCenterId": zod.string(),
+  "name": zod.string(),
+  "yearsExperience": zod.number(),
+  "specialization": zod.string(),
+  "certifications": zod.array(zod.string()).optional(),
+  "rating": zod.number(),
+  "completedJobs": zod.number(),
+  "avatarUrl": zod.string().nullish()
+}),zod.null()]).optional(),
+  "deliveryAgent": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "vehicleType": zod.string(),
+  "bio": zod.string().nullish(),
+  "rating": zod.number(),
+  "completedDeliveries": zod.number(),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "bookingSummary": zod.union([zod.object({
+  "id": zod.string(),
+  "serviceType": zod.string(),
+  "status": zod.string(),
+  "vehicleLabel": zod.string()
 }),zod.null()]).optional()
 })
 export const ListOrdersResponse = zod.array(ListOrdersResponseItem)
@@ -1025,10 +1098,14 @@ export const ListOrdersResponse = zod.array(ListOrdersResponseItem)
 
 export const CreateOrderBody = zod.object({
   "vendorId": zod.string(),
+  "bookingId": zod.string().nullish(),
+  "mechanicId": zod.string().nullish(),
   "buyerKind": zod.enum(['owner', 'center']),
   "buyerName": zod.string().min(1),
   "buyerPhone": zod.string().min(1),
   "shippingAddress": zod.string().min(1),
+  "deliveryCity": zod.string().nullish(),
+  "deliveryRegion": zod.string().nullish(),
   "notes": zod.string().nullish(),
   "items": zod.array(zod.object({
   "partId": zod.string(),
@@ -1047,16 +1124,24 @@ export const GetOrderParams = zod.object({
 export const GetOrderResponse = zod.object({
   "id": zod.string(),
   "vendorId": zod.string(),
+  "bookingId": zod.string().nullish(),
+  "mechanicId": zod.string().nullish(),
+  "deliveryAgentId": zod.string().nullish(),
   "buyerKind": zod.enum(['owner', 'center']),
   "buyerName": zod.string(),
   "buyerPhone": zod.string(),
   "shippingAddress": zod.string(),
+  "deliveryCity": zod.string().optional(),
+  "deliveryRegion": zod.string().optional(),
   "notes": zod.string().nullish(),
-  "status": zod.enum(['placed', 'confirmed', 'shipped', 'delivered', 'cancelled']),
+  "status": zod.enum(['proposed', 'placed', 'confirmed', 'shipped', 'delivered', 'cancelled']),
   "itemsTotal": zod.number(),
   "shippingFee": zod.number(),
   "total": zod.number(),
+  "proposedAt": zod.coerce.date().nullish(),
   "placedAt": zod.coerce.date(),
+  "approvedAt": zod.coerce.date().nullish(),
+  "rejectedAt": zod.coerce.date().nullish(),
   "confirmedAt": zod.coerce.date().nullish(),
   "shippedAt": zod.coerce.date().nullish(),
   "deliveredAt": zod.coerce.date().nullish(),
@@ -1068,12 +1153,44 @@ export const GetOrderResponse = zod.object({
   "name": zod.string(),
   "bio": zod.string().nullish(),
   "address": zod.string(),
+  "city": zod.string(),
+  "region": zod.string(),
   "phone": zod.string(),
   "rating": zod.number(),
   "reviewsCount": zod.number(),
   "logoUrl": zod.string().nullish(),
   "partsCount": zod.number().optional(),
   "createdAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "mechanic": zod.union([zod.object({
+  "id": zod.string(),
+  "serviceCenterId": zod.string(),
+  "name": zod.string(),
+  "yearsExperience": zod.number(),
+  "specialization": zod.string(),
+  "certifications": zod.array(zod.string()).optional(),
+  "rating": zod.number(),
+  "completedJobs": zod.number(),
+  "avatarUrl": zod.string().nullish()
+}),zod.null()]).optional(),
+  "deliveryAgent": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "vehicleType": zod.string(),
+  "bio": zod.string().nullish(),
+  "rating": zod.number(),
+  "completedDeliveries": zod.number(),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "bookingSummary": zod.union([zod.object({
+  "id": zod.string(),
+  "serviceType": zod.string(),
+  "status": zod.string(),
+  "vehicleLabel": zod.string()
 }),zod.null()]).optional()
 }).and(zod.object({
   "items": zod.array(zod.object({
@@ -1104,22 +1221,31 @@ export const UpdateOrderStatusParams = zod.object({
 
 export const UpdateOrderStatusBody = zod.object({
   "status": zod.enum(['placed', 'confirmed', 'shipped', 'delivered', 'cancelled']),
-  "trackingCode": zod.string().nullish()
+  "trackingCode": zod.string().nullish(),
+  "deliveryAgentId": zod.string().nullish()
 })
 
 export const UpdateOrderStatusResponse = zod.object({
   "id": zod.string(),
   "vendorId": zod.string(),
+  "bookingId": zod.string().nullish(),
+  "mechanicId": zod.string().nullish(),
+  "deliveryAgentId": zod.string().nullish(),
   "buyerKind": zod.enum(['owner', 'center']),
   "buyerName": zod.string(),
   "buyerPhone": zod.string(),
   "shippingAddress": zod.string(),
+  "deliveryCity": zod.string().optional(),
+  "deliveryRegion": zod.string().optional(),
   "notes": zod.string().nullish(),
-  "status": zod.enum(['placed', 'confirmed', 'shipped', 'delivered', 'cancelled']),
+  "status": zod.enum(['proposed', 'placed', 'confirmed', 'shipped', 'delivered', 'cancelled']),
   "itemsTotal": zod.number(),
   "shippingFee": zod.number(),
   "total": zod.number(),
+  "proposedAt": zod.coerce.date().nullish(),
   "placedAt": zod.coerce.date(),
+  "approvedAt": zod.coerce.date().nullish(),
+  "rejectedAt": zod.coerce.date().nullish(),
   "confirmedAt": zod.coerce.date().nullish(),
   "shippedAt": zod.coerce.date().nullish(),
   "deliveredAt": zod.coerce.date().nullish(),
@@ -1131,12 +1257,44 @@ export const UpdateOrderStatusResponse = zod.object({
   "name": zod.string(),
   "bio": zod.string().nullish(),
   "address": zod.string(),
+  "city": zod.string(),
+  "region": zod.string(),
   "phone": zod.string(),
   "rating": zod.number(),
   "reviewsCount": zod.number(),
   "logoUrl": zod.string().nullish(),
   "partsCount": zod.number().optional(),
   "createdAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "mechanic": zod.union([zod.object({
+  "id": zod.string(),
+  "serviceCenterId": zod.string(),
+  "name": zod.string(),
+  "yearsExperience": zod.number(),
+  "specialization": zod.string(),
+  "certifications": zod.array(zod.string()).optional(),
+  "rating": zod.number(),
+  "completedJobs": zod.number(),
+  "avatarUrl": zod.string().nullish()
+}),zod.null()]).optional(),
+  "deliveryAgent": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "vehicleType": zod.string(),
+  "bio": zod.string().nullish(),
+  "rating": zod.number(),
+  "completedDeliveries": zod.number(),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "bookingSummary": zod.union([zod.object({
+  "id": zod.string(),
+  "serviceType": zod.string(),
+  "status": zod.string(),
+  "vehicleLabel": zod.string()
 }),zod.null()]).optional()
 })
 
@@ -1158,6 +1316,73 @@ export const GetVendorDashboardResponse = zod.object({
   "status": zod.string(),
   "count": zod.number()
 }))
+})
+
+
+/**
+ * @summary List delivery agents, optionally filtered by city/region or active status
+ */
+export const ListDeliveryAgentsQueryParams = zod.object({
+  "city": zod.coerce.string().optional(),
+  "region": zod.coerce.string().optional(),
+  "activeOnly": zod.coerce.boolean().optional()
+})
+
+export const ListDeliveryAgentsResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "vehicleType": zod.string(),
+  "bio": zod.string().nullish(),
+  "rating": zod.number(),
+  "completedDeliveries": zod.number(),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+export const ListDeliveryAgentsResponse = zod.array(ListDeliveryAgentsResponseItem)
+
+
+/**
+ * @summary Self-register as a delivery agent
+ */
+
+
+
+
+
+
+
+export const RegisterDeliveryAgentBody = zod.object({
+  "name": zod.string().min(1),
+  "phone": zod.string().min(1),
+  "city": zod.string().min(1),
+  "region": zod.string().min(1),
+  "vehicleType": zod.string().min(1),
+  "bio": zod.string().nullish()
+})
+
+
+/**
+ * @summary Get a delivery agent
+ */
+export const GetDeliveryAgentParams = zod.object({
+  "agentId": zod.coerce.string()
+})
+
+export const GetDeliveryAgentResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "vehicleType": zod.string(),
+  "bio": zod.string().nullish(),
+  "rating": zod.number(),
+  "completedDeliveries": zod.number(),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date()
 })
 
 

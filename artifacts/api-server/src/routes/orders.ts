@@ -6,6 +6,11 @@ import {
   partsTable,
   ordersTable,
   orderItemsTable,
+  bookingsTable,
+  mechanicsTable,
+  vehiclesTable,
+  deliveryAgentsTable,
+  serviceCentersTable,
   type OrderItemSnapshot,
 } from "@workspace/db";
 import {
@@ -27,8 +32,12 @@ class HttpError extends Error {
 async function hydrate(orders: (typeof ordersTable.$inferSelect)[]) {
   if (orders.length === 0) return [];
   const vendorIds = [...new Set(orders.map((o) => o.vendorId))];
+  const mechanicIds = [...new Set(orders.map((o) => o.mechanicId).filter((v): v is string => !!v))];
+  const agentIds = [...new Set(orders.map((o) => o.deliveryAgentId).filter((v): v is string => !!v))];
+  const bookingIds = [...new Set(orders.map((o) => o.bookingId).filter((v): v is string => !!v))];
   const orderIds = orders.map((o) => o.id);
-  const [vendors, lineCounts] = await Promise.all([
+
+  const [vendors, lineCounts, mechanics, agents, bookings] = await Promise.all([
     db.select().from(vendorsTable).where(inArray(vendorsTable.id, vendorIds)),
     db
       .select({
@@ -38,12 +47,57 @@ async function hydrate(orders: (typeof ordersTable.$inferSelect)[]) {
       .from(orderItemsTable)
       .where(inArray(orderItemsTable.orderId, orderIds))
       .groupBy(orderItemsTable.orderId),
+    mechanicIds.length
+      ? db.select().from(mechanicsTable).where(inArray(mechanicsTable.id, mechanicIds))
+      : Promise.resolve([] as (typeof mechanicsTable.$inferSelect)[]),
+    agentIds.length
+      ? db.select().from(deliveryAgentsTable).where(inArray(deliveryAgentsTable.id, agentIds))
+      : Promise.resolve([] as (typeof deliveryAgentsTable.$inferSelect)[]),
+    bookingIds.length
+      ? db
+          .select({
+            id: bookingsTable.id,
+            serviceType: bookingsTable.serviceType,
+            status: bookingsTable.status,
+            brand: vehiclesTable.brand,
+            model: vehiclesTable.model,
+            year: vehiclesTable.year,
+          })
+          .from(bookingsTable)
+          .innerJoin(vehiclesTable, eq(vehiclesTable.id, bookingsTable.vehicleId))
+          .where(inArray(bookingsTable.id, bookingIds))
+      : Promise.resolve([] as Array<{
+          id: string;
+          serviceType: string;
+          status: string;
+          brand: string;
+          model: string;
+          year: number;
+        }>),
   ]);
+
   const vmap = new Map(vendors.map((v) => [v.id, v]));
   const cmap = new Map(lineCounts.map((c) => [c.orderId, Number(c.n)]));
+  const mmap = new Map(mechanics.map((m) => [m.id, m]));
+  const amap = new Map(agents.map((a) => [a.id, a]));
+  const bmap = new Map(
+    bookings.map((b) => [
+      b.id,
+      {
+        id: b.id,
+        serviceType: b.serviceType,
+        status: b.status,
+        vehicleLabel: `${b.brand} ${b.model} (${b.year})`,
+      },
+    ]),
+  );
+
   return orders.map((o) => ({
     ...o,
     vendor: vmap.get(o.vendorId) ?? null,
+    mechanic: o.mechanicId ? (mmap.get(o.mechanicId) ?? null) : null,
+    deliveryAgent: o.deliveryAgentId ? (amap.get(o.deliveryAgentId) ?? null) : null,
+    bookingSummary: o.bookingId ? (bmap.get(o.bookingId) ?? null) : null,
     itemsCount: cmap.get(o.id) ?? 0,
   }));
 }
@@ -57,14 +111,17 @@ router.get("/orders", async (req, res): Promise<void> => {
   const conditions = [];
   if (q.data.vendorId) conditions.push(eq(ordersTable.vendorId, q.data.vendorId));
   if (q.data.buyerName) conditions.push(eq(ordersTable.buyerName, q.data.buyerName));
+  if (q.data.bookingId) conditions.push(eq(ordersTable.bookingId, q.data.bookingId));
+  if (q.data.mechanicId) conditions.push(eq(ordersTable.mechanicId, q.data.mechanicId));
+  if (q.data.deliveryAgentId)
+    conditions.push(eq(ordersTable.deliveryAgentId, q.data.deliveryAgentId));
+  if (q.data.status) conditions.push(eq(ordersTable.status, q.data.status));
+
+  const baseQuery = db.select().from(ordersTable);
   const rows =
     conditions.length > 0
-      ? await db
-          .select()
-          .from(ordersTable)
-          .where(and(...conditions))
-          .orderBy(desc(ordersTable.placedAt))
-      : await db.select().from(ordersTable).orderBy(desc(ordersTable.placedAt));
+      ? await baseQuery.where(and(...conditions)).orderBy(desc(ordersTable.placedAt))
+      : await baseQuery.orderBy(desc(ordersTable.placedAt));
   res.json(await hydrate(rows));
 });
 
@@ -81,6 +138,67 @@ router.post("/orders", async (req, res): Promise<void> => {
     .where(eq(vendorsTable.id, parsed.data.vendorId));
   if (!vendor) {
     res.status(400).json({ error: "Vendor not found" });
+    return;
+  }
+
+  // Mechanic-proposed orders skip the stock decrement until the owner approves.
+  const isProposal = !!(parsed.data.bookingId && parsed.data.mechanicId);
+
+  // If a proposal, resolve the mechanic + their service center to derive the ship-to address.
+  let mechanicCenter: typeof serviceCentersTable.$inferSelect | null = null;
+  let mechanic: typeof mechanicsTable.$inferSelect | null = null;
+  let booking: typeof bookingsTable.$inferSelect | null = null;
+  if (isProposal) {
+    const [m] = await db
+      .select()
+      .from(mechanicsTable)
+      .where(eq(mechanicsTable.id, parsed.data.mechanicId!));
+    if (!m) {
+      res.status(400).json({ error: "Mechanic not found" });
+      return;
+    }
+    mechanic = m;
+    const [b] = await db
+      .select()
+      .from(bookingsTable)
+      .where(eq(bookingsTable.id, parsed.data.bookingId!));
+    if (!b) {
+      res.status(400).json({ error: "Booking not found" });
+      return;
+    }
+    // Proposals are only legal while work is actively underway, and the
+    // mechanic on the proposal must be the one assigned to the booking
+    // (and therefore implicitly belong to its service center).
+    if (b.status !== "in_progress") {
+      res.status(409).json({
+        error: "Parts can only be proposed while the booking is in progress",
+      });
+      return;
+    }
+    if (!b.mechanicId || b.mechanicId !== m.id) {
+      res.status(403).json({
+        error: "Only the mechanic assigned to this booking can propose parts",
+      });
+      return;
+    }
+    if (m.serviceCenterId !== b.serviceCenterId) {
+      res.status(403).json({
+        error: "Mechanic does not belong to the booking's service center",
+      });
+      return;
+    }
+    booking = b;
+    const [c] = await db
+      .select()
+      .from(serviceCentersTable)
+      .where(eq(serviceCentersTable.id, m.serviceCenterId));
+    mechanicCenter = c ?? null;
+  } else if (parsed.data.bookingId || parsed.data.mechanicId) {
+    // Half-specified link is never valid — both must be present for a proposal,
+    // and neither is allowed for a direct buy.
+    res.status(400).json({
+      error: "bookingId and mechanicId must be provided together to propose parts for a job",
+    });
     return;
   }
 
@@ -110,21 +228,26 @@ router.post("/orders", async (req, res): Promise<void> => {
           );
         }
         if (!part.active) throw new HttpError(409, `Part ${part.name} is not available`);
+        if (!isProposal && part.stock < item.quantity) {
+          throw new HttpError(409, `Insufficient stock for ${part.name}`);
+        }
       }
 
-      // Conditional, atomic stock decrement. If another transaction won the race,
-      // the WHERE clause returns 0 rows and we abort with 409.
-      for (const item of items) {
-        const part = partMap.get(item.partId)!;
-        const updated = await tx
-          .update(partsTable)
-          .set({ stock: sql`${partsTable.stock} - ${item.quantity}` })
-          .where(
-            and(eq(partsTable.id, item.partId), gte(partsTable.stock, item.quantity)),
-          )
-          .returning({ id: partsTable.id });
-        if (updated.length === 0) {
-          throw new HttpError(409, `Insufficient stock for ${part.name}`);
+      // Stock is reserved only when the order actually goes live (direct buy now,
+      // proposal at the owner-approval step).
+      if (!isProposal) {
+        for (const item of items) {
+          const part = partMap.get(item.partId)!;
+          const updated = await tx
+            .update(partsTable)
+            .set({ stock: sql`${partsTable.stock} - ${item.quantity}` })
+            .where(
+              and(eq(partsTable.id, item.partId), gte(partsTable.stock, item.quantity)),
+            )
+            .returning({ id: partsTable.id });
+          if (updated.length === 0) {
+            throw new HttpError(409, `Insufficient stock for ${part.name}`);
+          }
         }
       }
 
@@ -134,16 +257,31 @@ router.post("/orders", async (req, res): Promise<void> => {
       );
       const shippingFee = itemsTotal > 200 ? 0 : 12;
       const total = +(itemsTotal + shippingFee).toFixed(2);
+      const now = new Date();
+
+      const shippingAddress =
+        isProposal && mechanicCenter ? mechanicCenter.address : parsed.data.shippingAddress;
+      const deliveryCity =
+        parsed.data.deliveryCity ?? (isProposal && mechanicCenter ? mechanicCenter.city : "");
+      const deliveryRegion =
+        parsed.data.deliveryRegion ?? (isProposal && mechanicCenter ? mechanicCenter.region : "");
 
       const [order] = await tx
         .insert(ordersTable)
         .values({
           vendorId: parsed.data.vendorId,
+          bookingId: parsed.data.bookingId ?? null,
+          mechanicId: parsed.data.mechanicId ?? null,
           buyerKind: parsed.data.buyerKind,
           buyerName: parsed.data.buyerName,
           buyerPhone: parsed.data.buyerPhone,
-          shippingAddress: parsed.data.shippingAddress,
+          shippingAddress,
+          deliveryCity,
+          deliveryRegion,
           notes: parsed.data.notes ?? null,
+          status: isProposal ? "proposed" : "placed",
+          proposedAt: isProposal ? now : null,
+          placedAt: now,
           itemsTotal: +itemsTotal.toFixed(2),
           shippingFee,
           total,
@@ -173,6 +311,7 @@ router.post("/orders", async (req, res): Promise<void> => {
       return { order, lines };
     });
 
+    void booking; // touched for narrow typing only
     const [hydrated] = await hydrate([result.order]);
     res.status(201).json({ ...hydrated, items: result.lines });
   } catch (err) {
@@ -217,7 +356,10 @@ router.patch("/orders/:orderId/status", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  // Allowed transitions. "placed" is reachable from "proposed" (owner approval)
+  // or as a starting state for direct buys.
   const allowed: Record<string, string[]> = {
+    proposed: ["placed", "cancelled"],
     placed: ["confirmed", "cancelled"],
     confirmed: ["shipped", "cancelled"],
     shipped: ["delivered"],
@@ -241,14 +383,38 @@ router.patch("/orders/:orderId/status", async (req, res): Promise<void> => {
         );
       }
 
-      const updates: Partial<typeof ordersTable.$inferInsert> = { status: next };
-      if (next === "confirmed") updates.confirmedAt = new Date();
-      if (next === "shipped") {
-        updates.shippedAt = new Date();
-        if (parsed.data.trackingCode) updates.trackingCode = parsed.data.trackingCode;
+      // confirmed → shipped requires a delivery agent assignment.
+      if (current.status === "confirmed" && next === "shipped") {
+        const agentId = parsed.data.deliveryAgentId ?? current.deliveryAgentId;
+        if (!agentId) {
+          throw new HttpError(400, "A delivery agent must be assigned before shipping");
+        }
+        const [agent] = await tx
+          .select()
+          .from(deliveryAgentsTable)
+          .where(eq(deliveryAgentsTable.id, agentId));
+        if (!agent || !agent.active) {
+          throw new HttpError(400, "Delivery agent not available");
+        }
       }
-      if (next === "delivered") updates.deliveredAt = new Date();
-      if (next === "cancelled") updates.cancelledAt = new Date();
+
+      const now = new Date();
+      const updates: Partial<typeof ordersTable.$inferInsert> = { status: next };
+      if (next === "placed" && current.status === "proposed") {
+        updates.approvedAt = now;
+        updates.placedAt = now;
+      }
+      if (next === "confirmed") updates.confirmedAt = now;
+      if (next === "shipped") {
+        updates.shippedAt = now;
+        if (parsed.data.trackingCode) updates.trackingCode = parsed.data.trackingCode;
+        if (parsed.data.deliveryAgentId) updates.deliveryAgentId = parsed.data.deliveryAgentId;
+      }
+      if (next === "delivered") updates.deliveredAt = now;
+      if (next === "cancelled") {
+        updates.cancelledAt = now;
+        if (current.status === "proposed") updates.rejectedAt = now;
+      }
 
       // Status-guarded update: if another transaction beat us to it, returns 0 rows.
       const updated = await tx
@@ -260,9 +426,31 @@ router.patch("/orders/:orderId/status", async (req, res): Promise<void> => {
         throw new HttpError(409, "Order status changed concurrently, please retry");
       }
 
-      // Restore stock atomically only after the status update succeeded, so we
-      // can't double-restore on racing cancels.
-      if (next === "cancelled") {
+      // Reserve stock at owner approval (proposed → placed). Atomic per-line.
+      if (current.status === "proposed" && next === "placed") {
+        const lines = await tx
+          .select()
+          .from(orderItemsTable)
+          .where(eq(orderItemsTable.orderId, current.id));
+        for (const line of lines) {
+          const dec = await tx
+            .update(partsTable)
+            .set({ stock: sql`${partsTable.stock} - ${line.quantity}` })
+            .where(
+              and(eq(partsTable.id, line.partId), gte(partsTable.stock, line.quantity)),
+            )
+            .returning({ id: partsTable.id });
+          if (dec.length === 0) {
+            throw new HttpError(
+              409,
+              `Insufficient stock for ${line.snapshot.name} — owner cannot approve this proposal`,
+            );
+          }
+        }
+      }
+
+      // Restore stock only for orders that were stock-reserved (not proposals).
+      if (next === "cancelled" && current.status !== "proposed") {
         const lines = await tx
           .select()
           .from(orderItemsTable)
@@ -273,6 +461,16 @@ router.patch("/orders/:orderId/status", async (req, res): Promise<void> => {
             .set({ stock: sql`${partsTable.stock} + ${line.quantity}` })
             .where(eq(partsTable.id, line.partId));
         }
+      }
+
+      // Delivered → bump the assigned agent's completedDeliveries counter.
+      if (next === "delivered" && current.deliveryAgentId) {
+        await tx
+          .update(deliveryAgentsTable)
+          .set({
+            completedDeliveries: sql`${deliveryAgentsTable.completedDeliveries} + 1`,
+          })
+          .where(eq(deliveryAgentsTable.id, current.deliveryAgentId));
       }
 
       return updated[0];
@@ -328,7 +526,7 @@ router.get("/dashboard/vendor/:vendorId", async (req, res): Promise<void> => {
       ),
     );
   const revenueThisMonth = monthOrders
-    .filter((o) => o.status !== "cancelled")
+    .filter((o) => o.status !== "cancelled" && o.status !== "proposed")
     .reduce((sum, o) => sum + o.total, 0);
 
   const breakdown = new Map<string, number>();

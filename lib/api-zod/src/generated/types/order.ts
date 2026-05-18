@@ -5,6 +5,9 @@
  * AutoCare API — vehicle owners book services, service centers fulfill them.
  * OpenAPI spec version: 0.1.0
  */
+import type { DeliveryAgent } from './deliveryAgent';
+import type { Mechanic } from './mechanic';
+import type { OrderBookingSummary } from './orderBookingSummary';
 import type { OrderBuyerKind } from './orderBuyerKind';
 import type { OrderStatus } from './orderStatus';
 import type { Vendor } from './vendor';
@@ -12,16 +15,24 @@ import type { Vendor } from './vendor';
 export interface Order {
   id: string;
   vendorId: string;
+  bookingId?: string | null;
+  mechanicId?: string | null;
+  deliveryAgentId?: string | null;
   buyerKind: OrderBuyerKind;
   buyerName: string;
   buyerPhone: string;
   shippingAddress: string;
+  deliveryCity?: string;
+  deliveryRegion?: string;
   notes?: string | null;
   status: OrderStatus;
   itemsTotal: number;
   shippingFee: number;
   total: number;
+  proposedAt?: Date | null;
   placedAt: Date;
+  approvedAt?: Date | null;
+  rejectedAt?: Date | null;
   confirmedAt?: Date | null;
   shippedAt?: Date | null;
   deliveredAt?: Date | null;
@@ -29,4 +40,7 @@ export interface Order {
   trackingCode?: string | null;
   itemsCount?: number;
   vendor?: Vendor | null;
+  mechanic?: Mechanic | null;
+  deliveryAgent?: DeliveryAgent | null;
+  bookingSummary?: OrderBookingSummary | null;
 }

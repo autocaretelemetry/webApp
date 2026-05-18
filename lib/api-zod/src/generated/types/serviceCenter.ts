@@ -10,6 +10,8 @@ export interface ServiceCenter {
   id: string;
   name: string;
   address: string;
+  city?: string;
+  region?: string;
   phone: string;
   specialties: string[];
   rating: number;

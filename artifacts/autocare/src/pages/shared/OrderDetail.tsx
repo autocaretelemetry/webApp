@@ -1,66 +1,104 @@
-import { useState } from "react";
-import { useParams, useLocation } from "wouter";
+import { useEffect, useState } from "react";
+import { useParams, useLocation, Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { useGetOrder, useUpdateOrderStatus, type OrderStatus } from "@workspace/api-client-react";
-import { getGetOrderQueryKey, getListOrdersQueryKey, getGetVendorDashboardQueryKey } from "@/lib/queryKeys";
+import {
+  useGetOrder,
+  useUpdateOrderStatus,
+  useListDeliveryAgents,
+  type UpdateOrderStatusInputStatus,
+} from "@workspace/api-client-react";
+import {
+  getGetOrderQueryKey,
+  getListOrdersQueryKey,
+  getGetVendorDashboardQueryKey,
+  getListDeliveryAgentsQueryKey,
+  getGetBookingQueryKey,
+} from "@/lib/queryKeys";
 import { PageHeader } from "@/components/PageHeader";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency, formatDateTime } from "@/lib/format";
-import { useRole } from "@/lib/role";
-import { ArrowLeft, Package, Truck, CheckCircle, X, Store } from "lucide-react";
+import { useRole, useDeliveryAgentId } from "@/lib/role";
+import {
+  ArrowLeft,
+  Package,
+  Truck,
+  CheckCircle,
+  X,
+  Store,
+  Wrench,
+  ThumbsUp,
+  ThumbsDown,
+  User,
+} from "lucide-react";
 import { toast } from "sonner";
-
-const NEXT_BY_STATUS: Record<OrderStatus, { next: OrderStatus; label: string; icon: typeof Truck }[]> = {
-  placed: [
-    { next: "confirmed", label: "Confirm order", icon: CheckCircle },
-    { next: "cancelled", label: "Cancel", icon: X },
-  ],
-  confirmed: [
-    { next: "shipped", label: "Mark as shipped", icon: Truck },
-    { next: "cancelled", label: "Cancel", icon: X },
-  ],
-  shipped: [{ next: "delivered", label: "Mark delivered", icon: CheckCircle }],
-  delivered: [],
-  cancelled: [],
-};
 
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { role } = useRole();
+  const deliveryAgentId = useDeliveryAgentId();
   const queryClient = useQueryClient();
   const [tracking, setTracking] = useState("");
+  const [pickedAgent, setPickedAgent] = useState<string>("");
 
   const { data: order, isLoading } = useGetOrder(id ?? "", {
     query: { enabled: !!id, queryKey: getGetOrderQueryKey(id ?? "") },
   });
   const updateStatus = useUpdateOrderStatus();
 
+  // Delivery agents near the delivery city/region, fetched only when needed.
+  const needsAgents =
+    role === "vendor" && !!order && order.status === "confirmed";
+  const agentParams: { city?: string; region?: string } = {};
+  if (order?.deliveryCity) agentParams.city = order.deliveryCity;
+  if (order?.deliveryRegion) agentParams.region = order.deliveryRegion;
+  const { data: agents } = useListDeliveryAgents(agentParams, {
+    query: { enabled: needsAgents, queryKey: getListDeliveryAgentsQueryKey(agentParams) },
+  });
+
+  useEffect(() => {
+    if (order?.deliveryAgentId) setPickedAgent(order.deliveryAgentId);
+  }, [order?.deliveryAgentId]);
+
   if (isLoading) return <div className="p-8">Loading...</div>;
   if (!order) return <div className="p-8">Order not found.</div>;
 
+  const isOwner = role === "owner";
   const isVendor = role === "vendor";
-  const transitions = NEXT_BY_STATUS[order.status];
+  const isDelivery = role === "delivery";
+  const isMyDelivery = isDelivery && deliveryAgentId && order.deliveryAgentId === deliveryAgentId;
 
-  const advance = async (next: OrderStatus) => {
+  const advance = async (next: UpdateOrderStatusInputStatus, extra: { trackingCode?: string | null; deliveryAgentId?: string | null } = {}) => {
     try {
       await updateStatus.mutateAsync({
         orderId: order.id,
         data: {
           status: next,
-          trackingCode: next === "shipped" && tracking.trim() ? tracking.trim() : null,
+          trackingCode: extra.trackingCode ?? (next === "shipped" && tracking.trim() ? tracking.trim() : null),
+          deliveryAgentId: extra.deliveryAgentId ?? null,
         },
       });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: getGetOrderQueryKey(order.id) }),
         queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() }),
         queryClient.invalidateQueries({ queryKey: getGetVendorDashboardQueryKey(order.vendorId) }),
+        order.bookingId
+          ? queryClient.invalidateQueries({ queryKey: getGetBookingQueryKey(order.bookingId) })
+          : Promise.resolve(),
       ]);
-      toast.success(`Order moved to ${next}.`);
+      const labels: Record<string, string> = {
+        placed: "Order approved and sent to the vendor.",
+        confirmed: "Order confirmed.",
+        shipped: "Order marked as shipped.",
+        delivered: "Order delivered.",
+        cancelled: "Order cancelled.",
+      };
+      toast.success(labels[next] ?? `Order moved to ${next}.`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to update order.";
       toast.error(msg);
@@ -68,7 +106,10 @@ export default function OrderDetail() {
   };
 
   const timeline = [
-    { at: order.placedAt, label: "Order placed" },
+    order.proposedAt ? { at: order.proposedAt, label: "Mechanic proposed parts" } : null,
+    order.rejectedAt ? { at: order.rejectedAt, label: "Owner rejected the request" } : null,
+    order.approvedAt ? { at: order.approvedAt, label: "Owner approved the request" } : null,
+    !order.proposedAt ? { at: order.placedAt, label: "Order placed" } : null,
     order.confirmedAt ? { at: order.confirmedAt, label: "Confirmed by vendor" } : null,
     order.shippedAt
       ? { at: order.shippedAt, label: `Shipped${order.trackingCode ? ` · ${order.trackingCode}` : ""}` }
@@ -85,16 +126,43 @@ export default function OrderDetail() {
 
       <PageHeader
         title={
-          <span className="flex items-center gap-3">
-            <span>Order #{order.id.slice(0, 8)}</span>
-            <OrderStatusBadge status={order.status} />
-          </span> as unknown as string
+          (
+            <span className="flex items-center gap-3">
+              <span>Order #{order.id.slice(0, 8)}</span>
+              <OrderStatusBadge status={order.status} />
+            </span>
+          ) as unknown as string
         }
-        description={`Placed ${formatDateTime(order.placedAt)} by ${order.buyerName}`}
+        description={
+          order.status === "proposed"
+            ? `Proposed ${order.proposedAt ? formatDateTime(order.proposedAt) : ""} by ${order.mechanic?.name ?? "mechanic"}`
+            : `Placed ${formatDateTime(order.placedAt)} by ${order.buyerName}`
+        }
       />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-6">
+          {order.bookingSummary && (
+            <Card>
+              <CardContent className="p-5 flex items-start gap-3">
+                <Wrench className="h-5 w-5 text-primary mt-0.5" />
+                <div className="flex-1 text-sm">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+                    Linked to job
+                  </p>
+                  <Link href={`/bookings/${order.bookingSummary.id}`}>
+                    <p className="font-semibold hover:text-primary cursor-pointer">
+                      {order.bookingSummary.serviceType}
+                    </p>
+                  </Link>
+                  <p className="text-muted-foreground">
+                    {order.bookingSummary.vehicleLabel} · Booking #{order.bookingSummary.id.slice(0, 8)}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardContent className="p-5">
               <div className="flex items-center gap-2 mb-4 pb-3 border-b">
@@ -167,6 +235,11 @@ export default function OrderDetail() {
               <p>{order.vendor?.name ?? "Vendor"}</p>
               <p className="text-muted-foreground">{order.vendor?.phone}</p>
               <p className="text-muted-foreground">{order.vendor?.address}</p>
+              {order.vendor?.city && (
+                <p className="text-xs text-muted-foreground">
+                  {order.vendor.city}{order.vendor.region ? `, ${order.vendor.region}` : ""}
+                </p>
+              )}
             </CardContent>
           </Card>
 
@@ -176,6 +249,11 @@ export default function OrderDetail() {
               <p>{order.buyerName}</p>
               <p className="text-muted-foreground">{order.buyerPhone}</p>
               <p className="text-muted-foreground whitespace-pre-line">{order.shippingAddress}</p>
+              {(order.deliveryCity || order.deliveryRegion) && (
+                <p className="text-xs text-muted-foreground">
+                  {order.deliveryCity}{order.deliveryRegion ? `, ${order.deliveryRegion}` : ""}
+                </p>
+              )}
               {order.notes && (
                 <div className="pt-2 mt-2 border-t">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Notes</p>
@@ -185,40 +263,135 @@ export default function OrderDetail() {
             </CardContent>
           </Card>
 
-          {isVendor && transitions.length > 0 && (
+          {order.deliveryAgent && (
+            <Card>
+              <CardContent className="p-5 space-y-1 text-sm">
+                <div className="flex items-center gap-2 font-semibold">
+                  <Truck className="h-4 w-4 text-primary" /> Delivery agent
+                </div>
+                <p>{order.deliveryAgent.name}</p>
+                <p className="text-muted-foreground">{order.deliveryAgent.phone}</p>
+                <p className="text-xs text-muted-foreground">
+                  {order.deliveryAgent.vehicleType} · {order.deliveryAgent.city}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Owner approval for proposed orders */}
+          {isOwner && order.status === "proposed" && (
+            <Card className="border-primary/40">
+              <CardContent className="p-5 space-y-3">
+                <p className="font-semibold">Approve parts request</p>
+                <p className="text-xs text-muted-foreground">
+                  Your mechanic proposed these parts for your service. Approving places the order with the vendor and reserves stock.
+                </p>
+                <div className="flex flex-col gap-2">
+                  <Button onClick={() => advance("placed")} disabled={updateStatus.isPending} className="gap-2 justify-start">
+                    <ThumbsUp className="h-4 w-4" /> Approve and place order
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => advance("cancelled")}
+                    disabled={updateStatus.isPending}
+                    className="gap-2 justify-start"
+                  >
+                    <ThumbsDown className="h-4 w-4" /> Reject
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Vendor fulfillment */}
+          {isVendor && (order.status === "placed" || order.status === "confirmed") && (
             <Card>
               <CardContent className="p-5 space-y-3">
                 <p className="font-semibold">Fulfillment</p>
-                {order.status === "confirmed" && (
-                  <div>
-                    <Label htmlFor="track" className="text-xs">Tracking code (optional)</Label>
-                    <Input
-                      id="track"
-                      value={tracking}
-                      onChange={(e) => setTracking(e.target.value)}
-                      placeholder="e.g. 1Z999AA10123456784"
-                      className="mt-1"
-                    />
+                {order.status === "placed" && (
+                  <div className="flex flex-col gap-2">
+                    <Button onClick={() => advance("confirmed")} disabled={updateStatus.isPending} className="gap-2 justify-start">
+                      <CheckCircle className="h-4 w-4" /> Confirm order
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => advance("cancelled")}
+                      disabled={updateStatus.isPending}
+                      className="gap-2 justify-start"
+                    >
+                      <X className="h-4 w-4" /> Cancel
+                    </Button>
                   </div>
                 )}
-                <div className="flex flex-col gap-2">
-                  {transitions.map((t) => {
-                    const Icon = t.icon;
-                    const isCancel = t.next === "cancelled";
-                    return (
+                {order.status === "confirmed" && (
+                  <>
+                    <div>
+                      <Label className="text-xs">Assign a delivery agent</Label>
+                      {agents && agents.length > 0 ? (
+                        <Select value={pickedAgent} onValueChange={setPickedAgent}>
+                          <SelectTrigger className="mt-1">
+                            <SelectValue placeholder="Pick an agent" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {agents.map((a) => (
+                              <SelectItem key={a.id} value={a.id}>
+                                {a.name} — {a.vehicleType} · {a.city}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          No active agents found near {order.deliveryCity || "this area"}.
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <Label htmlFor="track" className="text-xs">Tracking code (optional)</Label>
+                      <Input
+                        id="track"
+                        value={tracking}
+                        onChange={(e) => setTracking(e.target.value)}
+                        placeholder="e.g. NG-1Z999"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
                       <Button
-                        key={t.next}
-                        variant={isCancel ? "outline" : "default"}
-                        onClick={() => advance(t.next)}
+                        onClick={() => advance("shipped", { deliveryAgentId: pickedAgent })}
+                        disabled={updateStatus.isPending || !pickedAgent}
+                        className="gap-2 justify-start"
+                      >
+                        <Truck className="h-4 w-4" /> Mark as shipped
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => advance("cancelled")}
                         disabled={updateStatus.isPending}
                         className="gap-2 justify-start"
                       >
-                        <Icon className="h-4 w-4" />
-                        {t.label}
+                        <X className="h-4 w-4" /> Cancel
                       </Button>
-                    );
-                  })}
-                </div>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Delivery agent action */}
+          {isMyDelivery && order.status === "shipped" && (
+            <Card className="border-primary/40">
+              <CardContent className="p-5 space-y-3">
+                <p className="font-semibold flex items-center gap-2">
+                  <User className="h-4 w-4 text-primary" /> Your delivery
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Mark this order delivered once the service center receives it.
+                </p>
+                <Button onClick={() => advance("delivered")} disabled={updateStatus.isPending} className="gap-2 justify-start w-full">
+                  <CheckCircle className="h-4 w-4" /> Mark delivered
+                </Button>
               </CardContent>
             </Card>
           )}

@@ -5,6 +5,8 @@ export const vendorsTable = pgTable("vendors", {
   name: text("name").notNull(),
   bio: text("bio"),
   address: text("address").notNull(),
+  city: text("city").notNull().default(""),
+  region: text("region").notNull().default(""),
   phone: text("phone").notNull(),
   rating: real("rating").notNull().default(0),
   reviewsCount: integer("reviews_count").notNull().default(0),

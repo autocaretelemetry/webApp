@@ -5,8 +5,13 @@
  * AutoCare API — vehicle owners book services, service centers fulfill them.
  * OpenAPI spec version: 0.1.0
  */
+import type { ListOrdersStatus } from './listOrdersStatus';
 
 export type ListOrdersParams = {
 vendorId?: string;
 buyerName?: string;
+bookingId?: string;
+mechanicId?: string;
+deliveryAgentId?: string;
+status?: ListOrdersStatus;
 };

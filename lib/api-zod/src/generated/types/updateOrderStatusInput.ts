@@ -10,4 +10,5 @@ import type { UpdateOrderStatusInputStatus } from './updateOrderStatusInputStatu
 export interface UpdateOrderStatusInput {
   status: UpdateOrderStatusInputStatus;
   trackingCode?: string | null;
+  deliveryAgentId?: string | null;
 }

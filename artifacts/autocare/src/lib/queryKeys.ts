@@ -24,4 +24,6 @@ export {
   getListOrdersQueryKey,
   getGetOrderQueryKey,
   getGetVendorDashboardQueryKey,
+  getListDeliveryAgentsQueryKey,
+  getGetDeliveryAgentQueryKey,
 } from "@workspace/api-client-react";

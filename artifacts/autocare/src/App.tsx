@@ -28,6 +28,11 @@ import VendorParts from "@/pages/vendor/Parts";
 import NewPart from "@/pages/vendor/NewPart";
 import VendorOrders from "@/pages/vendor/Orders";
 
+// Delivery Pages
+import DeliveryDashboard from "@/pages/delivery/Dashboard";
+import DeliveryRegister from "@/pages/delivery/Register";
+import DeliveryOrders from "@/pages/delivery/Orders";
+
 // Shared Pages
 import Bookings from "@/pages/shared/Bookings";
 import BookingDetail from "@/pages/shared/BookingDetail";
@@ -53,7 +58,8 @@ function HomeRoute() {
   const { role } = useRole();
   if (role === "owner") return <OwnerDashboard />;
   if (role === "center") return <CenterDashboard />;
-  return <VendorDashboard />;
+  if (role === "vendor") return <VendorDashboard />;
+  return <DeliveryDashboard />;
 }
 
 function RoleGuard({
@@ -84,6 +90,7 @@ const ownerOnly = (c: ComponentType) => () => <RoleGuard allow={["owner"]} compo
 const centerOnly = (c: ComponentType) => () => <RoleGuard allow={["center"]} component={c} />;
 const vendorOnly = (c: ComponentType) => () => <RoleGuard allow={["vendor"]} component={c} />;
 const buyersOnly = (c: ComponentType) => () => <RoleGuard allow={["owner", "center"]} component={c} />;
+const deliveryOnly = (c: ComponentType) => () => <RoleGuard allow={["delivery"]} component={c} />;
 
 function Router() {
   return (
@@ -108,8 +115,12 @@ function Router() {
         <Route path="/vendor/parts" component={vendorOnly(VendorParts)} />
         <Route path="/vendor/orders" component={vendorOnly(VendorOrders)} />
 
+        {/* Delivery Routes */}
+        <Route path="/delivery/register" component={deliveryOnly(DeliveryRegister)} />
+        <Route path="/delivery/orders" component={deliveryOnly(DeliveryOrders)} />
+
         {/* Marketplace (shared) */}
-        <Route path="/marketplace" component={Marketplace} />
+        <Route path="/marketplace" component={buyersOnly(Marketplace)} />
         <Route path="/marketplace/:id" component={PartDetail} />
         <Route path="/cart" component={buyersOnly(Cart)} />
         <Route path="/checkout" component={buyersOnly(Checkout)} />

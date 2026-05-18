@@ -14,6 +14,8 @@ import {
   ShoppingBag,
   Package,
   ShoppingCart,
+  Truck,
+  UserPlus,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -42,20 +44,32 @@ const VENDOR_NAV = [
   { href: "/marketplace", label: "Browse", icon: Store },
 ];
 
+const DELIVERY_NAV = [
+  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/delivery/orders", label: "My Deliveries", icon: Truck },
+  { href: "/delivery/register", label: "Profile", icon: UserPlus },
+];
+
 function navFor(role: Role) {
   if (role === "owner") return OWNER_NAV;
   if (role === "center") return CENTER_NAV;
-  return VENDOR_NAV;
+  if (role === "vendor") return VENDOR_NAV;
+  return DELIVERY_NAV;
 }
 
 function CartButton() {
-  const { itemCount } = useCart();
+  const { itemCount, scope } = useCart();
   return (
     <Link href="/cart">
       <span className="relative inline-flex items-center justify-center rounded-md h-9 w-9 hover:bg-sidebar-accent cursor-pointer transition-colors">
         <ShoppingCart className="h-4 w-4" />
         {itemCount > 0 && (
-          <span className="absolute -top-1 -right-1 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-semibold h-4 min-w-4 px-1">
+          <span
+            className={cn(
+              "absolute -top-1 -right-1 inline-flex items-center justify-center rounded-full text-primary-foreground text-[10px] font-semibold h-4 min-w-4 px-1",
+              scope ? "bg-indigo-600" : "bg-primary",
+            )}
+          >
             {itemCount}
           </span>
         )}
@@ -69,7 +83,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
 
   const navItems = navFor(role);
-  const showCart = role !== "vendor";
+  const showCart = role === "owner" || role === "center";
 
   return (
     <div className="flex min-h-screen bg-background flex-col md:flex-row">
@@ -82,10 +96,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="flex items-center gap-2">
           {showCart && <CartButton />}
           <Tabs value={role} onValueChange={(v) => setRole(v as Role)}>
-            <TabsList className="grid grid-cols-3">
-              <TabsTrigger value="owner" className="text-xs px-2">Owner</TabsTrigger>
-              <TabsTrigger value="center" className="text-xs px-2">Center</TabsTrigger>
-              <TabsTrigger value="vendor" className="text-xs px-2">Vendor</TabsTrigger>
+            <TabsList className="grid grid-cols-4">
+              <TabsTrigger value="owner" className="text-xs px-1.5">Owner</TabsTrigger>
+              <TabsTrigger value="center" className="text-xs px-1.5">Center</TabsTrigger>
+              <TabsTrigger value="vendor" className="text-xs px-1.5">Vendor</TabsTrigger>
+              <TabsTrigger value="delivery" className="text-xs px-1.5">Delivery</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
@@ -102,10 +117,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
 
         <Tabs value={role} onValueChange={(v) => setRole(v as Role)} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="owner" className="text-xs">Owner</TabsTrigger>
-            <TabsTrigger value="center" className="text-xs">Center</TabsTrigger>
-            <TabsTrigger value="vendor" className="text-xs">Vendor</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="owner" className="text-[11px] px-1">Owner</TabsTrigger>
+            <TabsTrigger value="center" className="text-[11px] px-1">Center</TabsTrigger>
+            <TabsTrigger value="vendor" className="text-[11px] px-1">Vendor</TabsTrigger>
+            <TabsTrigger value="delivery" className="text-[11px] px-1">Delivery</TabsTrigger>
           </TabsList>
         </Tabs>
 

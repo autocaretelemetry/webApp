@@ -6,17 +6,16 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface Vendor {
-  id: string;
+export interface RegisterDeliveryAgentInput {
+  /** @minLength 1 */
   name: string;
-  bio?: string | null;
-  address: string;
-  city: string;
-  region: string;
+  /** @minLength 1 */
   phone: string;
-  rating: number;
-  reviewsCount: number;
-  logoUrl?: string | null;
-  partsCount?: number;
-  createdAt: Date;
+  /** @minLength 1 */
+  city: string;
+  /** @minLength 1 */
+  region: string;
+  /** @minLength 1 */
+  vehicleType: string;
+  bio?: string | null;
 }

@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, count, inArray } from "drizzle-orm";
 import { db, vendorsTable, partsTable } from "@workspace/db";
-import { GetVendorParams } from "@workspace/api-zod";
+import { GetVendorParams, ListVendorsQueryParams } from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
@@ -17,9 +17,26 @@ async function hydrate(vendors: (typeof vendorsTable.$inferSelect)[]) {
   return vendors.map((v) => ({ ...v, partsCount: countMap.get(v.id) ?? 0 }));
 }
 
-router.get("/vendors", async (_req, res): Promise<void> => {
+router.get("/vendors", async (req, res): Promise<void> => {
+  const q = ListVendorsQueryParams.safeParse(req.query);
+  if (!q.success) {
+    res.status(400).json({ error: q.error.message });
+    return;
+  }
+  const nearCity = q.data.nearCity?.trim().toLowerCase() ?? "";
+  const nearRegion = q.data.nearRegion?.trim().toLowerCase() ?? "";
   const rows = await db.select().from(vendorsTable).orderBy(vendorsTable.name);
-  res.json(await hydrate(rows));
+  // Proximity sort: same city first, then same region, then everywhere else; stable by name within each tier.
+  const tiered = rows
+    .map((v, idx) => {
+      const sameCity = nearCity && v.city.toLowerCase() === nearCity;
+      const sameRegion = nearRegion && v.region.toLowerCase() === nearRegion;
+      const tier = sameCity ? 0 : sameRegion ? 1 : 2;
+      return { v, tier, idx };
+    })
+    .sort((a, b) => a.tier - b.tier || a.idx - b.idx)
+    .map((x) => x.v);
+  res.json(await hydrate(tiered));
 });
 
 router.get("/vendors/:vendorId", async (req, res): Promise<void> => {

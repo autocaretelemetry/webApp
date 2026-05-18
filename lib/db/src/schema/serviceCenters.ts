@@ -4,6 +4,8 @@ export const serviceCentersTable = pgTable("service_centers", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   address: text("address").notNull(),
+  city: text("city").notNull().default(""),
+  region: text("region").notNull().default(""),
   phone: text("phone").notNull(),
   specialties: text("specialties").array().notNull().default([]),
   rating: real("rating").notNull().default(0),

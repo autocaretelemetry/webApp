@@ -1,32 +1,65 @@
-import { useMemo, useState } from "react";
-import { Link } from "wouter";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useSearch } from "wouter";
 import {
   useListParts,
   useListPartCategories,
   useListVendors,
+  useGetBooking,
 } from "@workspace/api-client-react";
+import { getGetBookingQueryKey } from "@/lib/queryKeys";
 import { PageHeader } from "@/components/PageHeader";
 import { PartCard } from "@/components/PartCard";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useCart } from "@/lib/cart";
-import { ShoppingCart, Search, Store } from "lucide-react";
+import { useCart, setCartScope } from "@/lib/cart";
+import { ShoppingCart, Search, Store, Wrench, X, MapPin } from "lucide-react";
 
 export default function Marketplace() {
-  const [category, setCategory] = useState<string>("All");
-  const [search, setSearch] = useState("");
-  const [brand, setBrand] = useState<string>("All");
-  const { itemCount } = useCart();
+  const search = useSearch();
+  const [, navigate] = useLocation();
+  const queryParams = useMemo(() => new URLSearchParams(search), [search]);
+  const bookingId = queryParams.get("bookingId");
+  const mechanicId = queryParams.get("mechanicId");
 
-  const params: { category?: string; brand?: string; search?: string } = {};
+  // When opened from a booking, fetch it to derive city/region for proximity
+  // and set the cart scope so the cart becomes per-job.
+  const { data: booking } = useGetBooking(bookingId ?? "", {
+    query: { enabled: !!bookingId, queryKey: getGetBookingQueryKey(bookingId ?? "") },
+  });
+
+  useEffect(() => {
+    if (bookingId && mechanicId && booking) {
+      const label = `${booking.serviceType} · ${booking.vehicle?.brand ?? ""} ${booking.vehicle?.model ?? ""}`.trim();
+      setCartScope({ bookingId, mechanicId, bookingLabel: label });
+    }
+  }, [bookingId, mechanicId, booking]);
+
+  const [category, setCategory] = useState<string>("All");
+  const [searchText, setSearchText] = useState("");
+  const [brand, setBrand] = useState<string>("All");
+  const { itemCount, scope } = useCart();
+
+  const nearCity = booking?.serviceCenter?.city ?? undefined;
+  const nearRegion = booking?.serviceCenter?.region ?? undefined;
+
+  const params: {
+    category?: string;
+    brand?: string;
+    search?: string;
+    nearCity?: string;
+    nearRegion?: string;
+  } = {};
   if (category !== "All") params.category = category;
   if (brand !== "All") params.brand = brand;
-  if (search.trim().length > 0) params.search = search.trim();
+  if (searchText.trim().length > 0) params.search = searchText.trim();
+  if (nearCity) params.nearCity = nearCity;
+  if (nearRegion) params.nearRegion = nearRegion;
 
   const { data: parts, isLoading } = useListParts(params);
   const { data: categories } = useListPartCategories();
-  const { data: vendors } = useListVendors();
+  const vendorsParams = nearCity || nearRegion ? { nearCity, nearRegion } : {};
+  const { data: vendors } = useListVendors(vendorsParams);
 
   const brandOptions = useMemo(() => {
     const set = new Set<string>();
@@ -38,12 +71,16 @@ export default function Marketplace() {
     <div className="space-y-6 animate-in fade-in-50 duration-500">
       <PageHeader
         title="Marketplace"
-        description="Browse OEM and aftermarket parts from trusted vendors."
+        description={
+          scope
+            ? `Ordering parts for ${scope.bookingLabel || "this job"}.`
+            : "Browse OEM and aftermarket parts from trusted vendors."
+        }
         actions={
           <Link href="/cart">
             <Button variant="outline" className="gap-2">
               <ShoppingCart className="h-4 w-4" />
-              Cart
+              {scope ? "Job cart" : "Cart"}
               {itemCount > 0 && (
                 <span className="ml-1 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold h-5 min-w-5 px-1.5">
                   {itemCount}
@@ -54,11 +91,37 @@ export default function Marketplace() {
         }
       />
 
+      {scope && (
+        <div className="rounded-lg border border-indigo-200 bg-indigo-50 dark:border-indigo-900 dark:bg-indigo-950/30 p-4 flex items-start gap-3">
+          <Wrench className="h-5 w-5 text-indigo-700 dark:text-indigo-300 mt-0.5 flex-shrink-0" />
+          <div className="flex-1 text-sm">
+            <p className="font-medium text-indigo-900 dark:text-indigo-200">
+              Building a parts request for booking #{scope.bookingId.slice(0, 8)}
+            </p>
+            <p className="text-indigo-700 dark:text-indigo-300 mt-0.5">
+              The owner will approve before any vendor is paid. Shipping is set to the service center automatically.
+              {nearCity ? ` Showing vendors near ${nearCity} first.` : ""}
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setCartScope(null);
+              navigate("/marketplace");
+            }}
+            className="gap-1.5 text-indigo-900 dark:text-indigo-200"
+          >
+            <X className="h-3.5 w-3.5" /> Exit job mode
+          </Button>
+        </div>
+      )}
+
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
           placeholder="Search by part name, SKU, or description"
           className="pl-9"
         />
@@ -111,12 +174,17 @@ export default function Marketplace() {
         <div className="rounded-lg border bg-card p-4">
           <div className="flex items-center gap-2 mb-3 text-sm font-medium">
             <Store className="h-4 w-4 text-primary" />
-            Trusted Vendors
+            {nearCity ? `Vendors near ${nearCity}` : "Trusted Vendors"}
           </div>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {vendors.map((v) => (
               <div key={v.id} className="text-sm">
                 <span className="font-semibold">{v.name}</span>
+                {v.city && (
+                  <span className="text-muted-foreground inline-flex items-center gap-1 ml-1">
+                    <MapPin className="h-3 w-3" /> {v.city}
+                  </span>
+                )}
                 <span className="text-muted-foreground"> · {v.partsCount ?? 0} parts</span>
               </div>
             ))}

@@ -6,3 +6,4 @@ export * from "./invoices";
 export * from "./vendors";
 export * from "./parts";
 export * from "./orders";
+export * from "./deliveryAgents";

@@ -10,6 +10,8 @@ import type { CreateOrderItemInput } from './createOrderItemInput';
 
 export interface CreateOrderInput {
   vendorId: string;
+  bookingId?: string | null;
+  mechanicId?: string | null;
   buyerKind: CreateOrderInputBuyerKind;
   /** @minLength 1 */
   buyerName: string;
@@ -17,6 +19,8 @@ export interface CreateOrderInput {
   buyerPhone: string;
   /** @minLength 1 */
   shippingAddress: string;
+  deliveryCity?: string | null;
+  deliveryRegion?: string | null;
   notes?: string | null;
   /** @minItems 1 */
   items: CreateOrderItemInput[];

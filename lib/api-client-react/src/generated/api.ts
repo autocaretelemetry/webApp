@@ -31,19 +31,23 @@ import type {
   CreateOrderInput,
   CreatePartInput,
   CreateVehicleInput,
+  DeliveryAgent,
   HealthStatus,
   Invoice,
   ListActivityParams,
   ListBookingsParams,
+  ListDeliveryAgentsParams,
   ListOrdersParams,
   ListPartsParams,
   ListServiceCentersParams,
+  ListVendorsParams,
   MaintenanceReminder,
   Mechanic,
   Order,
   OrderDetail,
   OwnerDashboard,
   Part,
+  RegisterDeliveryAgentInput,
   ServiceCenter,
   ServiceRecord,
   ServiceType,
@@ -1836,20 +1840,27 @@ export function useListActivity<TData = Awaited<ReturnType<typeof listActivity>>
 
 
 
-export const getListVendorsUrl = () => {
+export const getListVendorsUrl = (params?: ListVendorsParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/vendors`
+  return stringifiedParams.length > 0 ? `/api/vendors?${stringifiedParams}` : `/api/vendors`
 }
 
 /**
- * @summary List all vendors
+ * @summary List all vendors, optionally sorted by proximity (same city first, then same region, then everywhere)
  */
-export const listVendors = async ( options?: RequestInit): Promise<Vendor[]> => {
+export const listVendors = async (params?: ListVendorsParams, options?: RequestInit): Promise<Vendor[]> => {
 
-  return customFetch<Vendor[]>(getListVendorsUrl(),
+  return customFetch<Vendor[]>(getListVendorsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -1862,23 +1873,23 @@ export const listVendors = async ( options?: RequestInit): Promise<Vendor[]> => 
 
 
 
-export const getListVendorsQueryKey = () => {
+export const getListVendorsQueryKey = (params?: ListVendorsParams,) => {
     return [
-    `/api/vendors`
+    `/api/vendors`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListVendorsQueryOptions = <TData = Awaited<ReturnType<typeof listVendors>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVendors>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListVendorsQueryOptions = <TData = Awaited<ReturnType<typeof listVendors>>, TError = ErrorType<unknown>>(params?: ListVendorsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVendors>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListVendorsQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListVendorsQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVendors>>> = ({ signal }) => listVendors({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVendors>>> = ({ signal }) => listVendors(params, { signal, ...requestOptions });
 
 
 
@@ -1892,15 +1903,15 @@ export type ListVendorsQueryError = ErrorType<unknown>
 
 
 /**
- * @summary List all vendors
+ * @summary List all vendors, optionally sorted by proximity (same city first, then same region, then everywhere)
  */
 
 export function useListVendors<TData = Awaited<ReturnType<typeof listVendors>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVendors>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ListVendorsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVendors>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListVendorsQueryOptions(options)
+  const queryOptions = getListVendorsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -2465,7 +2476,7 @@ export const getListOrdersUrl = (params?: ListOrdersParams,) => {
 }
 
 /**
- * @summary List orders, optionally scoped by vendor or buyer
+ * @summary List orders, optionally scoped by vendor, buyer, booking, mechanic, delivery agent, or status
  */
 export const listOrders = async (params?: ListOrdersParams, options?: RequestInit): Promise<Order[]> => {
 
@@ -2512,7 +2523,7 @@ export type ListOrdersQueryError = ErrorType<unknown>
 
 
 /**
- * @summary List orders, optionally scoped by vendor or buyer
+ * @summary List orders, optionally scoped by vendor, buyer, booking, mechanic, delivery agent, or status
  */
 
 export function useListOrders<TData = Awaited<ReturnType<typeof listOrders>>, TError = ErrorType<unknown>>(
@@ -2818,6 +2829,238 @@ export function useGetVendorDashboard<TData = Awaited<ReturnType<typeof getVendo
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetVendorDashboardQueryOptions(vendorId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListDeliveryAgentsUrl = (params?: ListDeliveryAgentsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/delivery-agents?${stringifiedParams}` : `/api/delivery-agents`
+}
+
+/**
+ * @summary List delivery agents, optionally filtered by city/region or active status
+ */
+export const listDeliveryAgents = async (params?: ListDeliveryAgentsParams, options?: RequestInit): Promise<DeliveryAgent[]> => {
+
+  return customFetch<DeliveryAgent[]>(getListDeliveryAgentsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListDeliveryAgentsQueryKey = (params?: ListDeliveryAgentsParams,) => {
+    return [
+    `/api/delivery-agents`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListDeliveryAgentsQueryOptions = <TData = Awaited<ReturnType<typeof listDeliveryAgents>>, TError = ErrorType<unknown>>(params?: ListDeliveryAgentsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDeliveryAgents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListDeliveryAgentsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listDeliveryAgents>>> = ({ signal }) => listDeliveryAgents(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDeliveryAgents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListDeliveryAgentsQueryResult = NonNullable<Awaited<ReturnType<typeof listDeliveryAgents>>>
+export type ListDeliveryAgentsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List delivery agents, optionally filtered by city/region or active status
+ */
+
+export function useListDeliveryAgents<TData = Awaited<ReturnType<typeof listDeliveryAgents>>, TError = ErrorType<unknown>>(
+ params?: ListDeliveryAgentsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDeliveryAgents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListDeliveryAgentsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getRegisterDeliveryAgentUrl = () => {
+
+
+
+
+  return `/api/delivery-agents`
+}
+
+/**
+ * @summary Self-register as a delivery agent
+ */
+export const registerDeliveryAgent = async (registerDeliveryAgentInput: RegisterDeliveryAgentInput, options?: RequestInit): Promise<DeliveryAgent> => {
+
+  return customFetch<DeliveryAgent>(getRegisterDeliveryAgentUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      registerDeliveryAgentInput,)
+  }
+);}
+
+
+
+
+export const getRegisterDeliveryAgentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerDeliveryAgent>>, TError,{data: BodyType<RegisterDeliveryAgentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof registerDeliveryAgent>>, TError,{data: BodyType<RegisterDeliveryAgentInput>}, TContext> => {
+
+const mutationKey = ['registerDeliveryAgent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registerDeliveryAgent>>, {data: BodyType<RegisterDeliveryAgentInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  registerDeliveryAgent(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegisterDeliveryAgentMutationResult = NonNullable<Awaited<ReturnType<typeof registerDeliveryAgent>>>
+    export type RegisterDeliveryAgentMutationBody = BodyType<RegisterDeliveryAgentInput>
+    export type RegisterDeliveryAgentMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Self-register as a delivery agent
+ */
+export const useRegisterDeliveryAgent = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerDeliveryAgent>>, TError,{data: BodyType<RegisterDeliveryAgentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof registerDeliveryAgent>>,
+        TError,
+        {data: BodyType<RegisterDeliveryAgentInput>},
+        TContext
+      > => {
+      return useMutation(getRegisterDeliveryAgentMutationOptions(options));
+    }
+
+export const getGetDeliveryAgentUrl = (agentId: string,) => {
+
+
+
+
+  return `/api/delivery-agents/${agentId}`
+}
+
+/**
+ * @summary Get a delivery agent
+ */
+export const getDeliveryAgent = async (agentId: string, options?: RequestInit): Promise<DeliveryAgent> => {
+
+  return customFetch<DeliveryAgent>(getGetDeliveryAgentUrl(agentId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDeliveryAgentQueryKey = (agentId: string,) => {
+    return [
+    `/api/delivery-agents/${agentId}`
+    ] as const;
+    }
+
+
+export const getGetDeliveryAgentQueryOptions = <TData = Awaited<ReturnType<typeof getDeliveryAgent>>, TError = ErrorType<unknown>>(agentId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDeliveryAgent>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDeliveryAgentQueryKey(agentId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDeliveryAgent>>> = ({ signal }) => getDeliveryAgent(agentId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(agentId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDeliveryAgent>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDeliveryAgentQueryResult = NonNullable<Awaited<ReturnType<typeof getDeliveryAgent>>>
+export type GetDeliveryAgentQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get a delivery agent
+ */
+
+export function useGetDeliveryAgent<TData = Awaited<ReturnType<typeof getDeliveryAgent>>, TError = ErrorType<unknown>>(
+ agentId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDeliveryAgent>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDeliveryAgentQueryOptions(agentId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

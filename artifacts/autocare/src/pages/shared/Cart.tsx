@@ -2,12 +2,12 @@ import { Link, useLocation } from "wouter";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { useCart, updateQuantity, removeFromCart } from "@/lib/cart";
+import { useCart, updateQuantity, removeFromCart, setCartScope } from "@/lib/cart";
 import { formatCurrency } from "@/lib/format";
-import { ShoppingCart, Trash2, Plus, Minus, Package, Store } from "lucide-react";
+import { ShoppingCart, Trash2, Plus, Minus, Package, Store, Wrench, X } from "lucide-react";
 
 export default function Cart() {
-  const { lines, subtotal, vendorIds } = useCart();
+  const { lines, subtotal, vendorIds, scope } = useCart();
   const [, navigate] = useLocation();
 
   const shippingFee = subtotal > 200 ? 0 : subtotal > 0 ? 12 : 0;
@@ -22,11 +22,18 @@ export default function Cart() {
   if (lines.length === 0) {
     return (
       <div className="space-y-8 animate-in fade-in-50 duration-500">
-        <PageHeader title="Your Cart" description="Review and check out the parts you need." />
+        <PageHeader
+          title={scope ? "Job parts cart" : "Your Cart"}
+          description={
+            scope
+              ? `For booking #${scope.bookingId.slice(0, 8)}. Add parts the owner should approve.`
+              : "Review and check out the parts you need."
+          }
+        />
         <div className="py-16 text-center bg-muted/30 rounded-lg border border-dashed">
           <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
           <p className="text-muted-foreground mb-4">Your cart is empty.</p>
-          <Link href="/marketplace">
+          <Link href={scope ? `/marketplace?bookingId=${scope.bookingId}&mechanicId=${scope.mechanicId}` : "/marketplace"}>
             <Button>Browse marketplace</Button>
           </Link>
         </div>
@@ -36,7 +43,37 @@ export default function Cart() {
 
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-500">
-      <PageHeader title="Your Cart" description={`${lines.length} item${lines.length === 1 ? "" : "s"} from ${vendorIds.length} vendor${vendorIds.length === 1 ? "" : "s"}.`} />
+      <PageHeader
+        title={scope ? "Job parts cart" : "Your Cart"}
+        description={`${lines.length} item${lines.length === 1 ? "" : "s"} from ${vendorIds.length} vendor${vendorIds.length === 1 ? "" : "s"}.`}
+      />
+
+      {scope && (
+        <Card className="border-indigo-200 bg-indigo-50 dark:border-indigo-900 dark:bg-indigo-950/30">
+          <CardContent className="p-4 text-sm flex items-start gap-3">
+            <Wrench className="h-5 w-5 text-indigo-700 dark:text-indigo-300 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="font-medium text-indigo-900 dark:text-indigo-200">
+                Parts request for booking #{scope.bookingId.slice(0, 8)}
+              </p>
+              <p className="text-indigo-700 dark:text-indigo-300 mt-0.5">
+                Submitting will send these orders to the owner for approval before any vendor ships.
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setCartScope(null);
+                navigate("/cart");
+              }}
+              className="gap-1.5 text-indigo-900 dark:text-indigo-200"
+            >
+              <X className="h-3.5 w-3.5" /> Exit job mode
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {vendorIds.length > 1 && (
         <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900">
@@ -130,9 +167,9 @@ export default function Cart() {
               </div>
             </div>
             <Button className="w-full" size="lg" onClick={() => navigate("/checkout")}>
-              Proceed to checkout
+              {scope ? "Send to owner for approval" : "Proceed to checkout"}
             </Button>
-            <Link href="/marketplace">
+            <Link href={scope ? `/marketplace?bookingId=${scope.bookingId}&mechanicId=${scope.mechanicId}` : "/marketplace"}>
               <Button variant="outline" className="w-full">Keep shopping</Button>
             </Link>
           </CardContent>

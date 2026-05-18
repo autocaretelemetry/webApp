@@ -386,7 +386,10 @@ paths:
     get:
       operationId: listVendors
       tags: [vendors]
-      summary: List all vendors
+      summary: List all vendors, optionally sorted by proximity (same city first, then same region, then everywhere)
+      parameters:
+        - { name: nearCity, in: query, required: false, schema: { type: string } }
+        - { name: nearRegion, in: query, required: false, schema: { type: string } }
       responses:
         "200":
           description: OK
@@ -510,10 +513,19 @@ paths:
     get:
       operationId: listOrders
       tags: [orders]
-      summary: List orders, optionally scoped by vendor or buyer
+      summary: List orders, optionally scoped by vendor, buyer, booking, mechanic, delivery agent, or status
       parameters:
         - { name: vendorId, in: query, required: false, schema: { type: string } }
         - { name: buyerName, in: query, required: false, schema: { type: string } }
+        - { name: bookingId, in: query, required: false, schema: { type: string } }
+        - { name: mechanicId, in: query, required: false, schema: { type: string } }
+        - { name: deliveryAgentId, in: query, required: false, schema: { type: string } }
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [proposed, placed, confirmed, shipped, delivered, cancelled]
       responses:
         "200":
           description: OK
@@ -584,6 +596,53 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/VendorDashboard" }
+
+  /delivery-agents:
+    get:
+      operationId: listDeliveryAgents
+      tags: [delivery]
+      summary: List delivery agents, optionally filtered by city/region or active status
+      parameters:
+        - { name: city, in: query, required: false, schema: { type: string } }
+        - { name: region, in: query, required: false, schema: { type: string } }
+        - { name: activeOnly, in: query, required: false, schema: { type: boolean } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/DeliveryAgent" }
+    post:
+      operationId: registerDeliveryAgent
+      tags: [delivery]
+      summary: Self-register as a delivery agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegisterDeliveryAgentInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeliveryAgent" }
+
+  /delivery-agents/{agentId}:
+    get:
+      operationId: getDeliveryAgent
+      tags: [delivery]
+      summary: Get a delivery agent
+      parameters:
+        - { name: agentId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeliveryAgent" }
 
   /catalog/service-types:
     get:
@@ -667,6 +726,8 @@ components:
         id: { type: string }
         name: { type: string }
         address: { type: string }
+        city: { type: string }
+        region: { type: string }
         phone: { type: string }
         specialties:
           type: array
@@ -897,12 +958,14 @@ components:
 
     Vendor:
       type: object
-      required: [id, name, address, phone, rating, reviewsCount, createdAt]
+      required: [id, name, address, city, region, phone, rating, reviewsCount, createdAt]
       properties:
         id: { type: string }
         name: { type: string }
         bio: { type: string, nullable: true }
         address: { type: string }
+        city: { type: string }
+        region: { type: string }
         phone: { type: string }
         rating: { type: number }
         reviewsCount: { type: integer }
@@ -979,20 +1042,28 @@ components:
       properties:
         id: { type: string }
         vendorId: { type: string }
+        bookingId: { type: string, nullable: true }
+        mechanicId: { type: string, nullable: true }
+        deliveryAgentId: { type: string, nullable: true }
         buyerKind:
           type: string
           enum: [owner, center]
         buyerName: { type: string }
         buyerPhone: { type: string }
         shippingAddress: { type: string }
+        deliveryCity: { type: string }
+        deliveryRegion: { type: string }
         notes: { type: string, nullable: true }
         status:
           type: string
-          enum: [placed, confirmed, shipped, delivered, cancelled]
+          enum: [proposed, placed, confirmed, shipped, delivered, cancelled]
         itemsTotal: { type: number }
         shippingFee: { type: number }
         total: { type: number }
+        proposedAt: { type: string, format: date-time, nullable: true }
         placedAt: { type: string, format: date-time }
+        approvedAt: { type: string, format: date-time, nullable: true }
+        rejectedAt: { type: string, format: date-time, nullable: true }
         confirmedAt: { type: string, format: date-time, nullable: true }
         shippedAt: { type: string, format: date-time, nullable: true }
         deliveredAt: { type: string, format: date-time, nullable: true }
@@ -1003,6 +1074,27 @@ components:
           oneOf:
             - { $ref: "#/components/schemas/Vendor" }
             - { type: "null" }
+        mechanic:
+          oneOf:
+            - { $ref: "#/components/schemas/Mechanic" }
+            - { type: "null" }
+        deliveryAgent:
+          oneOf:
+            - { $ref: "#/components/schemas/DeliveryAgent" }
+            - { type: "null" }
+        bookingSummary:
+          oneOf:
+            - { $ref: "#/components/schemas/OrderBookingSummary" }
+            - { type: "null" }
+
+    OrderBookingSummary:
+      type: object
+      required: [id, serviceType, status, vehicleLabel]
+      properties:
+        id: { type: string }
+        serviceType: { type: string }
+        status: { type: string }
+        vehicleLabel: { type: string }
 
     OrderLine:
       type: object
@@ -1047,12 +1139,18 @@ components:
       required: [vendorId, buyerKind, buyerName, buyerPhone, shippingAddress, items]
       properties:
         vendorId: { type: string }
+        # If bookingId + mechanicId are provided, the order is created in the "proposed" state
+        # and goes to the car owner for approval before being placed and stock-reserved.
+        bookingId: { type: string, nullable: true }
+        mechanicId: { type: string, nullable: true }
         buyerKind:
           type: string
           enum: [owner, center]
         buyerName: { type: string, minLength: 1 }
         buyerPhone: { type: string, minLength: 1 }
         shippingAddress: { type: string, minLength: 1 }
+        deliveryCity: { type: string, nullable: true }
+        deliveryRegion: { type: string, nullable: true }
         notes: { type: string, nullable: true }
         items:
           type: array
@@ -1067,6 +1165,35 @@ components:
           type: string
           enum: [placed, confirmed, shipped, delivered, cancelled]
         trackingCode: { type: string, nullable: true }
+        # Required when transitioning confirmed → shipped
+        deliveryAgentId: { type: string, nullable: true }
+
+    DeliveryAgent:
+      type: object
+      required: [id, name, phone, city, region, vehicleType, rating, completedDeliveries, active, createdAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        phone: { type: string }
+        city: { type: string }
+        region: { type: string }
+        vehicleType: { type: string }
+        bio: { type: string, nullable: true }
+        rating: { type: number }
+        completedDeliveries: { type: integer }
+        active: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    RegisterDeliveryAgentInput:
+      type: object
+      required: [name, phone, city, region, vehicleType]
+      properties:
+        name: { type: string, minLength: 1 }
+        phone: { type: string, minLength: 1 }
+        city: { type: string, minLength: 1 }
+        region: { type: string, minLength: 1 }
+        vehicleType: { type: string, minLength: 1 }
+        bio: { type: string, nullable: true }
 
     VendorDashboard:
       type: object

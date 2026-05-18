@@ -71,6 +71,8 @@ export interface ServiceCenter {
   id: string;
   name: string;
   address: string;
+  city?: string;
+  region?: string;
   phone: string;
   specialties: string[];
   rating: number;
@@ -304,6 +306,8 @@ export interface Vendor {
   name: string;
   bio?: string | null;
   address: string;
+  city: string;
+  region: string;
   phone: string;
   rating: number;
   reviewsCount: number;
@@ -380,6 +384,7 @@ export type OrderStatus = typeof OrderStatus[keyof typeof OrderStatus];
 
 
 export const OrderStatus = {
+  proposed: 'proposed',
   placed: 'placed',
   confirmed: 'confirmed',
   shipped: 'shipped',
@@ -387,19 +392,48 @@ export const OrderStatus = {
   cancelled: 'cancelled',
 } as const;
 
+export interface DeliveryAgent {
+  id: string;
+  name: string;
+  phone: string;
+  city: string;
+  region: string;
+  vehicleType: string;
+  bio?: string | null;
+  rating: number;
+  completedDeliveries: number;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface OrderBookingSummary {
+  id: string;
+  serviceType: string;
+  status: string;
+  vehicleLabel: string;
+}
+
 export interface Order {
   id: string;
   vendorId: string;
+  bookingId?: string | null;
+  mechanicId?: string | null;
+  deliveryAgentId?: string | null;
   buyerKind: OrderBuyerKind;
   buyerName: string;
   buyerPhone: string;
   shippingAddress: string;
+  deliveryCity?: string;
+  deliveryRegion?: string;
   notes?: string | null;
   status: OrderStatus;
   itemsTotal: number;
   shippingFee: number;
   total: number;
+  proposedAt?: string | null;
   placedAt: string;
+  approvedAt?: string | null;
+  rejectedAt?: string | null;
   confirmedAt?: string | null;
   shippedAt?: string | null;
   deliveredAt?: string | null;
@@ -407,6 +441,9 @@ export interface Order {
   trackingCode?: string | null;
   itemsCount?: number;
   vendor?: Vendor | null;
+  mechanic?: Mechanic | null;
+  deliveryAgent?: DeliveryAgent | null;
+  bookingSummary?: OrderBookingSummary | null;
 }
 
 export type OrderLineSnapshot = {
@@ -448,6 +485,8 @@ export const CreateOrderInputBuyerKind = {
 
 export interface CreateOrderInput {
   vendorId: string;
+  bookingId?: string | null;
+  mechanicId?: string | null;
   buyerKind: CreateOrderInputBuyerKind;
   /** @minLength 1 */
   buyerName: string;
@@ -455,6 +494,8 @@ export interface CreateOrderInput {
   buyerPhone: string;
   /** @minLength 1 */
   shippingAddress: string;
+  deliveryCity?: string | null;
+  deliveryRegion?: string | null;
   notes?: string | null;
   /** @minItems 1 */
   items: CreateOrderItemInput[];
@@ -474,6 +515,21 @@ export const UpdateOrderStatusInputStatus = {
 export interface UpdateOrderStatusInput {
   status: UpdateOrderStatusInputStatus;
   trackingCode?: string | null;
+  deliveryAgentId?: string | null;
+}
+
+export interface RegisterDeliveryAgentInput {
+  /** @minLength 1 */
+  name: string;
+  /** @minLength 1 */
+  phone: string;
+  /** @minLength 1 */
+  city: string;
+  /** @minLength 1 */
+  region: string;
+  /** @minLength 1 */
+  vehicleType: string;
+  bio?: string | null;
 }
 
 export interface VendorDashboard {
@@ -528,6 +584,11 @@ export const ListActivityRole = {
   center: 'center',
 } as const;
 
+export type ListVendorsParams = {
+nearCity?: string;
+nearRegion?: string;
+};
+
 export type ListPartsParams = {
 category?: string;
 brand?: string;
@@ -537,5 +598,27 @@ search?: string;
 export type ListOrdersParams = {
 vendorId?: string;
 buyerName?: string;
+bookingId?: string;
+mechanicId?: string;
+deliveryAgentId?: string;
+status?: ListOrdersStatus;
+};
+
+export type ListOrdersStatus = typeof ListOrdersStatus[keyof typeof ListOrdersStatus];
+
+
+export const ListOrdersStatus = {
+  proposed: 'proposed',
+  placed: 'placed',
+  confirmed: 'confirmed',
+  shipped: 'shipped',
+  delivered: 'delivered',
+  cancelled: 'cancelled',
+} as const;
+
+export type ListDeliveryAgentsParams = {
+city?: string;
+region?: string;
+activeOnly?: boolean;
 };
 

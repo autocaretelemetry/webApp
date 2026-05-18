@@ -18,6 +18,7 @@ export const INVOICE_STATUS_CONFIG: Record<InvoiceStatus, { label: string; color
 };
 
 export const ORDER_STATUS_CONFIG: Record<OrderStatus, { label: string; colorClass: string }> = {
+  proposed: { label: "Awaiting Owner Approval", colorClass: "bg-primary/10 text-primary border-primary/20 dark:bg-primary/20 dark:text-primary-foreground dark:border-primary/30" },
   placed: { label: "Placed", colorClass: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800" },
   confirmed: { label: "Confirmed", colorClass: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800" },
   shipped: { label: "Shipped", colorClass: "bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800" },
