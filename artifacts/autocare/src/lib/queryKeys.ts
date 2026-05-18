@@ -1,0 +1,18 @@
+export {
+  getHealthCheckQueryKey,
+  getListVehiclesQueryKey,
+  getGetVehicleQueryKey,
+  getGetVehicleHistoryQueryKey,
+  getGetVehicleRemindersQueryKey,
+  getListServiceCentersQueryKey,
+  getGetServiceCenterQueryKey,
+  getListMechanicsForCenterQueryKey,
+  getGetMechanicQueryKey,
+  getListBookingsQueryKey,
+  getGetBookingQueryKey,
+  getGetInvoiceQueryKey,
+  getGetOwnerDashboardQueryKey,
+  getGetCenterDashboardQueryKey,
+  getListActivityQueryKey,
+  getListServiceTypesQueryKey,
+} from "@workspace/api-client-react";

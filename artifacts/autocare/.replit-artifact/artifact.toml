@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "AutoCare"
+version = "1.0.0"
+id = "artifacts/autocare"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22848
+
+[services.development]
+run = "pnpm --filter @workspace/autocare run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/autocare", "run", "build" ]
+publicDir = "artifacts/autocare/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22848"
+BASE_PATH = "/"

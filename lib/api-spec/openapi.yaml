@@ -3,34 +3,688 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: AutoCare API — vehicle owners book services, service centers fulfill them.
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: vehicles
+  - name: serviceCenters
+  - name: mechanics
+  - name: bookings
+  - name: invoices
+  - name: dashboard
+  - name: catalog
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
           content:
             application/json:
+              schema: { $ref: "#/components/schemas/HealthStatus" }
+
+  /vehicles:
+    get:
+      operationId: listVehicles
+      tags: [vehicles]
+      summary: List all vehicles for the current owner
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
               schema:
-                $ref: "#/components/schemas/HealthStatus"
+                type: array
+                items: { $ref: "#/components/schemas/Vehicle" }
+    post:
+      operationId: createVehicle
+      tags: [vehicles]
+      summary: Register a new vehicle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateVehicleInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Vehicle" }
+
+  /vehicles/{vehicleId}:
+    get:
+      operationId: getVehicle
+      tags: [vehicles]
+      parameters:
+        - { name: vehicleId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Vehicle" }
+    patch:
+      operationId: updateVehicle
+      tags: [vehicles]
+      parameters:
+        - { name: vehicleId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateVehicleInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Vehicle" }
+    delete:
+      operationId: deleteVehicle
+      tags: [vehicles]
+      parameters:
+        - { name: vehicleId, in: path, required: true, schema: { type: string } }
+      responses:
+        "204": { description: Deleted }
+
+  /vehicles/{vehicleId}/history:
+    get:
+      operationId: getVehicleHistory
+      tags: [vehicles]
+      summary: Full service history timeline for a vehicle
+      parameters:
+        - { name: vehicleId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ServiceRecord" }
+
+  /vehicles/{vehicleId}/reminders:
+    get:
+      operationId: getVehicleReminders
+      tags: [vehicles]
+      summary: Smart maintenance reminders for a vehicle
+      parameters:
+        - { name: vehicleId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MaintenanceReminder" }
+
+  /service-centers:
+    get:
+      operationId: listServiceCenters
+      tags: [serviceCenters]
+      summary: Browse service centers
+      parameters:
+        - { name: specialty, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ServiceCenter" }
+
+  /service-centers/{centerId}:
+    get:
+      operationId: getServiceCenter
+      tags: [serviceCenters]
+      parameters:
+        - { name: centerId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServiceCenter" }
+
+  /service-centers/{centerId}/mechanics:
+    get:
+      operationId: listMechanicsForCenter
+      tags: [mechanics]
+      parameters:
+        - { name: centerId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Mechanic" }
+
+  /mechanics/{mechanicId}:
+    get:
+      operationId: getMechanic
+      tags: [mechanics]
+      parameters:
+        - { name: mechanicId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Mechanic" }
+
+  /bookings:
+    get:
+      operationId: listBookings
+      tags: [bookings]
+      summary: List bookings for the active role
+      parameters:
+        - name: role
+          in: query
+          required: false
+          schema: { type: string, enum: [owner, center] }
+        - name: status
+          in: query
+          required: false
+          schema: { type: string, enum: [requested, accepted, in_progress, awaiting_approval, approved, completed, cancelled] }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Booking" }
+    post:
+      operationId: createBooking
+      tags: [bookings]
+      summary: Owner books a service
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateBookingInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Booking" }
+
+  /bookings/{bookingId}:
+    get:
+      operationId: getBooking
+      tags: [bookings]
+      parameters:
+        - { name: bookingId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BookingDetail" }
+
+  /bookings/{bookingId}/status:
+    patch:
+      operationId: updateBookingStatus
+      tags: [bookings]
+      summary: Move a booking through its lifecycle
+      parameters:
+        - { name: bookingId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateBookingStatusInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Booking" }
+
+  /bookings/{bookingId}/assign-mechanic:
+    post:
+      operationId: assignMechanic
+      tags: [bookings]
+      summary: Service center assigns a mechanic to a booking
+      parameters:
+        - { name: bookingId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssignMechanicInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Booking" }
+
+  /bookings/{bookingId}/invoice:
+    post:
+      operationId: createInvoice
+      tags: [invoices]
+      summary: Service center creates an invoice for a booking
+      parameters:
+        - { name: bookingId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateInvoiceInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Invoice" }
+
+  /invoices/{invoiceId}:
+    get:
+      operationId: getInvoice
+      tags: [invoices]
+      parameters:
+        - { name: invoiceId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Invoice" }
+
+  /invoices/{invoiceId}/approve:
+    post:
+      operationId: approveInvoice
+      tags: [invoices]
+      summary: Owner approves a pending invoice
+      parameters:
+        - { name: invoiceId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Invoice" }
+
+  /invoices/{invoiceId}/pay:
+    post:
+      operationId: payInvoice
+      tags: [invoices]
+      summary: Mark an approved invoice as paid (mocked payment)
+      parameters:
+        - { name: invoiceId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Invoice" }
+
+  /dashboard/owner:
+    get:
+      operationId: getOwnerDashboard
+      tags: [dashboard]
+      summary: Headline numbers for the vehicle owner
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OwnerDashboard" }
+
+  /dashboard/center:
+    get:
+      operationId: getCenterDashboard
+      tags: [dashboard]
+      summary: Headline numbers for the service center
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CenterDashboard" }
+
+  /activity:
+    get:
+      operationId: listActivity
+      tags: [dashboard]
+      summary: Recent activity feed across the platform
+      parameters:
+        - name: role
+          in: query
+          required: false
+          schema: { type: string, enum: [owner, center] }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, default: 20 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ActivityEvent" }
+
+  /catalog/service-types:
+    get:
+      operationId: listServiceTypes
+      tags: [catalog]
+      summary: Available service categories owners can book
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ServiceType" }
+
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
+      properties:
+        status: { type: string }
+
+    Vehicle:
+      type: object
+      required: [id, ownerName, brand, model, year, plateNumber, color, mileage, createdAt]
+      properties:
+        id: { type: string }
+        ownerName: { type: string }
+        ownerPhone: { type: string, nullable: true }
+        brand: { type: string }
+        model: { type: string }
+        year: { type: integer }
+        vin: { type: string, nullable: true }
+        plateNumber: { type: string }
+        color: { type: string }
+        engineType: { type: string, nullable: true }
+        mileage: { type: integer }
+        imageUrl: { type: string, nullable: true }
+        nextServiceDate: { type: string, format: date-time, nullable: true }
+        insuranceProvider: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    CreateVehicleInput:
+      type: object
+      required: [ownerName, brand, model, year, plateNumber, color, mileage]
+      properties:
+        ownerName: { type: string, minLength: 1 }
+        ownerPhone: { type: string, nullable: true }
+        brand: { type: string, minLength: 1 }
+        model: { type: string, minLength: 1 }
+        year: { type: integer, minimum: 1900, maximum: 2100 }
+        vin: { type: string, nullable: true }
+        plateNumber: { type: string, minLength: 1 }
+        color: { type: string, minLength: 1 }
+        engineType: { type: string, nullable: true }
+        mileage: { type: integer, minimum: 0 }
+        imageUrl: { type: string, nullable: true }
+        insuranceProvider: { type: string, nullable: true }
+
+    UpdateVehicleInput:
+      type: object
+      properties:
+        ownerName: { type: string }
+        ownerPhone: { type: string, nullable: true }
+        brand: { type: string }
+        model: { type: string }
+        year: { type: integer }
+        vin: { type: string, nullable: true }
+        plateNumber: { type: string }
+        color: { type: string }
+        engineType: { type: string, nullable: true }
+        mileage: { type: integer }
+        imageUrl: { type: string, nullable: true }
+        insuranceProvider: { type: string, nullable: true }
+
+    ServiceCenter:
+      type: object
+      required: [id, name, address, phone, specialties, rating, reviewsCount, openJobs]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        address: { type: string }
+        phone: { type: string }
+        specialties:
+          type: array
+          items: { type: string }
+        rating: { type: number }
+        reviewsCount: { type: integer }
+        openJobs: { type: integer }
+        imageUrl: { type: string, nullable: true }
+        bio: { type: string, nullable: true }
+
+    Mechanic:
+      type: object
+      required: [id, serviceCenterId, name, yearsExperience, specialization, rating, completedJobs]
+      properties:
+        id: { type: string }
+        serviceCenterId: { type: string }
+        name: { type: string }
+        yearsExperience: { type: integer }
+        specialization: { type: string }
+        certifications:
+          type: array
+          items: { type: string }
+        rating: { type: number }
+        completedJobs: { type: integer }
+        avatarUrl: { type: string, nullable: true }
+
+    Booking:
+      type: object
+      required: [id, vehicleId, serviceCenterId, serviceType, description, status, requestedAt]
+      properties:
+        id: { type: string }
+        vehicleId: { type: string }
+        serviceCenterId: { type: string }
+        mechanicId: { type: string, nullable: true }
+        serviceType: { type: string }
+        description: { type: string }
+        status:
+          type: string
+          enum: [requested, accepted, in_progress, awaiting_approval, approved, completed, cancelled]
+        requestedAt: { type: string, format: date-time }
+        scheduledAt: { type: string, format: date-time, nullable: true }
+        completedAt: { type: string, format: date-time, nullable: true }
+        estimatedDurationHours: { type: number, nullable: true }
+        vehicle: { $ref: "#/components/schemas/Vehicle" }
+        serviceCenter: { $ref: "#/components/schemas/ServiceCenter" }
+        mechanic:
+          oneOf:
+            - { $ref: "#/components/schemas/Mechanic" }
+            - { type: "null" }
+        invoiceId: { type: string, nullable: true }
+
+    BookingDetail:
+      allOf:
+        - $ref: "#/components/schemas/Booking"
+        - type: object
+          properties:
+            invoice:
+              oneOf:
+                - { $ref: "#/components/schemas/Invoice" }
+                - { type: "null" }
+            timeline:
+              type: array
+              items: { $ref: "#/components/schemas/TimelineEntry" }
+
+    TimelineEntry:
+      type: object
+      required: [at, label]
+      properties:
+        at: { type: string, format: date-time }
+        label: { type: string }
+        actor: { type: string, nullable: true }
+
+    CreateBookingInput:
+      type: object
+      required: [vehicleId, serviceCenterId, serviceType, description]
+      properties:
+        vehicleId: { type: string }
+        serviceCenterId: { type: string }
+        serviceType: { type: string }
+        description: { type: string }
+        scheduledAt: { type: string, format: date-time, nullable: true }
+
+    UpdateBookingStatusInput:
+      type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
+          enum: [requested, accepted, in_progress, awaiting_approval, approved, completed, cancelled]
+        estimatedDurationHours: { type: number, nullable: true }
+        scheduledAt: { type: string, format: date-time, nullable: true }
 
+    AssignMechanicInput:
+      type: object
+      required: [mechanicId]
+      properties:
+        mechanicId: { type: string }
+
+    InvoiceItem:
+      type: object
+      required: [description, quantity, unitPrice, kind]
+      properties:
+        description: { type: string }
+        quantity: { type: number }
+        unitPrice: { type: number }
+        kind:
+          type: string
+          enum: [labor, part]
+
+    Invoice:
+      type: object
+      required: [id, bookingId, items, laborTotal, partsTotal, tax, total, status, createdAt]
+      properties:
+        id: { type: string }
+        bookingId: { type: string }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/InvoiceItem" }
+        laborTotal: { type: number }
+        partsTotal: { type: number }
+        tax: { type: number }
+        total: { type: number }
+        notes: { type: string, nullable: true }
+        status:
+          type: string
+          enum: [pending_approval, approved, paid, rejected]
+        createdAt: { type: string, format: date-time }
+        approvedAt: { type: string, format: date-time, nullable: true }
+        paidAt: { type: string, format: date-time, nullable: true }
+
+    CreateInvoiceInput:
+      type: object
+      required: [items, taxRate]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/InvoiceItem" }
+        taxRate: { type: number, minimum: 0, maximum: 1 }
+        notes: { type: string, nullable: true }
+
+    ServiceRecord:
+      type: object
+      required: [id, vehicleId, serviceType, summary, totalCost, completedAt, serviceCenterName]
+      properties:
+        id: { type: string }
+        vehicleId: { type: string }
+        serviceType: { type: string }
+        summary: { type: string }
+        totalCost: { type: number }
+        completedAt: { type: string, format: date-time }
+        serviceCenterName: { type: string }
+        mechanicName: { type: string, nullable: true }
+        mileageAtService: { type: integer, nullable: true }
+
+    MaintenanceReminder:
+      type: object
+      required: [id, vehicleId, title, dueAt, urgency]
+      properties:
+        id: { type: string }
+        vehicleId: { type: string }
+        title: { type: string }
+        detail: { type: string, nullable: true }
+        dueAt: { type: string, format: date-time }
+        urgency:
+          type: string
+          enum: [low, medium, high]
+
+    OwnerDashboard:
+      type: object
+      required: [vehiclesCount, activeBookings, pendingApprovals, lifetimeSpend, upcomingReminders, statusBreakdown]
+      properties:
+        vehiclesCount: { type: integer }
+        activeBookings: { type: integer }
+        pendingApprovals: { type: integer }
+        lifetimeSpend: { type: number }
+        upcomingReminders:
+          type: array
+          items: { $ref: "#/components/schemas/MaintenanceReminder" }
+        statusBreakdown:
+          type: array
+          items: { $ref: "#/components/schemas/StatusCount" }
+
+    CenterDashboard:
+      type: object
+      required: [pendingRequests, jobsInProgress, completedToday, revenueThisMonth, topMechanics, statusBreakdown]
+      properties:
+        pendingRequests: { type: integer }
+        jobsInProgress: { type: integer }
+        completedToday: { type: integer }
+        revenueThisMonth: { type: number }
+        topMechanics:
+          type: array
+          items: { $ref: "#/components/schemas/Mechanic" }
+        statusBreakdown:
+          type: array
+          items: { $ref: "#/components/schemas/StatusCount" }
+
+    StatusCount:
+      type: object
+      required: [status, count]
+      properties:
+        status: { type: string }
+        count: { type: integer }
+
+    ActivityEvent:
+      type: object
+      required: [id, at, kind, message]
+      properties:
+        id: { type: string }
+        at: { type: string, format: date-time }
+        kind:
+          type: string
+          enum: [booking_created, booking_accepted, mechanic_assigned, invoice_created, invoice_approved, invoice_paid, booking_completed]
+        message: { type: string }
+        bookingId: { type: string, nullable: true }
+        vehicleId: { type: string, nullable: true }
+
+    ServiceType:
+      type: object
+      required: [id, name, description, estimatedHours, startingPrice]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        estimatedHours: { type: number }
+        startingPrice: { type: number }
+        icon: { type: string, nullable: true }
