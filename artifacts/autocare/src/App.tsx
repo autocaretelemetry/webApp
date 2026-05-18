@@ -39,6 +39,10 @@ import AdminServiceCenters from "@/pages/admin/ServiceCenters";
 import AdminVendors from "@/pages/admin/Vendors";
 import AdminMechanics from "@/pages/admin/Mechanics";
 import AdminDeliveryAgents from "@/pages/admin/DeliveryAgents";
+import AdminStaff from "@/pages/admin/Staff";
+import AdminPlans from "@/pages/admin/Plans";
+import AdminSubscriptions from "@/pages/admin/Subscriptions";
+import AdminRevenue from "@/pages/admin/Revenue";
 
 // Shared Pages
 import Bookings from "@/pages/shared/Bookings";
@@ -136,6 +140,10 @@ function Router() {
         <Route path="/admin/vendors" component={adminOnly(AdminVendors)} />
         <Route path="/admin/mechanics" component={adminOnly(AdminMechanics)} />
         <Route path="/admin/agents" component={adminOnly(AdminDeliveryAgents)} />
+        <Route path="/admin/staff" component={adminOnly(AdminStaff)} />
+        <Route path="/admin/plans" component={adminOnly(AdminPlans)} />
+        <Route path="/admin/subscriptions" component={adminOnly(AdminSubscriptions)} />
+        <Route path="/admin/revenue" component={adminOnly(AdminRevenue)} />
 
         {/* Marketplace (shared) */}
         <Route path="/marketplace" component={buyersOnly(Marketplace)} />

@@ -18,6 +18,10 @@ import {
   UserPlus,
   ShieldCheck,
   Building2,
+  UserCog,
+  Layers,
+  CreditCard,
+  TrendingUp,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -54,6 +58,10 @@ const DELIVERY_NAV = [
 
 const ADMIN_NAV = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
+  { href: "/admin/revenue", label: "Revenue", icon: TrendingUp },
+  { href: "/admin/subscriptions", label: "Subscriptions", icon: CreditCard },
+  { href: "/admin/plans", label: "Plans", icon: Layers },
+  { href: "/admin/staff", label: "Platform Staff", icon: UserCog },
   { href: "/admin/centers", label: "Service Centers", icon: Building2 },
   { href: "/admin/vendors", label: "Vendors", icon: Store },
   { href: "/admin/mechanics", label: "Mechanics", icon: Users },

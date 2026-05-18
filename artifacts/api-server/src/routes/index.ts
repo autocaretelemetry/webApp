@@ -11,6 +11,9 @@ import ordersRouter from "./orders";
 import deliveryAgentsRouter from "./deliveryAgents";
 import mechanicsRouter from "./mechanics";
 import adminRouter from "./admin";
+import platformStaffRouter from "./platformStaff";
+import subscriptionsRouter from "./subscriptions";
+import revenueRouter from "./revenue";
 
 const router: IRouter = Router();
 
@@ -26,5 +29,8 @@ router.use(ordersRouter);
 router.use(deliveryAgentsRouter);
 router.use(mechanicsRouter);
 router.use(adminRouter);
+router.use(platformStaffRouter);
+router.use(subscriptionsRouter);
+router.use(revenueRouter);
 
 export default router;

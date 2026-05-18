@@ -1740,6 +1740,221 @@ export const DeleteDeliveryAgentParams = zod.object({
 
 
 /**
+ * @summary List platform staff (admins + custom-permission staff)
+ */
+export const ListPlatformStaffQueryParams = zod.object({
+  "includeInactive": zod.coerce.boolean().optional()
+})
+
+export const ListPlatformStaffResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "role": zod.enum(['admin', 'staff']),
+  "permissions": zod.array(zod.string()),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+export const ListPlatformStaffResponse = zod.array(ListPlatformStaffResponseItem)
+
+
+/**
+ * @summary Add a new platform staff member
+ */
+
+
+
+export const CreatePlatformStaffBody = zod.object({
+  "name": zod.string().min(1),
+  "email": zod.string().email(),
+  "role": zod.enum(['admin', 'staff']).optional(),
+  "permissions": zod.array(zod.string()).optional()
+})
+
+
+export const UpdatePlatformStaffParams = zod.object({
+  "staffId": zod.coerce.string()
+})
+
+export const UpdatePlatformStaffBody = zod.object({
+  "name": zod.string().optional(),
+  "email": zod.string().email().optional(),
+  "role": zod.enum(['admin', 'staff']).optional(),
+  "permissions": zod.array(zod.string()).optional(),
+  "active": zod.boolean().optional()
+})
+
+export const UpdatePlatformStaffResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "role": zod.enum(['admin', 'staff']),
+  "permissions": zod.array(zod.string()),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+
+
+export const DeletePlatformStaffParams = zod.object({
+  "staffId": zod.coerce.string()
+})
+
+
+export const ListSubscriptionPlansQueryParams = zod.object({
+  "audience": zod.coerce.string().optional(),
+  "includeInactive": zod.coerce.boolean().optional()
+})
+
+export const ListSubscriptionPlansResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "audience": zod.enum(['center', 'vendor', 'owner']),
+  "priceMonthly": zod.number(),
+  "features": zod.array(zod.string()),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+export const ListSubscriptionPlansResponse = zod.array(ListSubscriptionPlansResponseItem)
+
+
+
+export const createSubscriptionPlanBodyPriceMonthlyMin = 0;
+
+
+
+export const CreateSubscriptionPlanBody = zod.object({
+  "name": zod.string().min(1),
+  "audience": zod.enum(['center', 'vendor', 'owner']),
+  "priceMonthly": zod.number().min(createSubscriptionPlanBodyPriceMonthlyMin),
+  "features": zod.array(zod.string()).optional()
+})
+
+
+export const UpdateSubscriptionPlanParams = zod.object({
+  "planId": zod.coerce.string()
+})
+
+export const updateSubscriptionPlanBodyPriceMonthlyMin = 0;
+
+
+
+export const UpdateSubscriptionPlanBody = zod.object({
+  "name": zod.string().optional(),
+  "priceMonthly": zod.number().min(updateSubscriptionPlanBodyPriceMonthlyMin).optional(),
+  "features": zod.array(zod.string()).optional(),
+  "active": zod.boolean().optional()
+})
+
+export const UpdateSubscriptionPlanResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "audience": zod.enum(['center', 'vendor', 'owner']),
+  "priceMonthly": zod.number(),
+  "features": zod.array(zod.string()),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+
+
+export const DeleteSubscriptionPlanParams = zod.object({
+  "planId": zod.coerce.string()
+})
+
+
+export const ListSubscriptionsQueryParams = zod.object({
+  "status": zod.coerce.string().optional(),
+  "subscriberKind": zod.coerce.string().optional()
+})
+
+export const ListSubscriptionsResponseItem = zod.object({
+  "id": zod.string(),
+  "subscriberKind": zod.enum(['center', 'vendor', 'owner']),
+  "subscriberId": zod.string(),
+  "subscriberName": zod.string(),
+  "planId": zod.string().nullish(),
+  "planName": zod.string().nullish(),
+  "priceMonthly": zod.number().nullish(),
+  "status": zod.enum(['active', 'cancelled', 'past_due']),
+  "startedAt": zod.coerce.date(),
+  "currentPeriodEnd": zod.coerce.date(),
+  "cancelledAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
+})
+export const ListSubscriptionsResponse = zod.array(ListSubscriptionsResponseItem)
+
+
+
+
+
+
+export const CreateSubscriptionBody = zod.object({
+  "subscriberKind": zod.enum(['center', 'vendor', 'owner']),
+  "subscriberId": zod.string().min(1),
+  "subscriberName": zod.string().min(1),
+  "planId": zod.string()
+})
+
+
+export const UpdateSubscriptionParams = zod.object({
+  "subscriptionId": zod.coerce.string()
+})
+
+export const UpdateSubscriptionBody = zod.object({
+  "planId": zod.string().optional(),
+  "status": zod.enum(['active', 'cancelled', 'past_due']).optional()
+})
+
+export const UpdateSubscriptionResponse = zod.object({
+  "id": zod.string(),
+  "subscriberKind": zod.enum(['center', 'vendor', 'owner']),
+  "subscriberId": zod.string(),
+  "subscriberName": zod.string(),
+  "planId": zod.string().nullish(),
+  "planName": zod.string().nullish(),
+  "priceMonthly": zod.number().nullish(),
+  "status": zod.enum(['active', 'cancelled', 'past_due']),
+  "startedAt": zod.coerce.date(),
+  "currentPeriodEnd": zod.coerce.date(),
+  "cancelledAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+
+export const DeleteSubscriptionParams = zod.object({
+  "subscriptionId": zod.coerce.string()
+})
+
+
+/**
+ * @summary Aggregated MRR + commission revenue with monthly trend
+ */
+export const GetRevenueOverviewResponse = zod.object({
+  "mrr": zod.number(),
+  "activeSubscriptions": zod.number(),
+  "commissionRate": zod.number(),
+  "totals": zod.object({
+  "subscriptions": zod.number(),
+  "bookingCommissions": zod.number(),
+  "orderCommissions": zod.number(),
+  "total": zod.number()
+}),
+  "monthly": zod.array(zod.object({
+  "month": zod.string(),
+  "subscriptions": zod.number(),
+  "bookingCommissions": zod.number(),
+  "orderCommissions": zod.number()
+})),
+  "recentPayments": zod.array(zod.object({
+  "id": zod.string(),
+  "kind": zod.enum(['subscription', 'booking_commission', 'order_commission']),
+  "label": zod.string(),
+  "amount": zod.number(),
+  "paidAt": zod.coerce.date()
+}))
+})
+
+
+/**
  * @summary Available service categories owners can book
  */
 export const ListServiceTypesResponseItem = zod.object({

@@ -794,6 +794,189 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/DeleteConflict" }
 
+  /platform-staff:
+    get:
+      operationId: listPlatformStaff
+      tags: [platformStaff]
+      summary: List platform staff (admins + custom-permission staff)
+      parameters:
+        - { name: includeInactive, in: query, required: false, schema: { type: boolean } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PlatformStaff" }
+    post:
+      operationId: createPlatformStaff
+      tags: [platformStaff]
+      summary: Add a new platform staff member
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreatePlatformStaffInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlatformStaff" }
+
+  /platform-staff/{staffId}:
+    patch:
+      operationId: updatePlatformStaff
+      tags: [platformStaff]
+      parameters:
+        - { name: staffId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdatePlatformStaffInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlatformStaff" }
+    delete:
+      operationId: deletePlatformStaff
+      tags: [platformStaff]
+      parameters:
+        - { name: staffId, in: path, required: true, schema: { type: string } }
+      responses:
+        "204": { description: Deleted }
+
+  /subscription-plans:
+    get:
+      operationId: listSubscriptionPlans
+      tags: [subscriptions]
+      parameters:
+        - { name: audience, in: query, required: false, schema: { type: string } }
+        - { name: includeInactive, in: query, required: false, schema: { type: boolean } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SubscriptionPlan" }
+    post:
+      operationId: createSubscriptionPlan
+      tags: [subscriptions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateSubscriptionPlanInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SubscriptionPlan" }
+
+  /subscription-plans/{planId}:
+    patch:
+      operationId: updateSubscriptionPlan
+      tags: [subscriptions]
+      parameters:
+        - { name: planId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateSubscriptionPlanInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SubscriptionPlan" }
+    delete:
+      operationId: deleteSubscriptionPlan
+      tags: [subscriptions]
+      parameters:
+        - { name: planId, in: path, required: true, schema: { type: string } }
+      responses:
+        "204": { description: Deleted }
+        "409":
+          description: Conflict — plan has active subscribers, suspend it instead
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeleteConflict" }
+
+  /subscriptions:
+    get:
+      operationId: listSubscriptions
+      tags: [subscriptions]
+      parameters:
+        - { name: status, in: query, required: false, schema: { type: string } }
+        - { name: subscriberKind, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Subscription" }
+    post:
+      operationId: createSubscription
+      tags: [subscriptions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateSubscriptionInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Subscription" }
+
+  /subscriptions/{subscriptionId}:
+    patch:
+      operationId: updateSubscription
+      tags: [subscriptions]
+      parameters:
+        - { name: subscriptionId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateSubscriptionInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Subscription" }
+    delete:
+      operationId: deleteSubscription
+      tags: [subscriptions]
+      parameters:
+        - { name: subscriptionId, in: path, required: true, schema: { type: string } }
+      responses:
+        "204": { description: Deleted }
+
+  /revenue/overview:
+    get:
+      operationId: getRevenueOverview
+      tags: [revenue]
+      summary: Aggregated MRR + commission revenue with monthly trend
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RevenueOverview" }
+
   /catalog/service-types:
     get:
       operationId: listServiceTypes
@@ -1420,3 +1603,148 @@ components:
         statusBreakdown:
           type: array
           items: { $ref: "#/components/schemas/StatusCount" }
+
+    PlatformStaff:
+      type: object
+      required: [id, name, email, role, permissions, active, createdAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: string }
+        role: { type: string, enum: [admin, staff] }
+        permissions:
+          type: array
+          items: { type: string }
+        active: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    CreatePlatformStaffInput:
+      type: object
+      required: [name, email]
+      properties:
+        name: { type: string, minLength: 1 }
+        email: { type: string, format: email }
+        role: { type: string, enum: [admin, staff] }
+        permissions:
+          type: array
+          items: { type: string }
+
+    UpdatePlatformStaffInput:
+      type: object
+      properties:
+        name: { type: string }
+        email: { type: string, format: email }
+        role: { type: string, enum: [admin, staff] }
+        permissions:
+          type: array
+          items: { type: string }
+        active: { type: boolean }
+
+    SubscriptionPlan:
+      type: object
+      required: [id, name, audience, priceMonthly, features, active, createdAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        audience: { type: string, enum: [center, vendor, owner] }
+        priceMonthly: { type: number }
+        features:
+          type: array
+          items: { type: string }
+        active: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    CreateSubscriptionPlanInput:
+      type: object
+      required: [name, audience, priceMonthly]
+      properties:
+        name: { type: string, minLength: 1 }
+        audience: { type: string, enum: [center, vendor, owner] }
+        priceMonthly: { type: number, minimum: 0 }
+        features:
+          type: array
+          items: { type: string }
+
+    UpdateSubscriptionPlanInput:
+      type: object
+      properties:
+        name: { type: string }
+        priceMonthly: { type: number, minimum: 0 }
+        features:
+          type: array
+          items: { type: string }
+        active: { type: boolean }
+
+    Subscription:
+      type: object
+      required:
+        [id, subscriberKind, subscriberId, subscriberName, status, startedAt, currentPeriodEnd, createdAt]
+      properties:
+        id: { type: string }
+        subscriberKind: { type: string, enum: [center, vendor, owner] }
+        subscriberId: { type: string }
+        subscriberName: { type: string }
+        planId: { type: string, nullable: true }
+        planName: { type: string, nullable: true }
+        priceMonthly: { type: number, nullable: true }
+        status: { type: string, enum: [active, cancelled, past_due] }
+        startedAt: { type: string, format: date-time }
+        currentPeriodEnd: { type: string, format: date-time }
+        cancelledAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    CreateSubscriptionInput:
+      type: object
+      required: [subscriberKind, subscriberId, subscriberName, planId]
+      properties:
+        subscriberKind: { type: string, enum: [center, vendor, owner] }
+        subscriberId: { type: string, minLength: 1 }
+        subscriberName: { type: string, minLength: 1 }
+        planId: { type: string }
+
+    UpdateSubscriptionInput:
+      type: object
+      properties:
+        planId: { type: string }
+        status: { type: string, enum: [active, cancelled, past_due] }
+
+    RevenueOverview:
+      type: object
+      required: [mrr, activeSubscriptions, commissionRate, totals, monthly, recentPayments]
+      properties:
+        mrr: { type: number }
+        activeSubscriptions: { type: integer }
+        commissionRate: { type: number }
+        totals:
+          type: object
+          required: [subscriptions, bookingCommissions, orderCommissions, total]
+          properties:
+            subscriptions: { type: number }
+            bookingCommissions: { type: number }
+            orderCommissions: { type: number }
+            total: { type: number }
+        monthly:
+          type: array
+          items: { $ref: "#/components/schemas/RevenueMonth" }
+        recentPayments:
+          type: array
+          items: { $ref: "#/components/schemas/RecentPayment" }
+
+    RevenueMonth:
+      type: object
+      required: [month, subscriptions, bookingCommissions, orderCommissions]
+      properties:
+        month: { type: string }
+        subscriptions: { type: number }
+        bookingCommissions: { type: number }
+        orderCommissions: { type: number }
+
+    RecentPayment:
+      type: object
+      required: [id, kind, label, amount, paidAt]
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [subscription, booking_commission, order_commission] }
+        label: { type: string }
+        amount: { type: number }
+        paidAt: { type: string, format: date-time }

@@ -594,6 +594,206 @@ export interface VendorDashboard {
   statusBreakdown: StatusCount[];
 }
 
+export type PlatformStaffRole = typeof PlatformStaffRole[keyof typeof PlatformStaffRole];
+
+
+export const PlatformStaffRole = {
+  admin: 'admin',
+  staff: 'staff',
+} as const;
+
+export interface PlatformStaff {
+  id: string;
+  name: string;
+  email: string;
+  role: PlatformStaffRole;
+  permissions: string[];
+  active: boolean;
+  createdAt: string;
+}
+
+export type CreatePlatformStaffInputRole = typeof CreatePlatformStaffInputRole[keyof typeof CreatePlatformStaffInputRole];
+
+
+export const CreatePlatformStaffInputRole = {
+  admin: 'admin',
+  staff: 'staff',
+} as const;
+
+export interface CreatePlatformStaffInput {
+  /** @minLength 1 */
+  name: string;
+  email: string;
+  role?: CreatePlatformStaffInputRole;
+  permissions?: string[];
+}
+
+export type UpdatePlatformStaffInputRole = typeof UpdatePlatformStaffInputRole[keyof typeof UpdatePlatformStaffInputRole];
+
+
+export const UpdatePlatformStaffInputRole = {
+  admin: 'admin',
+  staff: 'staff',
+} as const;
+
+export interface UpdatePlatformStaffInput {
+  name?: string;
+  email?: string;
+  role?: UpdatePlatformStaffInputRole;
+  permissions?: string[];
+  active?: boolean;
+}
+
+export type SubscriptionPlanAudience = typeof SubscriptionPlanAudience[keyof typeof SubscriptionPlanAudience];
+
+
+export const SubscriptionPlanAudience = {
+  center: 'center',
+  vendor: 'vendor',
+  owner: 'owner',
+} as const;
+
+export interface SubscriptionPlan {
+  id: string;
+  name: string;
+  audience: SubscriptionPlanAudience;
+  priceMonthly: number;
+  features: string[];
+  active: boolean;
+  createdAt: string;
+}
+
+export type CreateSubscriptionPlanInputAudience = typeof CreateSubscriptionPlanInputAudience[keyof typeof CreateSubscriptionPlanInputAudience];
+
+
+export const CreateSubscriptionPlanInputAudience = {
+  center: 'center',
+  vendor: 'vendor',
+  owner: 'owner',
+} as const;
+
+export interface CreateSubscriptionPlanInput {
+  /** @minLength 1 */
+  name: string;
+  audience: CreateSubscriptionPlanInputAudience;
+  /** @minimum 0 */
+  priceMonthly: number;
+  features?: string[];
+}
+
+export interface UpdateSubscriptionPlanInput {
+  name?: string;
+  /** @minimum 0 */
+  priceMonthly?: number;
+  features?: string[];
+  active?: boolean;
+}
+
+export type SubscriptionSubscriberKind = typeof SubscriptionSubscriberKind[keyof typeof SubscriptionSubscriberKind];
+
+
+export const SubscriptionSubscriberKind = {
+  center: 'center',
+  vendor: 'vendor',
+  owner: 'owner',
+} as const;
+
+export type SubscriptionStatus = typeof SubscriptionStatus[keyof typeof SubscriptionStatus];
+
+
+export const SubscriptionStatus = {
+  active: 'active',
+  cancelled: 'cancelled',
+  past_due: 'past_due',
+} as const;
+
+export interface Subscription {
+  id: string;
+  subscriberKind: SubscriptionSubscriberKind;
+  subscriberId: string;
+  subscriberName: string;
+  planId?: string | null;
+  planName?: string | null;
+  priceMonthly?: number | null;
+  status: SubscriptionStatus;
+  startedAt: string;
+  currentPeriodEnd: string;
+  cancelledAt?: string | null;
+  createdAt: string;
+}
+
+export type CreateSubscriptionInputSubscriberKind = typeof CreateSubscriptionInputSubscriberKind[keyof typeof CreateSubscriptionInputSubscriberKind];
+
+
+export const CreateSubscriptionInputSubscriberKind = {
+  center: 'center',
+  vendor: 'vendor',
+  owner: 'owner',
+} as const;
+
+export interface CreateSubscriptionInput {
+  subscriberKind: CreateSubscriptionInputSubscriberKind;
+  /** @minLength 1 */
+  subscriberId: string;
+  /** @minLength 1 */
+  subscriberName: string;
+  planId: string;
+}
+
+export type UpdateSubscriptionInputStatus = typeof UpdateSubscriptionInputStatus[keyof typeof UpdateSubscriptionInputStatus];
+
+
+export const UpdateSubscriptionInputStatus = {
+  active: 'active',
+  cancelled: 'cancelled',
+  past_due: 'past_due',
+} as const;
+
+export interface UpdateSubscriptionInput {
+  planId?: string;
+  status?: UpdateSubscriptionInputStatus;
+}
+
+export type RevenueOverviewTotals = {
+  subscriptions: number;
+  bookingCommissions: number;
+  orderCommissions: number;
+  total: number;
+};
+
+export interface RevenueMonth {
+  month: string;
+  subscriptions: number;
+  bookingCommissions: number;
+  orderCommissions: number;
+}
+
+export type RecentPaymentKind = typeof RecentPaymentKind[keyof typeof RecentPaymentKind];
+
+
+export const RecentPaymentKind = {
+  subscription: 'subscription',
+  booking_commission: 'booking_commission',
+  order_commission: 'order_commission',
+} as const;
+
+export interface RecentPayment {
+  id: string;
+  kind: RecentPaymentKind;
+  label: string;
+  amount: number;
+  paidAt: string;
+}
+
+export interface RevenueOverview {
+  mrr: number;
+  activeSubscriptions: number;
+  commissionRate: number;
+  totals: RevenueOverviewTotals;
+  monthly: RevenueMonth[];
+  recentPayments: RecentPayment[];
+}
+
 export type ListServiceCentersParams = {
 specialty?: string;
 includeInactive?: boolean;
@@ -679,5 +879,19 @@ export type ListDeliveryAgentsParams = {
 city?: string;
 region?: string;
 activeOnly?: boolean;
+};
+
+export type ListPlatformStaffParams = {
+includeInactive?: boolean;
+};
+
+export type ListSubscriptionPlansParams = {
+audience?: string;
+includeInactive?: boolean;
+};
+
+export type ListSubscriptionsParams = {
+status?: string;
+subscriberKind?: string;
 };
 
