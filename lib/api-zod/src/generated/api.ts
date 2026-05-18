@@ -219,6 +219,23 @@ export const GetServiceCenterResponse = zod.object({
 })
 
 
+/**
+ * @summary List every mechanic across all service centers (used by admins)
+ */
+export const ListMechanicsResponseItem = zod.object({
+  "id": zod.string(),
+  "serviceCenterId": zod.string(),
+  "name": zod.string(),
+  "yearsExperience": zod.number(),
+  "specialization": zod.string(),
+  "certifications": zod.array(zod.string()).optional(),
+  "rating": zod.number(),
+  "completedJobs": zod.number(),
+  "avatarUrl": zod.string().nullish()
+})
+export const ListMechanicsResponse = zod.array(ListMechanicsResponseItem)
+
+
 export const ListMechanicsForCenterParams = zod.object({
   "centerId": zod.coerce.string()
 })
@@ -1320,6 +1337,165 @@ export const GetVendorDashboardResponse = zod.object({
 
 
 /**
+ * @summary Platform-wide overview for the super admin / platform owner
+ */
+export const GetAdminOverviewResponse = zod.object({
+  "counts": zod.object({
+  "vehicles": zod.number(),
+  "serviceCenters": zod.number(),
+  "mechanics": zod.number(),
+  "vendors": zod.number(),
+  "parts": zod.number(),
+  "deliveryAgents": zod.number(),
+  "activeDeliveryAgents": zod.number().optional(),
+  "bookings": zod.number(),
+  "orders": zod.number(),
+  "invoices": zod.number()
+}),
+  "revenue": zod.object({
+  "invoicesPaid": zod.number(),
+  "ordersPlaced": zod.number()
+}),
+  "bookingStatusBreakdown": zod.array(zod.object({
+  "status": zod.string(),
+  "count": zod.number()
+})),
+  "orderStatusBreakdown": zod.array(zod.object({
+  "status": zod.string(),
+  "count": zod.number()
+})),
+  "recentBookings": zod.array(zod.object({
+  "id": zod.string(),
+  "vehicleId": zod.string(),
+  "serviceCenterId": zod.string(),
+  "mechanicId": zod.string().nullish(),
+  "serviceType": zod.string(),
+  "description": zod.string(),
+  "status": zod.enum(['requested', 'accepted', 'in_progress', 'awaiting_approval', 'approved', 'completed', 'cancelled']),
+  "requestedAt": zod.coerce.date(),
+  "scheduledAt": zod.coerce.date().nullish(),
+  "completedAt": zod.coerce.date().nullish(),
+  "estimatedDurationHours": zod.number().nullish(),
+  "vehicle": zod.object({
+  "id": zod.string(),
+  "ownerName": zod.string(),
+  "ownerPhone": zod.string().nullish(),
+  "brand": zod.string(),
+  "model": zod.string(),
+  "year": zod.number(),
+  "vin": zod.string().nullish(),
+  "plateNumber": zod.string(),
+  "color": zod.string(),
+  "engineType": zod.string().nullish(),
+  "mileage": zod.number(),
+  "imageUrl": zod.string().nullish(),
+  "nextServiceDate": zod.coerce.date().nullish(),
+  "insuranceProvider": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+}).optional(),
+  "serviceCenter": zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "address": zod.string(),
+  "city": zod.string().optional(),
+  "region": zod.string().optional(),
+  "phone": zod.string(),
+  "specialties": zod.array(zod.string()),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "openJobs": zod.number(),
+  "imageUrl": zod.string().nullish(),
+  "bio": zod.string().nullish()
+}).optional(),
+  "mechanic": zod.union([zod.object({
+  "id": zod.string(),
+  "serviceCenterId": zod.string(),
+  "name": zod.string(),
+  "yearsExperience": zod.number(),
+  "specialization": zod.string(),
+  "certifications": zod.array(zod.string()).optional(),
+  "rating": zod.number(),
+  "completedJobs": zod.number(),
+  "avatarUrl": zod.string().nullish()
+}),zod.null()]).optional(),
+  "invoiceId": zod.string().nullish()
+})),
+  "recentOrders": zod.array(zod.object({
+  "id": zod.string(),
+  "vendorId": zod.string(),
+  "bookingId": zod.string().nullish(),
+  "mechanicId": zod.string().nullish(),
+  "deliveryAgentId": zod.string().nullish(),
+  "buyerKind": zod.enum(['owner', 'center']),
+  "buyerName": zod.string(),
+  "buyerPhone": zod.string(),
+  "shippingAddress": zod.string(),
+  "deliveryCity": zod.string().optional(),
+  "deliveryRegion": zod.string().optional(),
+  "notes": zod.string().nullish(),
+  "status": zod.enum(['proposed', 'placed', 'confirmed', 'shipped', 'delivered', 'cancelled']),
+  "itemsTotal": zod.number(),
+  "shippingFee": zod.number(),
+  "total": zod.number(),
+  "proposedAt": zod.coerce.date().nullish(),
+  "placedAt": zod.coerce.date(),
+  "approvedAt": zod.coerce.date().nullish(),
+  "rejectedAt": zod.coerce.date().nullish(),
+  "confirmedAt": zod.coerce.date().nullish(),
+  "shippedAt": zod.coerce.date().nullish(),
+  "deliveredAt": zod.coerce.date().nullish(),
+  "cancelledAt": zod.coerce.date().nullish(),
+  "trackingCode": zod.string().nullish(),
+  "itemsCount": zod.number().optional(),
+  "vendor": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "bio": zod.string().nullish(),
+  "address": zod.string(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "phone": zod.string(),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "logoUrl": zod.string().nullish(),
+  "partsCount": zod.number().optional(),
+  "createdAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "mechanic": zod.union([zod.object({
+  "id": zod.string(),
+  "serviceCenterId": zod.string(),
+  "name": zod.string(),
+  "yearsExperience": zod.number(),
+  "specialization": zod.string(),
+  "certifications": zod.array(zod.string()).optional(),
+  "rating": zod.number(),
+  "completedJobs": zod.number(),
+  "avatarUrl": zod.string().nullish()
+}),zod.null()]).optional(),
+  "deliveryAgent": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "vehicleType": zod.string(),
+  "bio": zod.string().nullish(),
+  "rating": zod.number(),
+  "completedDeliveries": zod.number(),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "bookingSummary": zod.union([zod.object({
+  "id": zod.string(),
+  "serviceType": zod.string(),
+  "status": zod.string(),
+  "vehicleLabel": zod.string()
+}),zod.null()]).optional()
+}))
+})
+
+
+/**
  * @summary List delivery agents, optionally filtered by city/region or active status
  */
 export const ListDeliveryAgentsQueryParams = zod.object({
@@ -1372,6 +1548,34 @@ export const GetDeliveryAgentParams = zod.object({
 })
 
 export const GetDeliveryAgentResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "vehicleType": zod.string(),
+  "bio": zod.string().nullish(),
+  "rating": zod.number(),
+  "completedDeliveries": zod.number(),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Update a delivery agent (admin can deactivate, agent can edit profile)
+ */
+export const UpdateDeliveryAgentParams = zod.object({
+  "agentId": zod.coerce.string()
+})
+
+export const UpdateDeliveryAgentBody = zod.object({
+  "active": zod.boolean().optional(),
+  "bio": zod.string().nullish(),
+  "vehicleType": zod.string().optional()
+})
+
+export const UpdateDeliveryAgentResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "phone": zod.string(),

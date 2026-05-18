@@ -5,6 +5,8 @@ import {
   GetDeliveryAgentParams,
   ListDeliveryAgentsQueryParams,
   RegisterDeliveryAgentBody,
+  UpdateDeliveryAgentBody,
+  UpdateDeliveryAgentParams,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -57,6 +59,38 @@ router.get("/delivery-agents/:agentId", async (req, res): Promise<void> => {
     .select()
     .from(deliveryAgentsTable)
     .where(eq(deliveryAgentsTable.id, params.data.agentId));
+  if (!row) {
+    res.status(404).json({ error: "Delivery agent not found" });
+    return;
+  }
+  res.json(row);
+});
+
+router.patch("/delivery-agents/:agentId", async (req, res): Promise<void> => {
+  const params = UpdateDeliveryAgentParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const body = UpdateDeliveryAgentBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  // Build update payload from only the fields the caller actually sent.
+  const updates: Partial<typeof deliveryAgentsTable.$inferInsert> = {};
+  if (body.data.active !== undefined) updates.active = body.data.active;
+  if (body.data.bio !== undefined) updates.bio = body.data.bio;
+  if (body.data.vehicleType !== undefined) updates.vehicleType = body.data.vehicleType;
+  if (Object.keys(updates).length === 0) {
+    res.status(400).json({ error: "No fields to update" });
+    return;
+  }
+  const [row] = await db
+    .update(deliveryAgentsTable)
+    .set(updates)
+    .where(eq(deliveryAgentsTable.id, params.data.agentId))
+    .returning();
   if (!row) {
     res.status(404).json({ error: "Delivery agent not found" });
     return;

@@ -9,6 +9,8 @@ import vendorsRouter from "./vendors";
 import partsRouter from "./parts";
 import ordersRouter from "./orders";
 import deliveryAgentsRouter from "./deliveryAgents";
+import mechanicsRouter from "./mechanics";
+import adminRouter from "./admin";
 
 const router: IRouter = Router();
 
@@ -22,5 +24,7 @@ router.use(vendorsRouter);
 router.use(partsRouter);
 router.use(ordersRouter);
 router.use(deliveryAgentsRouter);
+router.use(mechanicsRouter);
+router.use(adminRouter);
 
 export default router;

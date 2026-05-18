@@ -8,6 +8,9 @@
 
 export * from './activityEvent';
 export * from './activityEventKind';
+export * from './adminCounts';
+export * from './adminOverview';
+export * from './adminOverviewRevenue';
 export * from './assignMechanicInput';
 export * from './booking';
 export * from './bookingDetail';
@@ -58,6 +61,7 @@ export * from './statusCount';
 export * from './timelineEntry';
 export * from './updateBookingStatusInput';
 export * from './updateBookingStatusInputStatus';
+export * from './updateDeliveryAgentInput';
 export * from './updateOrderStatusInput';
 export * from './updateOrderStatusInputStatus';
 export * from './updatePartInput';

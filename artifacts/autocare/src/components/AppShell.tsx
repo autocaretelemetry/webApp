@@ -16,6 +16,8 @@ import {
   ShoppingCart,
   Truck,
   UserPlus,
+  ShieldCheck,
+  Building2,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -50,10 +52,21 @@ const DELIVERY_NAV = [
   { href: "/delivery/register", label: "Profile", icon: UserPlus },
 ];
 
+const ADMIN_NAV = [
+  { href: "/", label: "Overview", icon: LayoutDashboard },
+  { href: "/admin/centers", label: "Service Centers", icon: Building2 },
+  { href: "/admin/vendors", label: "Vendors", icon: Store },
+  { href: "/admin/mechanics", label: "Mechanics", icon: Users },
+  { href: "/admin/agents", label: "Delivery Agents", icon: Truck },
+  { href: "/bookings", label: "All Bookings", icon: CalendarDays },
+  { href: "/orders", label: "All Orders", icon: Package },
+];
+
 function navFor(role: Role) {
   if (role === "owner") return OWNER_NAV;
   if (role === "center") return CENTER_NAV;
   if (role === "vendor") return VENDOR_NAV;
+  if (role === "admin") return ADMIN_NAV;
   return DELIVERY_NAV;
 }
 
@@ -78,6 +91,44 @@ function CartButton() {
   );
 }
 
+function RoleTabs({
+  role,
+  setRole,
+  className,
+  triggerClassName,
+}: {
+  role: Role;
+  setRole: (r: Role) => void;
+  className?: string;
+  triggerClassName?: string;
+}) {
+  const tabs: { value: Role; label: string }[] = [
+    { value: "owner", label: "Owner" },
+    { value: "center", label: "Center" },
+    { value: "vendor", label: "Vendor" },
+    { value: "delivery", label: "Delivery" },
+    { value: "admin", label: "Admin" },
+  ];
+  return (
+    <Tabs value={role} onValueChange={(v) => setRole(v as Role)} className={className}>
+      <TabsList className="grid w-full grid-cols-5">
+        {tabs.map((t) => (
+          <TabsTrigger key={t.value} value={t.value} className={triggerClassName}>
+            {t.value === "admin" ? (
+              <span className="inline-flex items-center gap-0.5">
+                <ShieldCheck className="h-3 w-3" />
+                {t.label}
+              </span>
+            ) : (
+              t.label
+            )}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </Tabs>
+  );
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const { role, setRole } = useRole();
   const [location] = useLocation();
@@ -95,14 +146,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         <div className="flex items-center gap-2">
           {showCart && <CartButton />}
-          <Tabs value={role} onValueChange={(v) => setRole(v as Role)}>
-            <TabsList className="grid grid-cols-4">
-              <TabsTrigger value="owner" className="text-xs px-1.5">Owner</TabsTrigger>
-              <TabsTrigger value="center" className="text-xs px-1.5">Center</TabsTrigger>
-              <TabsTrigger value="vendor" className="text-xs px-1.5">Vendor</TabsTrigger>
-              <TabsTrigger value="delivery" className="text-xs px-1.5">Delivery</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <RoleTabs role={role} setRole={setRole} triggerClassName="text-[10px] px-1" />
         </div>
       </header>
 
@@ -116,14 +160,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {showCart && <CartButton />}
         </div>
 
-        <Tabs value={role} onValueChange={(v) => setRole(v as Role)} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="owner" className="text-[11px] px-1">Owner</TabsTrigger>
-            <TabsTrigger value="center" className="text-[11px] px-1">Center</TabsTrigger>
-            <TabsTrigger value="vendor" className="text-[11px] px-1">Vendor</TabsTrigger>
-            <TabsTrigger value="delivery" className="text-[11px] px-1">Delivery</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <RoleTabs role={role} setRole={setRole} className="w-full" triggerClassName="text-[10px] px-0.5" />
 
         <nav className="flex flex-col gap-1 flex-1">
           {navItems.map((item) => {

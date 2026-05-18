@@ -518,6 +518,39 @@ export interface UpdateOrderStatusInput {
   deliveryAgentId?: string | null;
 }
 
+export interface UpdateDeliveryAgentInput {
+  active?: boolean;
+  bio?: string | null;
+  vehicleType?: string;
+}
+
+export interface AdminCounts {
+  vehicles: number;
+  serviceCenters: number;
+  mechanics: number;
+  vendors: number;
+  parts: number;
+  deliveryAgents: number;
+  activeDeliveryAgents?: number;
+  bookings: number;
+  orders: number;
+  invoices: number;
+}
+
+export type AdminOverviewRevenue = {
+  invoicesPaid: number;
+  ordersPlaced: number;
+};
+
+export interface AdminOverview {
+  counts: AdminCounts;
+  revenue: AdminOverviewRevenue;
+  bookingStatusBreakdown: StatusCount[];
+  orderStatusBreakdown: StatusCount[];
+  recentBookings: Booking[];
+  recentOrders: Order[];
+}
+
 export interface RegisterDeliveryAgentInput {
   /** @minLength 1 */
   name: string;

@@ -158,6 +158,20 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ServiceCenter" }
 
+  /mechanics:
+    get:
+      operationId: listMechanics
+      tags: [mechanics]
+      summary: List every mechanic across all service centers (used by admins)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Mechanic" }
+
   /service-centers/{centerId}/mechanics:
     get:
       operationId: listMechanicsForCenter
@@ -597,6 +611,18 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/VendorDashboard" }
 
+  /admin/overview:
+    get:
+      operationId: getAdminOverview
+      tags: [admin]
+      summary: Platform-wide overview for the super admin / platform owner
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminOverview" }
+
   /delivery-agents:
     get:
       operationId: listDeliveryAgents
@@ -637,6 +663,23 @@ paths:
       summary: Get a delivery agent
       parameters:
         - { name: agentId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeliveryAgent" }
+    patch:
+      operationId: updateDeliveryAgent
+      tags: [delivery]
+      summary: Update a delivery agent (admin can deactivate, agent can edit profile)
+      parameters:
+        - { name: agentId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateDeliveryAgentInput" }
       responses:
         "200":
           description: OK
@@ -1183,6 +1226,52 @@ components:
         completedDeliveries: { type: integer }
         active: { type: boolean }
         createdAt: { type: string, format: date-time }
+
+    UpdateDeliveryAgentInput:
+      type: object
+      properties:
+        active: { type: boolean }
+        bio: { type: string, nullable: true }
+        vehicleType: { type: string }
+
+    AdminCounts:
+      type: object
+      required: [vehicles, serviceCenters, mechanics, vendors, parts, deliveryAgents, bookings, orders, invoices]
+      properties:
+        vehicles: { type: integer }
+        serviceCenters: { type: integer }
+        mechanics: { type: integer }
+        vendors: { type: integer }
+        parts: { type: integer }
+        deliveryAgents: { type: integer }
+        activeDeliveryAgents: { type: integer }
+        bookings: { type: integer }
+        orders: { type: integer }
+        invoices: { type: integer }
+
+    AdminOverview:
+      type: object
+      required: [counts, revenue, bookingStatusBreakdown, orderStatusBreakdown, recentBookings, recentOrders]
+      properties:
+        counts: { $ref: "#/components/schemas/AdminCounts" }
+        revenue:
+          type: object
+          required: [invoicesPaid, ordersPlaced]
+          properties:
+            invoicesPaid: { type: number }
+            ordersPlaced: { type: number }
+        bookingStatusBreakdown:
+          type: array
+          items: { $ref: "#/components/schemas/StatusCount" }
+        orderStatusBreakdown:
+          type: array
+          items: { $ref: "#/components/schemas/StatusCount" }
+        recentBookings:
+          type: array
+          items: { $ref: "#/components/schemas/Booking" }
+        recentOrders:
+          type: array
+          items: { $ref: "#/components/schemas/Order" }
 
     RegisterDeliveryAgentInput:
       type: object

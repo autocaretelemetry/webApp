@@ -33,6 +33,13 @@ import DeliveryDashboard from "@/pages/delivery/Dashboard";
 import DeliveryRegister from "@/pages/delivery/Register";
 import DeliveryOrders from "@/pages/delivery/Orders";
 
+// Admin Pages
+import AdminDashboard from "@/pages/admin/Dashboard";
+import AdminServiceCenters from "@/pages/admin/ServiceCenters";
+import AdminVendors from "@/pages/admin/Vendors";
+import AdminMechanics from "@/pages/admin/Mechanics";
+import AdminDeliveryAgents from "@/pages/admin/DeliveryAgents";
+
 // Shared Pages
 import Bookings from "@/pages/shared/Bookings";
 import BookingDetail from "@/pages/shared/BookingDetail";
@@ -59,6 +66,7 @@ function HomeRoute() {
   if (role === "owner") return <OwnerDashboard />;
   if (role === "center") return <CenterDashboard />;
   if (role === "vendor") return <VendorDashboard />;
+  if (role === "admin") return <AdminDashboard />;
   return <DeliveryDashboard />;
 }
 
@@ -91,6 +99,7 @@ const centerOnly = (c: ComponentType) => () => <RoleGuard allow={["center"]} com
 const vendorOnly = (c: ComponentType) => () => <RoleGuard allow={["vendor"]} component={c} />;
 const buyersOnly = (c: ComponentType) => () => <RoleGuard allow={["owner", "center"]} component={c} />;
 const deliveryOnly = (c: ComponentType) => () => <RoleGuard allow={["delivery"]} component={c} />;
+const adminOnly = (c: ComponentType) => () => <RoleGuard allow={["admin"]} component={c} />;
 
 function Router() {
   return (
@@ -103,7 +112,10 @@ function Router() {
         <Route path="/vehicles/new" component={ownerOnly(NewVehicle)} />
         <Route path="/vehicles/:id" component={ownerOnly(VehicleDetail)} />
         <Route path="/service-centers" component={ownerOnly(ServiceCenters)} />
-        <Route path="/service-centers/:id" component={ownerOnly(ServiceCenterDetail)} />
+        <Route
+          path="/service-centers/:id"
+          component={() => <RoleGuard allow={["owner", "admin"]} component={ServiceCenterDetail} />}
+        />
         <Route path="/book" component={ownerOnly(Book)} />
 
         {/* Center Routes */}
@@ -118,6 +130,12 @@ function Router() {
         {/* Delivery Routes */}
         <Route path="/delivery/register" component={deliveryOnly(DeliveryRegister)} />
         <Route path="/delivery/orders" component={deliveryOnly(DeliveryOrders)} />
+
+        {/* Admin Routes */}
+        <Route path="/admin/centers" component={adminOnly(AdminServiceCenters)} />
+        <Route path="/admin/vendors" component={adminOnly(AdminVendors)} />
+        <Route path="/admin/mechanics" component={adminOnly(AdminMechanics)} />
+        <Route path="/admin/agents" component={adminOnly(AdminDeliveryAgents)} />
 
         {/* Marketplace (shared) */}
         <Route path="/marketplace" component={buyersOnly(Marketplace)} />

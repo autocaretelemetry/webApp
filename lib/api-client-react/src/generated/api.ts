@@ -21,6 +21,7 @@ import type {
 
 import type {
   ActivityEvent,
+  AdminOverview,
   AssignMechanicInput,
   Booking,
   BookingDetail,
@@ -52,6 +53,7 @@ import type {
   ServiceRecord,
   ServiceType,
   UpdateBookingStatusInput,
+  UpdateDeliveryAgentInput,
   UpdateOrderStatusInput,
   UpdatePartInput,
   UpdateVehicleInput,
@@ -795,6 +797,83 @@ export function useGetServiceCenter<TData = Awaited<ReturnType<typeof getService
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetServiceCenterQueryOptions(centerId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListMechanicsUrl = () => {
+
+
+
+
+  return `/api/mechanics`
+}
+
+/**
+ * @summary List every mechanic across all service centers (used by admins)
+ */
+export const listMechanics = async ( options?: RequestInit): Promise<Mechanic[]> => {
+
+  return customFetch<Mechanic[]>(getListMechanicsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMechanicsQueryKey = () => {
+    return [
+    `/api/mechanics`
+    ] as const;
+    }
+
+
+export const getListMechanicsQueryOptions = <TData = Awaited<ReturnType<typeof listMechanics>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMechanics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMechanicsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMechanics>>> = ({ signal }) => listMechanics({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMechanics>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMechanicsQueryResult = NonNullable<Awaited<ReturnType<typeof listMechanics>>>
+export type ListMechanicsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List every mechanic across all service centers (used by admins)
+ */
+
+export function useListMechanics<TData = Awaited<ReturnType<typeof listMechanics>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMechanics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMechanicsQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -2841,6 +2920,83 @@ export function useGetVendorDashboard<TData = Awaited<ReturnType<typeof getVendo
 
 
 
+export const getGetAdminOverviewUrl = () => {
+
+
+
+
+  return `/api/admin/overview`
+}
+
+/**
+ * @summary Platform-wide overview for the super admin / platform owner
+ */
+export const getAdminOverview = async ( options?: RequestInit): Promise<AdminOverview> => {
+
+  return customFetch<AdminOverview>(getGetAdminOverviewUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminOverviewQueryKey = () => {
+    return [
+    `/api/admin/overview`
+    ] as const;
+    }
+
+
+export const getGetAdminOverviewQueryOptions = <TData = Awaited<ReturnType<typeof getAdminOverview>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminOverview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminOverviewQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminOverview>>> = ({ signal }) => getAdminOverview({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminOverview>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminOverviewQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminOverview>>>
+export type GetAdminOverviewQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Platform-wide overview for the super admin / platform owner
+ */
+
+export function useGetAdminOverview<TData = Awaited<ReturnType<typeof getAdminOverview>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminOverview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminOverviewQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getListDeliveryAgentsUrl = (params?: ListDeliveryAgentsParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -3072,6 +3228,78 @@ export function useGetDeliveryAgent<TData = Awaited<ReturnType<typeof getDeliver
 
 
 
+
+export const getUpdateDeliveryAgentUrl = (agentId: string,) => {
+
+
+
+
+  return `/api/delivery-agents/${agentId}`
+}
+
+/**
+ * @summary Update a delivery agent (admin can deactivate, agent can edit profile)
+ */
+export const updateDeliveryAgent = async (agentId: string,
+    updateDeliveryAgentInput: UpdateDeliveryAgentInput, options?: RequestInit): Promise<DeliveryAgent> => {
+
+  return customFetch<DeliveryAgent>(getUpdateDeliveryAgentUrl(agentId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateDeliveryAgentInput,)
+  }
+);}
+
+
+
+
+export const getUpdateDeliveryAgentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDeliveryAgent>>, TError,{agentId: string;data: BodyType<UpdateDeliveryAgentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateDeliveryAgent>>, TError,{agentId: string;data: BodyType<UpdateDeliveryAgentInput>}, TContext> => {
+
+const mutationKey = ['updateDeliveryAgent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateDeliveryAgent>>, {agentId: string;data: BodyType<UpdateDeliveryAgentInput>}> = (props) => {
+          const {agentId,data} = props ?? {};
+
+          return  updateDeliveryAgent(agentId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateDeliveryAgentMutationResult = NonNullable<Awaited<ReturnType<typeof updateDeliveryAgent>>>
+    export type UpdateDeliveryAgentMutationBody = BodyType<UpdateDeliveryAgentInput>
+    export type UpdateDeliveryAgentMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update a delivery agent (admin can deactivate, agent can edit profile)
+ */
+export const useUpdateDeliveryAgent = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDeliveryAgent>>, TError,{agentId: string;data: BodyType<UpdateDeliveryAgentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateDeliveryAgent>>,
+        TError,
+        {agentId: string;data: BodyType<UpdateDeliveryAgentInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateDeliveryAgentMutationOptions(options));
+    }
 
 export const getListServiceTypesUrl = () => {
 

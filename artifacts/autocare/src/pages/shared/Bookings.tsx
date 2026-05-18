@@ -18,19 +18,25 @@ const STATUSES: { value: ListBookingsStatus | "all"; label: string }[] = [
 
 export default function Bookings() {
   const { role } = useRole();
+  // Admin sees everything; for action affordances on cards we render admin as
+  // the owner perspective (read-only). Server does not narrow by role anyway —
+  // we only send the param so the URL is self-describing.
+  const isAdmin = role === "admin";
   const scopedRole: "owner" | "center" = role === "center" ? "center" : "owner";
   const [status, setStatus] = useState<ListBookingsStatus | "all">("all");
 
   const { data: bookings, isLoading } = useListBookings({
-    role: scopedRole,
+    ...(isAdmin ? {} : { role: scopedRole }),
     ...(status !== "all" ? { status } : {})
   });
 
   return (
     <div className="space-y-8 animate-in fade-in-50 duration-500">
       <PageHeader 
-        title="Bookings" 
-        description="View and manage all service appointments."
+        title={isAdmin ? "All bookings" : "Bookings"}
+        description={isAdmin
+          ? "Every booking across every vehicle and service center."
+          : "View and manage all service appointments."}
       />
 
       <div className="flex flex-wrap gap-2 mb-6">

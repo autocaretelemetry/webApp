@@ -16,7 +16,10 @@ export default function Orders() {
   const { role } = useRole();
   const [filter, setFilter] = useState<(typeof STATUSES)[number]>("All");
   // Scope by buyer identity (no auth in MVP — buyerName is the de facto buyer id).
-  const buyerName = role === "vendor" ? undefined : getBuyerProfile().name;
+  // Admin and vendor both see every order; owner/center are scoped to their persona.
+  const isAdmin = role === "admin";
+  const buyerName =
+    role === "vendor" || isAdmin ? undefined : getBuyerProfile().name;
   const { data: orders, isLoading } = useListOrders(
     buyerName ? { buyerName } : undefined,
   );
@@ -27,9 +30,10 @@ export default function Orders() {
     return orders.filter((o) => o.status === filter);
   }, [orders, filter]);
 
-  const heading = role === "vendor" ? "All orders" : "My orders";
-  const description =
-    role === "vendor"
+  const heading = isAdmin || role === "vendor" ? "All orders" : "My orders";
+  const description = isAdmin
+    ? "Every parts order across every buyer and vendor."
+    : role === "vendor"
       ? "All orders across the marketplace. Use the vendor portal to fulfill yours."
       : "Track parts you've ordered from marketplace vendors.";
 
