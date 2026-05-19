@@ -1,12 +1,10 @@
-import { type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { useRole, type Role } from "@/lib/role";
 import { useCart } from "@/lib/cart";
 import { cn } from "@/lib/utils";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useAuth } from "@/lib/auth";
-import { LogOut, UserCircle2 } from "lucide-react";
-import type { AuthedUser } from "@workspace/api-client-react";
 import {
   Car,
   Wrench,
@@ -27,62 +25,143 @@ import {
   CreditCard,
   TrendingUp,
   KeyRound,
+  Menu,
+  X,
+  LogOut,
+  UserCircle2,
+  PanelLeftClose,
+  PanelLeftOpen,
+  ChevronRight,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import type { AuthedUser } from "@workspace/api-client-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
-const OWNER_NAV = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/vehicles", label: "My Vehicles", icon: Car },
-  { href: "/service-centers", label: "Service Centers", icon: Store },
-  { href: "/bookings", label: "Bookings", icon: CalendarDays },
-  { href: "/rentals", label: "Rent a Car", icon: KeyRound },
-  { href: "/rentals/my-bookings", label: "My Rentals", icon: KeyRound },
-  { href: "/rentals/profile", label: "Renter Profile", icon: KeyRound },
-  { href: "/rentals/my-listings", label: "My Listings", icon: KeyRound },
-  { href: "/rentals/listing-requests", label: "Requests on my cars", icon: KeyRound },
-  { href: "/marketplace", label: "Marketplace", icon: ShoppingBag },
-  { href: "/orders", label: "My Orders", icon: Package },
+type NavItem = {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+};
+
+type NavSection = {
+  label: string;
+  items: NavItem[];
+};
+
+const OWNER_NAV: NavSection[] = [
+  {
+    label: "Workshop",
+    items: [
+      { href: "/", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/vehicles", label: "My Vehicles", icon: Car },
+      { href: "/service-centers", label: "Service Centers", icon: Store },
+      { href: "/bookings", label: "Bookings", icon: CalendarDays },
+    ],
+  },
+  {
+    label: "Rentals",
+    items: [
+      { href: "/rentals", label: "Rent a Car", icon: KeyRound },
+      { href: "/rentals/my-bookings", label: "My Rentals", icon: CalendarDays },
+      { href: "/rentals/profile", label: "Renter Profile", icon: UserCircle2 },
+      { href: "/rentals/my-listings", label: "My Listings", icon: Layers },
+      { href: "/rentals/listing-requests", label: "Requests on my cars", icon: ShieldCheck },
+    ],
+  },
+  {
+    label: "Parts",
+    items: [
+      { href: "/marketplace", label: "Marketplace", icon: ShoppingBag },
+      { href: "/orders", label: "My Orders", icon: Package },
+    ],
+  },
 ];
 
-const CENTER_NAV = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/jobs", label: "Jobs", icon: Wrench },
-  { href: "/mechanics", label: "Mechanics", icon: Users },
-  { href: "/center/retainer-plans", label: "Retainer Plans", icon: ShieldCheck },
-  { href: "/bookings", label: "All Bookings", icon: CalendarDays },
-  { href: "/marketplace", label: "Parts Marketplace", icon: ShoppingBag },
-  { href: "/orders", label: "Parts Orders", icon: Package },
+const CENTER_NAV: NavSection[] = [
+  {
+    label: "Operations",
+    items: [
+      { href: "/", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/jobs", label: "Jobs", icon: Wrench },
+      { href: "/mechanics", label: "Mechanics", icon: Users },
+      { href: "/bookings", label: "All Bookings", icon: CalendarDays },
+    ],
+  },
+  {
+    label: "Business",
+    items: [
+      { href: "/center/retainer-plans", label: "Retainer Plans", icon: ShieldCheck },
+      { href: "/marketplace", label: "Parts Marketplace", icon: ShoppingBag },
+      { href: "/orders", label: "Parts Orders", icon: Package },
+    ],
+  },
 ];
 
-const VENDOR_NAV = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/vendor/parts", label: "My Catalog", icon: Package },
-  { href: "/vendor/orders", label: "Fulfillment", icon: ShoppingBag },
-  { href: "/marketplace", label: "Browse", icon: Store },
+const VENDOR_NAV: NavSection[] = [
+  {
+    label: "Catalog",
+    items: [
+      { href: "/", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/vendor/parts", label: "My Catalog", icon: Package },
+      { href: "/vendor/orders", label: "Fulfillment", icon: ShoppingBag },
+      { href: "/marketplace", label: "Browse", icon: Store },
+    ],
+  },
 ];
 
-const DELIVERY_NAV = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/delivery/orders", label: "My Deliveries", icon: Truck },
-  { href: "/delivery/register", label: "Profile", icon: UserPlus },
+const DELIVERY_NAV: NavSection[] = [
+  {
+    label: "On the road",
+    items: [
+      { href: "/", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/delivery/orders", label: "My Deliveries", icon: Truck },
+      { href: "/delivery/register", label: "Profile", icon: UserPlus },
+    ],
+  },
 ];
 
-const ADMIN_NAV = [
-  { href: "/", label: "Overview", icon: LayoutDashboard },
-  { href: "/admin/revenue", label: "Revenue", icon: TrendingUp },
-  { href: "/admin/subscriptions", label: "Subscriptions", icon: CreditCard },
-  { href: "/admin/plans", label: "Plans", icon: Layers },
-  { href: "/admin/staff", label: "Platform Staff", icon: UserCog },
-  { href: "/admin/centers", label: "Service Centers", icon: Building2 },
-  { href: "/admin/vendors", label: "Vendors", icon: Store },
-  { href: "/admin/mechanics", label: "Mechanics", icon: Users },
-  { href: "/admin/agents", label: "Delivery Agents", icon: Truck },
-  { href: "/admin/rentals", label: "Rentals", icon: KeyRound },
-  { href: "/bookings", label: "All Bookings", icon: CalendarDays },
-  { href: "/orders", label: "All Orders", icon: Package },
+const ADMIN_NAV: NavSection[] = [
+  {
+    label: "Overview",
+    items: [
+      { href: "/", label: "Overview", icon: LayoutDashboard },
+      { href: "/admin/revenue", label: "Revenue", icon: TrendingUp },
+    ],
+  },
+  {
+    label: "Billing",
+    items: [
+      { href: "/admin/subscriptions", label: "Subscriptions", icon: CreditCard },
+      { href: "/admin/plans", label: "Plans", icon: Layers },
+    ],
+  },
+  {
+    label: "Network",
+    items: [
+      { href: "/admin/staff", label: "Platform Staff", icon: UserCog },
+      { href: "/admin/centers", label: "Service Centers", icon: Building2 },
+      { href: "/admin/vendors", label: "Vendors", icon: Store },
+      { href: "/admin/mechanics", label: "Mechanics", icon: Users },
+      { href: "/admin/agents", label: "Delivery Agents", icon: Truck },
+      { href: "/admin/rentals", label: "Rentals", icon: KeyRound },
+    ],
+  },
+  {
+    label: "Activity",
+    items: [
+      { href: "/bookings", label: "All Bookings", icon: CalendarDays },
+      { href: "/orders", label: "All Orders", icon: Package },
+    ],
+  },
 ];
 
-function navFor(role: Role) {
+function navFor(role: Role): NavSection[] {
   if (role === "owner") return OWNER_NAV;
   if (role === "center") return CENTER_NAV;
   if (role === "vendor") return VENDOR_NAV;
@@ -90,11 +169,16 @@ function navFor(role: Role) {
   return DELIVERY_NAV;
 }
 
-function CartButton() {
+function CartButton({ collapsed = false }: { collapsed?: boolean }) {
   const { itemCount, scope } = useCart();
   return (
     <Link href="/cart">
-      <span className="relative inline-flex items-center justify-center rounded-md h-9 w-9 hover:bg-sidebar-accent cursor-pointer transition-colors">
+      <span
+        className={cn(
+          "relative inline-flex items-center justify-center rounded-md hover:bg-sidebar-accent cursor-pointer transition-colors",
+          collapsed ? "h-9 w-9" : "h-9 w-9",
+        )}
+      >
         <ShoppingCart className="h-4 w-4" />
         {itemCount > 0 && (
           <span
@@ -150,158 +234,333 @@ function RoleTabs({
   );
 }
 
-function UserMenu({
-  user,
-  onLogout,
-  variant = "topbar",
+const ROLE_LABEL: Record<Role, string> = {
+  owner: "Vehicle owner",
+  center: "Service center",
+  vendor: "Parts vendor",
+  delivery: "Delivery agent",
+  admin: "Platform admin",
+  super_admin: "Super admin",
+};
+
+function SidebarItem({
+  item,
+  active,
+  collapsed,
+  onNavigate,
 }: {
-  user: AuthedUser | null;
-  onLogout: () => void | Promise<void>;
-  variant?: "topbar" | "sidebar";
+  item: NavItem;
+  active: boolean;
+  collapsed: boolean;
+  onNavigate?: () => void;
 }) {
-  if (!user) return null;
-  if (variant === "sidebar") {
+  const Icon = item.icon;
+  const content = (
+    <Link href={item.href} onClick={onNavigate}>
+      <span
+        className={cn(
+          "group relative flex items-center gap-3 rounded-md text-sm font-medium transition-all cursor-pointer",
+          collapsed ? "justify-center h-10 w-10 mx-auto" : "px-3 py-2",
+          active
+            ? "bg-primary text-primary-foreground shadow-sm"
+            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:translate-x-0.5",
+        )}
+      >
+        {/* Active indicator bar */}
+        {active && !collapsed && (
+          <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-0.5 rounded-r bg-primary-foreground/80" />
+        )}
+        <Icon className={cn("h-4 w-4 shrink-0 transition-transform", active && "scale-110")} />
+        {!collapsed && <span className="truncate">{item.label}</span>}
+        {!collapsed && active && (
+          <ChevronRight className="ml-auto h-3.5 w-3.5 opacity-70" />
+        )}
+      </span>
+    </Link>
+  );
+
+  if (collapsed) {
     return (
-      <div className="rounded-md border bg-card px-3 py-2 flex items-center gap-2">
-        <UserCircle2 className="h-5 w-5 text-muted-foreground shrink-0" />
-        <div className="flex-1 min-w-0">
-          <div className="text-xs font-medium truncate">{user.name}</div>
-          <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
-            {user.role.replace("_", " ")}
-          </div>
-        </div>
-        <button
-          aria-label="Sign out"
-          onClick={() => void onLogout()}
-          className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-muted text-muted-foreground"
-        >
-          <LogOut className="h-3.5 w-3.5" />
-        </button>
-      </div>
+      <Tooltip delayDuration={0}>
+        <TooltipTrigger asChild>{content}</TooltipTrigger>
+        <TooltipContent side="right" sideOffset={8}>
+          {item.label}
+        </TooltipContent>
+      </Tooltip>
     );
   }
+  return content;
+}
+
+function SidebarBody({
+  role,
+  setRole,
+  user,
+  logout,
+  collapsed,
+  canSwitchRole,
+  location,
+  onNavigate,
+}: {
+  role: Role;
+  setRole: (r: Role) => void;
+  user: AuthedUser | null;
+  logout: () => void | Promise<void>;
+  collapsed: boolean;
+  canSwitchRole: boolean;
+  location: string;
+  onNavigate?: () => void;
+}) {
+  const sections = navFor(role);
+  const showCart = role === "owner" || role === "center";
+  const showBell = role === "owner";
+
   return (
-    <button
-      aria-label="Sign out"
-      onClick={() => void onLogout()}
-      title={`${user.name} — sign out`}
-      className="inline-flex items-center justify-center h-9 w-9 rounded-md hover:bg-sidebar-accent"
-    >
-      <LogOut className="h-4 w-4" />
-    </button>
+    <div className="flex h-full flex-col bg-sidebar">
+      {/* Branding */}
+      <div
+        className={cn(
+          "flex items-center border-b border-sidebar-border/60",
+          collapsed ? "justify-center h-16 px-2" : "justify-between gap-2 h-16 px-4",
+        )}
+      >
+        <Link href="/" onClick={onNavigate}>
+          <div className="flex items-center gap-2 text-primary font-bold cursor-pointer">
+            <div className="relative h-9 w-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center shadow-sm">
+              <Wrench className="h-5 w-5" />
+            </div>
+            {!collapsed && <span className="text-xl tracking-tight">AutoCare</span>}
+          </div>
+        </Link>
+        {!collapsed && (
+          <div className="flex items-center gap-1">
+            {showBell && <NotificationBell />}
+            {showCart && <CartButton />}
+          </div>
+        )}
+      </div>
+
+      {/* Collapsed quick actions */}
+      {collapsed && (showBell || showCart) && (
+        <div className="flex flex-col items-center gap-1 py-2 border-b border-sidebar-border/60">
+          {showBell && <NotificationBell />}
+          {showCart && <CartButton collapsed />}
+        </div>
+      )}
+
+      {/* User chip */}
+      {user && (
+        <div className={cn("px-3 pt-3", collapsed && "px-2")}>
+          {collapsed ? (
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <div className="flex items-center justify-center h-10 w-10 mx-auto rounded-full bg-primary/10 text-primary font-semibold uppercase">
+                  {user.name.charAt(0)}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={8}>
+                <div className="text-xs">
+                  <div className="font-semibold">{user.name}</div>
+                  <div className="text-muted-foreground">{ROLE_LABEL[user.role as Role]}</div>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <div className="rounded-lg border border-sidebar-border/60 bg-card/60 px-3 py-2.5 flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-full bg-primary/10 text-primary font-semibold uppercase flex items-center justify-center shrink-0">
+                {user.name.charAt(0)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold truncate">{user.name}</div>
+                <div className="text-[10px] text-muted-foreground uppercase tracking-wider truncate">
+                  {ROLE_LABEL[user.role as Role]}
+                </div>
+              </div>
+              <button
+                aria-label="Sign out"
+                onClick={() => void logout()}
+                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-muted text-muted-foreground transition-colors"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Role switcher (super admin only) */}
+      {canSwitchRole && !collapsed && (
+        <div className="px-3 pt-3">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1.5 px-1">
+            Impersonate
+          </div>
+          <RoleTabs
+            role={role}
+            setRole={setRole}
+            className="w-full"
+            triggerClassName="text-[10px] px-0.5"
+          />
+        </div>
+      )}
+
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-4">
+        {sections.map((section, idx) => (
+          <div key={idx} className="space-y-1">
+            {!collapsed && (
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground px-2 pb-1">
+                {section.label}
+              </div>
+            )}
+            {collapsed && idx > 0 && (
+              <div className="h-px bg-sidebar-border/60 my-2 mx-2" />
+            )}
+            <div className={cn("flex flex-col", collapsed ? "gap-1.5 items-center" : "gap-0.5")}>
+              {section.items.map((item) => {
+                const isActive =
+                  location === item.href ||
+                  (item.href !== "/" && location.startsWith(item.href));
+                return (
+                  <SidebarItem
+                    key={item.href}
+                    item={item}
+                    active={isActive}
+                    collapsed={collapsed}
+                    onNavigate={onNavigate}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      {/* Footer */}
+      <div className={cn("border-t border-sidebar-border/60 p-3", collapsed && "px-2")}>
+        <SidebarItem
+          item={{ href: "/settings", label: "Settings", icon: Settings }}
+          active={location === "/settings"}
+          collapsed={collapsed}
+          onNavigate={onNavigate}
+        />
+      </div>
+    </div>
   );
 }
+
+const COLLAPSED_KEY = "autocare_sidebar_collapsed";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { role, setRole } = useRole();
   const [location] = useLocation();
   const { user, logout } = useAuth();
 
-  const navItems = navFor(role);
-  const showCart = role === "owner" || role === "center";
-  const showBell = role === "owner";
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(COLLAPSED_KEY) === "1";
+  });
+
+  useEffect(() => {
+    localStorage.setItem(COLLAPSED_KEY, collapsed ? "1" : "0");
+  }, [collapsed]);
+
+  // Close mobile drawer on route change
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location]);
+
   const canSwitchRole = user?.role === "super_admin";
 
   return (
-    <div className="flex min-h-screen bg-background flex-col md:flex-row">
-      {/* Mobile Top Bar */}
-      <header className="md:hidden flex items-center justify-between p-4 border-b bg-card gap-2">
-        <div className="flex items-center gap-2 text-primary font-bold text-xl">
-          <Wrench className="h-6 w-6" />
-          <span>AutoCare</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {showBell && <NotificationBell />}
-          {showCart && <CartButton />}
-          {canSwitchRole && (
-            <RoleTabs role={role} setRole={setRole} triggerClassName="text-[10px] px-1" />
-          )}
-          <UserMenu user={user} onLogout={logout} />
-        </div>
-      </header>
-
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-64 flex-col border-r bg-sidebar p-4 gap-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-primary font-bold text-2xl px-2">
-            <Wrench className="h-8 w-8" />
-            <span>AutoCare</span>
-          </div>
-          <div className="flex items-center gap-1">
-            {showBell && <NotificationBell />}
-            {showCart && <CartButton />}
-          </div>
-        </div>
-
-        <UserMenu user={user} onLogout={logout} variant="sidebar" />
-
-        {canSwitchRole && (
-          <RoleTabs role={role} setRole={setRole} className="w-full" triggerClassName="text-[10px] px-0.5" />
+    <div className="flex min-h-screen bg-background">
+      {/* Desktop sidebar — animated width collapse */}
+      <aside
+        className={cn(
+          "hidden md:flex shrink-0 border-r border-sidebar-border/60 bg-sidebar relative transition-[width] duration-300 ease-out",
+          collapsed ? "w-[72px]" : "w-64",
         )}
-
-        <nav className="flex flex-col gap-1 flex-1">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
-
-            return (
-              <Link key={item.href} href={item.href}>
-                <span
-                  className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors cursor-pointer",
-                    isActive
-                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  {item.label}
-                </span>
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className="mt-auto">
-          <Link href="/settings">
-            <span
-              className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors cursor-pointer text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                location === "/settings" && "bg-sidebar-accent text-sidebar-accent-foreground",
-              )}
-            >
-              <Settings className="h-4 w-4" />
-              Settings
-            </span>
-          </Link>
+      >
+        <div className="w-full">
+          <SidebarBody
+            role={role}
+            setRole={setRole}
+            user={user}
+            logout={logout}
+            collapsed={collapsed}
+            canSwitchRole={canSwitchRole}
+            location={location}
+          />
         </div>
+
+        {/* Collapse toggle — sits on the seam between sidebar and content */}
+        <button
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          onClick={() => setCollapsed((c) => !c)}
+          className="absolute -right-3 top-20 z-10 h-6 w-6 rounded-full border border-sidebar-border/60 bg-card text-muted-foreground shadow-sm hover:text-foreground hover:bg-accent flex items-center justify-center transition-colors"
+        >
+          {collapsed ? (
+            <PanelLeftOpen className="h-3.5 w-3.5" />
+          ) : (
+            <PanelLeftClose className="h-3.5 w-3.5" />
+          )}
+        </button>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        {/* Mobile Navigation (Horizontal Scroll) */}
-        <nav className="md:hidden flex overflow-x-auto p-2 border-b bg-sidebar gap-1 no-scrollbar">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
+      {/* Mobile slide-out sheet */}
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetContent
+          side="left"
+          className="p-0 w-72 max-w-[85vw] bg-sidebar border-r border-sidebar-border/60"
+        >
+          <SheetTitle className="sr-only">Navigation</SheetTitle>
+          <SidebarBody
+            role={role}
+            setRole={setRole}
+            user={user}
+            logout={logout}
+            collapsed={false}
+            canSwitchRole={canSwitchRole}
+            location={location}
+            onNavigate={() => setMobileOpen(false)}
+          />
+        </SheetContent>
+      </Sheet>
 
-            return (
-              <Link key={item.href} href={item.href}>
-                <span
-                  className={cn(
-                    "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap",
-                    isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent",
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  {item.label}
-                </span>
-              </Link>
-            );
-          })}
-        </nav>
+      {/* Main content area */}
+      <main className="flex-1 flex flex-col min-h-screen min-w-0">
+        {/* Mobile top bar */}
+        <header className="md:hidden sticky top-0 z-30 flex items-center justify-between gap-2 px-4 h-14 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+          <div className="flex items-center gap-2">
+            <button
+              aria-label="Open menu"
+              onClick={() => setMobileOpen(true)}
+              className="h-9 w-9 inline-flex items-center justify-center rounded-md hover:bg-accent transition-colors"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <Link href="/">
+              <div className="flex items-center gap-1.5 text-primary font-bold cursor-pointer">
+                <Wrench className="h-5 w-5" />
+                <span>AutoCare</span>
+              </div>
+            </Link>
+          </div>
+          <div className="flex items-center gap-1">
+            {role === "owner" && <NotificationBell />}
+            {(role === "owner" || role === "center") && <CartButton />}
+            {user && (
+              <button
+                aria-label="Sign out"
+                onClick={() => void logout()}
+                className="h-9 w-9 inline-flex items-center justify-center rounded-md hover:bg-accent transition-colors"
+                title={`${user.name} — sign out`}
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        </header>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
           <div className="max-w-6xl mx-auto">{children}</div>
