@@ -8,6 +8,7 @@
     "seed:marketplace": "tsx ./src/seedMarketplace.ts",
     "seed:platform": "tsx ./src/seedPlatform.ts",
     "seed:rentals": "tsx ./src/seedRentals.ts",
+    "seed:users": "tsx ./src/seedUsers.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {

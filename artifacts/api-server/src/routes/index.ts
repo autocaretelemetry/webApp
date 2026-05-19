@@ -19,6 +19,7 @@ import storageRouter from "./storage";
 import retainersRouter from "./retainers";
 import notificationsRouter from "./notifications";
 import pushRouter from "./push";
+import authRouter from "./auth";
 
 const router: IRouter = Router();
 
@@ -42,5 +43,6 @@ router.use(storageRouter);
 router.use(retainersRouter);
 router.use(notificationsRouter);
 router.use(pushRouter);
+router.use(authRouter);
 
 export default router;

@@ -2813,3 +2813,33 @@ export const DeletePushSubscriptionBody = zod.object({
 })
 
 
+
+
+
+export const LoginBody = zod.object({
+  "email": zod.string().email(),
+  "password": zod.string().min(1)
+})
+
+export const LoginResponse = zod.object({
+  "id": zod.string(),
+  "email": zod.string(),
+  "name": zod.string(),
+  "role": zod.enum(['owner', 'center', 'vendor', 'delivery', 'admin', 'super_admin']),
+  "phone": zod.string().nullish(),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+
+
+export const GetCurrentUserResponse = zod.object({
+  "id": zod.string(),
+  "email": zod.string(),
+  "name": zod.string(),
+  "role": zod.enum(['owner', 'center', 'vendor', 'delivery', 'admin', 'super_admin']),
+  "phone": zod.string().nullish(),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+
+

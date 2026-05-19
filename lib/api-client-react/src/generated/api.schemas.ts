@@ -5,6 +5,38 @@
  * AutoCare API — vehicle owners book services, service centers fulfill them.
  * OpenAPI spec version: 0.1.0
  */
+export interface ErrorResponse {
+  error: string;
+}
+
+export interface LoginInput {
+  email: string;
+  /** @minLength 1 */
+  password: string;
+}
+
+export type AuthedUserRole = typeof AuthedUserRole[keyof typeof AuthedUserRole];
+
+
+export const AuthedUserRole = {
+  owner: 'owner',
+  center: 'center',
+  vendor: 'vendor',
+  delivery: 'delivery',
+  admin: 'admin',
+  super_admin: 'super_admin',
+} as const;
+
+export interface AuthedUser {
+  id: string;
+  email: string;
+  name: string;
+  role: AuthedUserRole;
+  phone?: string | null;
+  active: boolean;
+  createdAt: string;
+}
+
 export interface HealthStatus {
   status: string;
 }

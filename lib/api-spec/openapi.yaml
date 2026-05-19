@@ -1521,8 +1521,77 @@ paths:
       responses:
         "204": { description: Unsubscribed }
 
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginInput" }
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthedUser" }
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      responses:
+        "204": { description: Logged out }
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthedUser" }
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
 components:
   schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 1 }
+
+    AuthedUser:
+      type: object
+      required: [id, email, name, role, active, createdAt]
+      properties:
+        id: { type: string }
+        email: { type: string }
+        name: { type: string }
+        role:
+          type: string
+          enum: [owner, center, vendor, delivery, admin, super_admin]
+        phone: { type: string, nullable: true }
+        active: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
     HealthStatus:
       type: object
       required: [status]

@@ -1,11 +1,14 @@
 import type { ComponentType } from "react";
-import { Switch, Route, Router as WouterRouter, Link } from "wouter";
+import { Switch, Route, Router as WouterRouter, Link, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/AppShell";
 import { useRole, type Role } from "@/lib/role";
+import { AuthProvider, useAuth } from "@/lib/auth";
+import Landing from "@/pages/Landing";
+import LoginPage from "@/pages/Login";
 import NotFound from "@/pages/not-found";
 
 // Owner Pages
@@ -117,16 +120,9 @@ const buyersOnly = (c: ComponentType) => () => <RoleGuard allow={["owner", "cent
 const deliveryOnly = (c: ComponentType) => () => <RoleGuard allow={["delivery"]} component={c} />;
 const adminOnly = (c: ComponentType) => () => <RoleGuard allow={["admin"]} component={c} />;
 
-function Router() {
+function AppRouter() {
   return (
-    <Switch>
-      {/* Public share link — renders outside the app shell so non-platform
-          visitors can view a single car without seeing the sidebar or any
-          role-based navigation. */}
-      <Route path="/share/cars/:id" component={SharedCar} />
-
-      <Route>
-        <AppShell>
+    <AppShell>
           <Switch>
             <Route path="/" component={HomeRoute} />
 
@@ -192,7 +188,36 @@ function Router() {
             <Route component={NotFound} />
           </Switch>
         </AppShell>
-      </Route>
+  );
+}
+
+function Router() {
+  const { user, loading } = useAuth();
+  return (
+    <Switch>
+      {/* Public share link — renders outside the app shell so non-platform
+          visitors can view a single car without seeing the sidebar or any
+          role-based navigation. */}
+      <Route path="/share/cars/:id" component={SharedCar} />
+
+      <Route path="/login" component={LoginPage} />
+
+      {loading ? (
+        <Route>
+          <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">
+            Loading AutoCare...
+          </div>
+        </Route>
+      ) : user ? (
+        <Route component={AppRouter} />
+      ) : (
+        <Switch>
+          <Route path="/" component={Landing} />
+          <Route>
+            <Redirect to="/" />
+          </Route>
+        </Switch>
+      )}
     </Switch>
   );
 }
@@ -202,7 +227,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
+          <AuthProvider>
+            <Router />
+          </AuthProvider>
         </WouterRouter>
         <Toaster position="bottom-right" richColors />
       </TooltipProvider>

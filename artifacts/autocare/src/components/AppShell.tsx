@@ -4,6 +4,9 @@ import { useRole, type Role } from "@/lib/role";
 import { useCart } from "@/lib/cart";
 import { cn } from "@/lib/utils";
 import { NotificationBell } from "@/components/NotificationBell";
+import { useAuth } from "@/lib/auth";
+import { LogOut, UserCircle2 } from "lucide-react";
+import type { AuthedUser } from "@workspace/api-client-react";
 import {
   Car,
   Wrench,
@@ -125,10 +128,11 @@ function RoleTabs({
     { value: "vendor", label: "Vendor" },
     { value: "delivery", label: "Delivery" },
     { value: "admin", label: "Admin" },
+    { value: "super_admin", label: "Root" },
   ];
   return (
     <Tabs value={role} onValueChange={(v) => setRole(v as Role)} className={className}>
-      <TabsList className="grid w-full grid-cols-5">
+      <TabsList className="grid w-full grid-cols-6">
         {tabs.map((t) => (
           <TabsTrigger key={t.value} value={t.value} className={triggerClassName}>
             {t.value === "admin" ? (
@@ -146,13 +150,57 @@ function RoleTabs({
   );
 }
 
+function UserMenu({
+  user,
+  onLogout,
+  variant = "topbar",
+}: {
+  user: AuthedUser | null;
+  onLogout: () => void | Promise<void>;
+  variant?: "topbar" | "sidebar";
+}) {
+  if (!user) return null;
+  if (variant === "sidebar") {
+    return (
+      <div className="rounded-md border bg-card px-3 py-2 flex items-center gap-2">
+        <UserCircle2 className="h-5 w-5 text-muted-foreground shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="text-xs font-medium truncate">{user.name}</div>
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
+            {user.role.replace("_", " ")}
+          </div>
+        </div>
+        <button
+          aria-label="Sign out"
+          onClick={() => void onLogout()}
+          className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-muted text-muted-foreground"
+        >
+          <LogOut className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    );
+  }
+  return (
+    <button
+      aria-label="Sign out"
+      onClick={() => void onLogout()}
+      title={`${user.name} — sign out`}
+      className="inline-flex items-center justify-center h-9 w-9 rounded-md hover:bg-sidebar-accent"
+    >
+      <LogOut className="h-4 w-4" />
+    </button>
+  );
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const { role, setRole } = useRole();
   const [location] = useLocation();
+  const { user, logout } = useAuth();
 
   const navItems = navFor(role);
   const showCart = role === "owner" || role === "center";
   const showBell = role === "owner";
+  const canSwitchRole = user?.role === "super_admin";
 
   return (
     <div className="flex min-h-screen bg-background flex-col md:flex-row">
@@ -165,7 +213,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="flex items-center gap-2">
           {showBell && <NotificationBell />}
           {showCart && <CartButton />}
-          <RoleTabs role={role} setRole={setRole} triggerClassName="text-[10px] px-1" />
+          {canSwitchRole && (
+            <RoleTabs role={role} setRole={setRole} triggerClassName="text-[10px] px-1" />
+          )}
+          <UserMenu user={user} onLogout={logout} />
         </div>
       </header>
 
@@ -182,7 +233,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
 
-        <RoleTabs role={role} setRole={setRole} className="w-full" triggerClassName="text-[10px] px-0.5" />
+        <UserMenu user={user} onLogout={logout} variant="sidebar" />
+
+        {canSwitchRole && (
+          <RoleTabs role={role} setRole={setRole} className="w-full" triggerClassName="text-[10px] px-0.5" />
+        )}
 
         <nav className="flex flex-col gap-1 flex-1">
           {navItems.map((item) => {

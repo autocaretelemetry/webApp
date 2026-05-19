@@ -1,6 +1,12 @@
 import { useState, useEffect } from "react";
 
-export type Role = "owner" | "center" | "vendor" | "delivery" | "admin";
+export type Role =
+  | "owner"
+  | "center"
+  | "vendor"
+  | "delivery"
+  | "admin"
+  | "super_admin";
 
 const ROLE_KEY = "autocare_role";
 const DELIVERY_AGENT_ID_KEY = "autocare_delivery_agent_id";
@@ -12,7 +18,8 @@ export function getRole(): Role {
     stored === "center" ||
     stored === "vendor" ||
     stored === "delivery" ||
-    stored === "admin"
+    stored === "admin" ||
+    stored === "super_admin"
   ) {
     return stored;
   }
