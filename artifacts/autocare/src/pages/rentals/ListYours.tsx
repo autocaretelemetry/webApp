@@ -18,18 +18,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Car, Banknote, ShieldCheck, Wrench } from "lucide-react";
+import { Car, Banknote, ShieldCheck, Wrench, Camera } from "lucide-react";
 import { toast } from "sonner";
+import { ImageUploader } from "@/components/ImageUploader";
 
-const NIGERIAN_CITIES = [
-  "Lagos",
-  "Abuja",
-  "Ibadan",
-  "Port Harcourt",
-  "Kano",
-  "Benin City",
-  "Enugu",
-  "Kaduna",
+const GHANA_CITIES = [
+  "Accra",
+  "Kumasi",
+  "Takoradi",
+  "Tamale",
+  "Cape Coast",
+  "Sunyani",
+  "Ho",
+  "Koforidua",
+  "Tema",
 ];
 
 export default function ListYourCar() {
@@ -50,8 +52,8 @@ export default function ListYourCar() {
     transmission: "automatic" as "automatic" | "manual",
     seats: 5,
     fuelType: "petrol" as "petrol" | "diesel" | "hybrid" | "electric",
-    dailyRate: 25000,
-    city: "Lagos",
+    dailyRate: 250,
+    city: "Accra",
     pickupAddress: "",
     description: "",
     imageUrl: "",
@@ -62,6 +64,10 @@ export default function ListYourCar() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.imageUrl) {
+      toast.error("Please upload a photo of the car before submitting.");
+      return;
+    }
     try {
       await create.mutateAsync({
         data: {
@@ -81,7 +87,7 @@ export default function ListYourCar() {
           city: form.city,
           pickupAddress: form.pickupAddress,
           description: form.description || undefined,
-          imageUrl: form.imageUrl || undefined,
+          imageUrl: form.imageUrl,
         },
       });
       setRenterProfile({
@@ -196,12 +202,23 @@ export default function ListYourCar() {
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Photo URL (optional)" className="sm:col-span-2">
-              <Input
+            <Field
+              label={
+                <span className="inline-flex items-center gap-1.5">
+                  <Camera className="h-3.5 w-3.5" /> Car photo
+                </span>
+              }
+              required
+              className="sm:col-span-2"
+            >
+              <ImageUploader
                 value={form.imageUrl}
-                onChange={(e) => update("imageUrl", e.target.value)}
-                placeholder="https://…"
+                onChange={(path) => update("imageUrl", path)}
+                label="Upload a photo of the car"
               />
+              <p className="text-xs text-muted-foreground mt-1.5">
+                A clear exterior shot helps renters trust your listing.
+              </p>
             </Field>
             <Field label="Description (optional)" className="sm:col-span-2">
               <Textarea
@@ -219,7 +236,7 @@ export default function ListYourCar() {
             <CardTitle className="text-base">Pricing & pickup</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
-            <Field label="Daily rate (NGN)" required>
+            <Field label="Daily rate (GHS)" required>
               <Input
                 type="number"
                 min={0}
@@ -232,7 +249,7 @@ export default function ListYourCar() {
               <Select value={form.city} onValueChange={(v) => update("city", v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {NIGERIAN_CITIES.map((c) => (
+                  {GHANA_CITIES.map((c) => (
                     <SelectItem key={c} value={c}>{c}</SelectItem>
                   ))}
                 </SelectContent>
@@ -285,7 +302,7 @@ function Field({
   children,
   className,
 }: {
-  label: string;
+  label: React.ReactNode;
   required?: boolean;
   children: React.ReactNode;
   className?: string;

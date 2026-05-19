@@ -9,7 +9,7 @@ import { useRenterProfile, hasStoredRenterProfile } from "@/lib/profile";
 import { isProfileReadyForBooking } from "@/pages/rentals/Profile";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, resolveImageUrl } from "@/lib/format";
 import {
   Car,
   MapPin,
@@ -125,7 +125,7 @@ export default function SharedCar() {
               <Card className="overflow-hidden">
                 <div className="aspect-video bg-muted">
                   {car.imageUrl ? (
-                    <img src={car.imageUrl} alt={`${car.brand} ${car.model}`} className="w-full h-full object-cover" />
+                    <img src={resolveImageUrl(car.imageUrl)} alt={`${car.brand} ${car.model}`} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                       <Car className="h-16 w-16" />

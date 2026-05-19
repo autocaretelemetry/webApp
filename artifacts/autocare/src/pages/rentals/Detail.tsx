@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, resolveImageUrl } from "@/lib/format";
 import {
   Car,
   MapPin,
@@ -137,7 +137,7 @@ export default function RentalDetail() {
         <Card className="overflow-hidden">
           <div className="aspect-video bg-muted">
             {car.imageUrl ? (
-              <img src={car.imageUrl} alt={`${car.brand} ${car.model}`} className="w-full h-full object-cover" />
+              <img src={resolveImageUrl(car.imageUrl)} alt={`${car.brand} ${car.model}`} className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                 <Car className="h-16 w-16" />

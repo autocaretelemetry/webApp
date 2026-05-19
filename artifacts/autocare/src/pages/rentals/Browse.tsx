@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, resolveImageUrl } from "@/lib/format";
 import { Car, MapPin, Users, Cog, Fuel, Plus, ArrowRight, LifeBuoy } from "lucide-react";
 
 export default function RentalsBrowse() {
@@ -104,7 +104,7 @@ export default function RentalsBrowse() {
             <div className="aspect-video bg-muted relative overflow-hidden">
               {c.imageUrl ? (
                 <img
-                  src={c.imageUrl}
+                  src={resolveImageUrl(c.imageUrl)}
                   alt={`${c.brand} ${c.model}`}
                   className="w-full h-full object-cover"
                 />

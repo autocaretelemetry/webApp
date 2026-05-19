@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/format";
+import { formatCurrency, formatDate, formatDateTime, resolveImageUrl } from "@/lib/format";
 import {
   Calendar,
   Car,
@@ -171,7 +171,7 @@ function RentalRow({
       <CardContent className="p-4 flex flex-col sm:flex-row gap-4">
         <div className="h-24 w-32 rounded-md bg-muted overflow-hidden flex-shrink-0 hidden sm:block">
           {b.carImageUrl ? (
-            <img src={b.carImageUrl} alt={b.carLabel ?? ""} className="w-full h-full object-cover" />
+            <img src={resolveImageUrl(b.carImageUrl)} alt={b.carLabel ?? ""} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-muted-foreground"><Car className="h-8 w-8" /></div>
           )}

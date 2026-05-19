@@ -9,7 +9,7 @@ import { useRenterProfile } from "@/lib/profile";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDate, resolveImageUrl } from "@/lib/format";
 import { Plus, Car, MapPin, Calendar, ShieldCheck, Clock, XCircle, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { shareUrlForCar } from "@/pages/rentals/SharedCar";
@@ -132,7 +132,7 @@ export default function MyListings() {
           <Card key={c.id} className="overflow-hidden">
             <div className="aspect-video bg-muted">
               {c.imageUrl ? (
-                <img src={c.imageUrl} alt={`${c.brand} ${c.model}`} className="w-full h-full object-cover" />
+                <img src={resolveImageUrl(c.imageUrl)} alt={`${c.brand} ${c.model}`} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                   <Car className="h-10 w-10" />

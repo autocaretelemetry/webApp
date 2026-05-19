@@ -69,8 +69,8 @@ RENTAL TERMS
 Pickup: ${fmtDate(booking.startDate)}
 Return: ${fmtDate(booking.endDate)}
 Duration: ${booking.days} day(s)
-Daily rate: NGN ${booking.dailyRate.toLocaleString()}
-Total: NGN ${booking.total.toLocaleString()}
+Daily rate: GHS ${booking.dailyRate.toLocaleString()}
+Total: GHS ${booking.total.toLocaleString()}
 
 CONDITIONS
 1. The Renter shall return the Vehicle in the same condition received,

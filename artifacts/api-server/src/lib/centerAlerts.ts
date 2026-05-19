@@ -72,7 +72,7 @@ export async function notifyCenterInvoiceApproved(
   const message =
     `AutoCare — invoice approved\n` +
     `Owner approved invoice for booking #${shortId(bookingId)}. ` +
-    `Total: ₦${invoiceTotal.toLocaleString()}.\n` +
+    `Total: GHS ${invoiceTotal.toLocaleString()}.\n` +
     `Open: ${appPublicUrl(`/jobs/${bookingId}`)}`;
   await notifyCenter(booking.serviceCenterId, message);
 }
@@ -89,7 +89,7 @@ export async function notifyCenterPaymentReceived(
   const message =
     `AutoCare — payment received\n` +
     `Booking #${shortId(bookingId)} marked complete. ` +
-    `Settled: ₦${invoiceTotal.toLocaleString()}.\n` +
+    `Settled: GHS ${invoiceTotal.toLocaleString()}.\n` +
     `Open: ${appPublicUrl(`/jobs/${bookingId}`)}`;
   await notifyCenter(booking.serviceCenterId, message);
 }
