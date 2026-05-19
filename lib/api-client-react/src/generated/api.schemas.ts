@@ -853,6 +853,56 @@ export interface RentalCar {
   createdAt: string;
 }
 
+export type PublicRentalCarOwnerKind = typeof PublicRentalCarOwnerKind[keyof typeof PublicRentalCarOwnerKind];
+
+
+export const PublicRentalCarOwnerKind = {
+  platform: 'platform',
+  user: 'user',
+} as const;
+
+export type PublicRentalCarTransmission = typeof PublicRentalCarTransmission[keyof typeof PublicRentalCarTransmission];
+
+
+export const PublicRentalCarTransmission = {
+  automatic: 'automatic',
+  manual: 'manual',
+} as const;
+
+export type PublicRentalCarFuelType = typeof PublicRentalCarFuelType[keyof typeof PublicRentalCarFuelType];
+
+
+export const PublicRentalCarFuelType = {
+  petrol: 'petrol',
+  diesel: 'diesel',
+  hybrid: 'hybrid',
+  electric: 'electric',
+} as const;
+
+/**
+ * Sanitized rental car view served at /rental-cars/{carId}/public for
+anonymous share-link visitors. Owner phone/email and plate number are
+intentionally omitted.
+
+ */
+export interface PublicRentalCar {
+  id: string;
+  ownerKind: PublicRentalCarOwnerKind;
+  ownerName: string;
+  brand: string;
+  model: string;
+  year: number;
+  color: string;
+  transmission: PublicRentalCarTransmission;
+  seats: number;
+  fuelType: PublicRentalCarFuelType;
+  dailyRate: number;
+  city: string;
+  pickupAddress: string;
+  description?: string | null;
+  imageUrl?: string | null;
+}
+
 export type CreateRentalCarInputOwnerKind = typeof CreateRentalCarInputOwnerKind[keyof typeof CreateRentalCarInputOwnerKind];
 
 

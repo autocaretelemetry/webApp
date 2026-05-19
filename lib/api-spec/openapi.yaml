@@ -1127,6 +1127,27 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/DeleteConflict" }
 
+  /rental-cars/{carId}/public:
+    get:
+      operationId: getPublicRentalCar
+      tags: [rentals]
+      summary: Public, sanitized view of a rental car for shareable links
+      description: |
+        Returns a sanitized snapshot of a rental car suitable for anonymous
+        visitors arriving via a shared link. Owner contact details and the
+        plate number are omitted. Only listings that are approved AND active
+        are returned; everything else responds 404.
+      parameters:
+        - { name: carId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicRentalCar" }
+        "404":
+          description: Not found or not publicly shareable
+
   /renter-profiles:
     post:
       operationId: upsertRenterProfile
@@ -2036,6 +2057,30 @@ components:
         status: { type: string, enum: [pending, approved, unavailable] }
         active: { type: boolean }
         createdAt: { type: string, format: date-time }
+
+    PublicRentalCar:
+      type: object
+      description: |
+        Sanitized rental car view served at /rental-cars/{carId}/public for
+        anonymous share-link visitors. Owner phone/email and plate number are
+        intentionally omitted.
+      required: [id, ownerKind, ownerName, brand, model, year, color, transmission, seats, fuelType, dailyRate, city, pickupAddress]
+      properties:
+        id: { type: string }
+        ownerKind: { type: string, enum: [platform, user] }
+        ownerName: { type: string }
+        brand: { type: string }
+        model: { type: string }
+        year: { type: integer }
+        color: { type: string }
+        transmission: { type: string, enum: [automatic, manual] }
+        seats: { type: integer }
+        fuelType: { type: string, enum: [petrol, diesel, hybrid, electric] }
+        dailyRate: { type: number }
+        city: { type: string }
+        pickupAddress: { type: string }
+        description: { type: string, nullable: true }
+        imageUrl: { type: string, nullable: true }
 
     CreateRentalCarInput:
       type: object

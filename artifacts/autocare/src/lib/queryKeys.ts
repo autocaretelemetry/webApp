@@ -34,6 +34,7 @@ export {
   getGetRevenueOverviewQueryKey,
   getListRentalCarsQueryKey,
   getGetRentalCarQueryKey,
+  getGetPublicRentalCarQueryKey,
   getListRentalBookingsQueryKey,
   getGetRenterProfileByPhoneQueryKey,
   getGetRenterProfileQueryKey,

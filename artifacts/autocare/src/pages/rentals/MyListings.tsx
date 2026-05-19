@@ -10,7 +10,9 @@ import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Plus, Car, MapPin, Calendar, ShieldCheck, Clock, XCircle } from "lucide-react";
+import { Plus, Car, MapPin, Calendar, ShieldCheck, Clock, XCircle, Share2 } from "lucide-react";
+import { toast } from "sonner";
+import { shareUrlForCar } from "@/pages/rentals/SharedCar";
 
 function StatusPill({ status }: { status: string }) {
   const map: Record<string, { label: string; cls: string; icon: typeof ShieldCheck }> = {
@@ -24,6 +26,43 @@ function StatusPill({ status }: { status: string }) {
     <span className={`inline-flex items-center gap-1 text-[11px] uppercase tracking-wide px-2 py-0.5 rounded ${s.cls}`}>
       <Icon className="h-3 w-3" /> {s.label}
     </span>
+  );
+}
+
+function ShareRow({ carId, disabled }: { carId: string; disabled: boolean }) {
+  const url = shareUrlForCar(carId);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Share link copied. Send it to anyone — no AutoCare account needed to view.");
+    } catch {
+      toast.error("Couldn't copy automatically — long-press the link to copy.");
+    }
+  };
+  if (disabled) {
+    return (
+      <p className="text-xs text-muted-foreground pt-1">
+        Sharing will be enabled once AutoCare approves this listing.
+      </p>
+    );
+  }
+  return (
+    <div className="flex items-center gap-2 pt-2">
+      <Link href={`/share/cars/${carId}`}>
+        <Button variant="outline" size="sm" className="gap-1.5">
+          <Share2 className="h-3.5 w-3.5" /> Preview
+        </Button>
+      </Link>
+      <Button
+        type="button"
+        variant="default"
+        size="sm"
+        className="gap-1.5 flex-1"
+        onClick={copy}
+      >
+        <Share2 className="h-3.5 w-3.5" /> Copy share link
+      </Button>
+    </div>
   );
 }
 
@@ -124,6 +163,7 @@ export default function MyListings() {
                   <p className="font-semibold text-right">{bookingsForCar.get(c.id) ?? 0}</p>
                 </div>
               </div>
+              <ShareRow carId={c.id} disabled={c.status !== "approved"} />
             </CardContent>
           </Card>
         ))}

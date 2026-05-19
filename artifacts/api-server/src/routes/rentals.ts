@@ -190,6 +190,42 @@ router.get("/rental-cars", async (req, res): Promise<void> => {
   res.json(rows);
 });
 
+router.get("/rental-cars/:carId/public", async (req, res): Promise<void> => {
+  const params = GetRentalCarParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const [row] = await db
+    .select()
+    .from(rentalCarsTable)
+    .where(eq(rentalCarsTable.id, params.data.carId));
+  // Anonymous share view: only expose listings that are approved AND active.
+  // Anything else (pending review, withdrawn, blocked) responds 404 so a
+  // leaked ID cannot reveal listing existence or owner PII.
+  if (!row || row.status !== "approved" || !row.active) {
+    res.status(404).json({ error: "Rental car not found" });
+    return;
+  }
+  res.json({
+    id: row.id,
+    ownerKind: row.ownerKind,
+    ownerName: row.ownerName,
+    brand: row.brand,
+    model: row.model,
+    year: row.year,
+    color: row.color,
+    transmission: row.transmission,
+    seats: row.seats,
+    fuelType: row.fuelType,
+    dailyRate: row.dailyRate,
+    city: row.city,
+    pickupAddress: row.pickupAddress,
+    description: row.description,
+    imageUrl: row.imageUrl,
+  });
+});
+
 router.get("/rental-cars/:carId", async (req, res): Promise<void> => {
   const params = GetRentalCarParams.safeParse(req.params);
   if (!params.success) {

@@ -2154,6 +2154,37 @@ export const DeleteRentalCarParams = zod.object({
 
 
 /**
+ * Returns a sanitized snapshot of a rental car suitable for anonymous
+visitors arriving via a shared link. Owner contact details and the
+plate number are omitted. Only listings that are approved AND active
+are returned; everything else responds 404.
+
+ * @summary Public, sanitized view of a rental car for shareable links
+ */
+export const GetPublicRentalCarParams = zod.object({
+  "carId": zod.coerce.string()
+})
+
+export const GetPublicRentalCarResponse = zod.object({
+  "id": zod.string(),
+  "ownerKind": zod.enum(['platform', 'user']),
+  "ownerName": zod.string(),
+  "brand": zod.string(),
+  "model": zod.string(),
+  "year": zod.number(),
+  "color": zod.string(),
+  "transmission": zod.enum(['automatic', 'manual']),
+  "seats": zod.number(),
+  "fuelType": zod.enum(['petrol', 'diesel', 'hybrid', 'electric']),
+  "dailyRate": zod.number(),
+  "city": zod.string(),
+  "pickupAddress": zod.string(),
+  "description": zod.string().nullish(),
+  "imageUrl": zod.string().nullish()
+}).describe('Sanitized rental car view served at \/rental-cars\/{carId}\/public for\nanonymous share-link visitors. Owner phone\/email and plate number are\nintentionally omitted.\n')
+
+
+/**
  * @summary Create or update a renter profile by phone (idempotent)
  */
 

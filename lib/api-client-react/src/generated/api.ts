@@ -61,6 +61,7 @@ import type {
   OwnerDashboard,
   Part,
   PlatformStaff,
+  PublicRentalCar,
   RegisterDeliveryAgentInput,
   RentalBooking,
   RentalCar,
@@ -5322,6 +5323,88 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getDeleteRentalCarMutationOptions(options));
     }
+
+export const getGetPublicRentalCarUrl = (carId: string,) => {
+
+
+
+
+  return `/api/rental-cars/${carId}/public`
+}
+
+/**
+ * Returns a sanitized snapshot of a rental car suitable for anonymous
+visitors arriving via a shared link. Owner contact details and the
+plate number are omitted. Only listings that are approved AND active
+are returned; everything else responds 404.
+
+ * @summary Public, sanitized view of a rental car for shareable links
+ */
+export const getPublicRentalCar = async (carId: string, options?: RequestInit): Promise<PublicRentalCar> => {
+
+  return customFetch<PublicRentalCar>(getGetPublicRentalCarUrl(carId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPublicRentalCarQueryKey = (carId: string,) => {
+    return [
+    `/api/rental-cars/${carId}/public`
+    ] as const;
+    }
+
+
+export const getGetPublicRentalCarQueryOptions = <TData = Awaited<ReturnType<typeof getPublicRentalCar>>, TError = ErrorType<void>>(carId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicRentalCar>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPublicRentalCarQueryKey(carId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPublicRentalCar>>> = ({ signal }) => getPublicRentalCar(carId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(carId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPublicRentalCar>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPublicRentalCarQueryResult = NonNullable<Awaited<ReturnType<typeof getPublicRentalCar>>>
+export type GetPublicRentalCarQueryError = ErrorType<void>
+
+
+/**
+ * @summary Public, sanitized view of a rental car for shareable links
+ */
+
+export function useGetPublicRentalCar<TData = Awaited<ReturnType<typeof getPublicRentalCar>>, TError = ErrorType<void>>(
+ carId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicRentalCar>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPublicRentalCarQueryOptions(carId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getUpsertRenterProfileUrl = () => {
 

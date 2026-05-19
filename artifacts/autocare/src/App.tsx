@@ -53,6 +53,7 @@ import MyListings from "@/pages/rentals/MyListings";
 import MyRentals from "@/pages/rentals/MyRentals";
 import RenterProfilePage from "@/pages/rentals/Profile";
 import ListingRequests from "@/pages/rentals/ListingRequests";
+import SharedCar from "@/pages/rentals/SharedCar";
 
 // Shared Pages
 import Bookings from "@/pages/shared/Bookings";
@@ -117,9 +118,16 @@ const adminOnly = (c: ComponentType) => () => <RoleGuard allow={["admin"]} compo
 
 function Router() {
   return (
-    <AppShell>
-      <Switch>
-        <Route path="/" component={HomeRoute} />
+    <Switch>
+      {/* Public share link — renders outside the app shell so non-platform
+          visitors can view a single car without seeing the sidebar or any
+          role-based navigation. */}
+      <Route path="/share/cars/:id" component={SharedCar} />
+
+      <Route>
+        <AppShell>
+          <Switch>
+            <Route path="/" component={HomeRoute} />
 
         {/* Owner Routes */}
         <Route path="/vehicles" component={ownerOnly(Vehicles)} />
@@ -179,9 +187,11 @@ function Router() {
         <Route path="/invoices/:id" component={InvoiceDetail} />
         <Route path="/settings" component={Settings} />
 
-        <Route component={NotFound} />
-      </Switch>
-    </AppShell>
+            <Route component={NotFound} />
+          </Switch>
+        </AppShell>
+      </Route>
+    </Switch>
   );
 }
 

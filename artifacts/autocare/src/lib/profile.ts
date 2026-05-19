@@ -14,6 +14,21 @@ const DEFAULT: RenterProfile = {
   email: "marcus.hale@example.com",
 };
 
+/**
+ * True only when the user has explicitly saved their own renter profile in
+ * this browser. Public share-link visitors who have never interacted with
+ * AutoCare must be treated as anonymous — otherwise the hardcoded DEFAULT
+ * identity below would cause them to look up a real renter by phone and
+ * skip the signup/KYC step.
+ */
+export function hasStoredRenterProfile(): boolean {
+  try {
+    return !!localStorage.getItem(KEY);
+  } catch {
+    return false;
+  }
+}
+
 export function getRenterProfile(): RenterProfile {
   try {
     const raw = localStorage.getItem(KEY);
