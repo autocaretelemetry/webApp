@@ -294,6 +294,24 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/Mechanic" }
+    post:
+      operationId: createMechanic
+      tags: [mechanics]
+      summary: Service center adds a mechanic to its roster
+      parameters:
+        - { name: centerId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateMechanicInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Mechanic" }
+        "404": { description: Service center not found }
 
   /mechanics/{mechanicId}:
     get:
@@ -1699,6 +1717,18 @@ components:
         completedJobs: { type: integer }
         avatarUrl: { type: string, nullable: true }
         active: { type: boolean }
+
+    CreateMechanicInput:
+      type: object
+      required: [name, specialization]
+      properties:
+        name: { type: string, minLength: 1 }
+        specialization: { type: string, minLength: 1 }
+        yearsExperience: { type: integer, minimum: 0 }
+        certifications:
+          type: array
+          items: { type: string }
+        avatarUrl: { type: string, nullable: true }
 
     Booking:
       type: object

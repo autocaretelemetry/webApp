@@ -384,6 +384,28 @@ export const ListMechanicsForCenterResponseItem = zod.object({
 export const ListMechanicsForCenterResponse = zod.array(ListMechanicsForCenterResponseItem)
 
 
+/**
+ * @summary Service center adds a mechanic to its roster
+ */
+export const CreateMechanicParams = zod.object({
+  "centerId": zod.coerce.string()
+})
+
+
+
+export const createMechanicBodyYearsExperienceMin = 0;
+
+
+
+export const CreateMechanicBody = zod.object({
+  "name": zod.string().min(1),
+  "specialization": zod.string().min(1),
+  "yearsExperience": zod.number().min(createMechanicBodyYearsExperienceMin).optional(),
+  "certifications": zod.array(zod.string()).optional(),
+  "avatarUrl": zod.string().nullish()
+})
+
+
 export const GetMechanicParams = zod.object({
   "mechanicId": zod.coerce.string()
 })

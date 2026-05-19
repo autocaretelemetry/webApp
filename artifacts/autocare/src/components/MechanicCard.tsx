@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Star, Wrench, Award, CheckCircle2 } from "lucide-react";
+import { resolveImageUrl } from "@/lib/format";
 
 interface MechanicCardProps {
   mechanic: Mechanic;
@@ -21,7 +22,7 @@ export function MechanicCard({ mechanic }: MechanicCardProps) {
       <CardContent className="p-6">
         <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start text-center sm:text-left">
           <Avatar className="h-24 w-24 border-2 border-muted shadow-sm">
-            <AvatarImage src={mechanic.avatarUrl || undefined} alt={mechanic.name} />
+            <AvatarImage src={resolveImageUrl(mechanic.avatarUrl) || undefined} alt={mechanic.name} />
             <AvatarFallback className="text-2xl bg-primary/10 text-primary">{initials}</AvatarFallback>
           </Avatar>
           

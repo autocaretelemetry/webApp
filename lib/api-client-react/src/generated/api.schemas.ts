@@ -145,6 +145,17 @@ export interface Mechanic {
   active?: boolean;
 }
 
+export interface CreateMechanicInput {
+  /** @minLength 1 */
+  name: string;
+  /** @minLength 1 */
+  specialization: string;
+  /** @minimum 0 */
+  yearsExperience?: number;
+  certifications?: string[];
+  avatarUrl?: string | null;
+}
+
 export type BookingStatus = typeof BookingStatus[keyof typeof BookingStatus];
 
 

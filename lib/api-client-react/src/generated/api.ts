@@ -30,6 +30,7 @@ import type {
   CenterDashboard,
   CreateBookingInput,
   CreateInvoiceInput,
+  CreateMechanicInput,
   CreateOrderInput,
   CreatePartInput,
   CreatePlatformStaffInput,
@@ -1382,6 +1383,78 @@ export function useListMechanicsForCenter<TData = Awaited<ReturnType<typeof list
 
 
 
+
+export const getCreateMechanicUrl = (centerId: string,) => {
+
+
+
+
+  return `/api/service-centers/${centerId}/mechanics`
+}
+
+/**
+ * @summary Service center adds a mechanic to its roster
+ */
+export const createMechanic = async (centerId: string,
+    createMechanicInput: CreateMechanicInput, options?: RequestInit): Promise<Mechanic> => {
+
+  return customFetch<Mechanic>(getCreateMechanicUrl(centerId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createMechanicInput,)
+  }
+);}
+
+
+
+
+export const getCreateMechanicMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMechanic>>, TError,{centerId: string;data: BodyType<CreateMechanicInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createMechanic>>, TError,{centerId: string;data: BodyType<CreateMechanicInput>}, TContext> => {
+
+const mutationKey = ['createMechanic'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createMechanic>>, {centerId: string;data: BodyType<CreateMechanicInput>}> = (props) => {
+          const {centerId,data} = props ?? {};
+
+          return  createMechanic(centerId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateMechanicMutationResult = NonNullable<Awaited<ReturnType<typeof createMechanic>>>
+    export type CreateMechanicMutationBody = BodyType<CreateMechanicInput>
+    export type CreateMechanicMutationError = ErrorType<void>
+
+    /**
+ * @summary Service center adds a mechanic to its roster
+ */
+export const useCreateMechanic = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMechanic>>, TError,{centerId: string;data: BodyType<CreateMechanicInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createMechanic>>,
+        TError,
+        {centerId: string;data: BodyType<CreateMechanicInput>},
+        TContext
+      > => {
+      return useMutation(getCreateMechanicMutationOptions(options));
+    }
 
 export const getGetMechanicUrl = (mechanicId: string,) => {
 

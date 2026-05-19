@@ -21,6 +21,7 @@ export * from './categoryCount';
 export * from './centerDashboard';
 export * from './createBookingInput';
 export * from './createInvoiceInput';
+export * from './createMechanicInput';
 export * from './createOrderInput';
 export * from './createOrderInputBuyerKind';
 export * from './createOrderItemInput';
