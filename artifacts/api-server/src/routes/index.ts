@@ -20,6 +20,7 @@ import retainersRouter from "./retainers";
 import notificationsRouter from "./notifications";
 import pushRouter from "./push";
 import authRouter from "./auth";
+import landingContentRouter from "./landingContent";
 
 const router: IRouter = Router();
 
@@ -44,5 +45,6 @@ router.use(retainersRouter);
 router.use(notificationsRouter);
 router.use(pushRouter);
 router.use(authRouter);
+router.use(landingContentRouter);
 
 export default router;

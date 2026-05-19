@@ -365,6 +365,101 @@ export const ListMechanicsResponseItem = zod.object({
 export const ListMechanicsResponse = zod.array(ListMechanicsResponseItem)
 
 
+/**
+ * @summary Public — content used to render the marketing landing page
+ */
+export const GetLandingContentResponse = zod.object({
+  "brandName": zod.string(),
+  "logoUrl": zod.string().nullish(),
+  "primaryColor": zod.string(),
+  "signInLabel": zod.string(),
+  "getStartedLabel": zod.string(),
+  "heroEyebrow": zod.string(),
+  "heroTitle": zod.string(),
+  "heroSubtitle": zod.string(),
+  "heroCtaLabel": zod.string(),
+  "heroImageUrl": zod.string().nullish(),
+  "rolesHeading": zod.string(),
+  "roles": zod.array(zod.object({
+  "icon": zod.enum(['car', 'building', 'package', 'truck', 'shield', 'wrench', 'users']),
+  "title": zod.string(),
+  "desc": zod.string()
+})),
+  "featuresHeading": zod.string(),
+  "featuresSubtitle": zod.string(),
+  "features": zod.array(zod.string()),
+  "footerText": zod.string(),
+  "footerSignInLabel": zod.string()
+})
+
+
+/**
+ * @summary Super admin — replace any subset of landing-page fields
+ */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+export const UpdateLandingContentBody = zod.object({
+  "brandName": zod.string().min(1).optional(),
+  "logoUrl": zod.string().nullish(),
+  "primaryColor": zod.string().min(1).optional(),
+  "signInLabel": zod.string().min(1).optional(),
+  "getStartedLabel": zod.string().min(1).optional(),
+  "heroEyebrow": zod.string().min(1).optional(),
+  "heroTitle": zod.string().min(1).optional(),
+  "heroSubtitle": zod.string().min(1).optional(),
+  "heroCtaLabel": zod.string().min(1).optional(),
+  "heroImageUrl": zod.string().nullish(),
+  "rolesHeading": zod.string().min(1).optional(),
+  "roles": zod.array(zod.object({
+  "icon": zod.enum(['car', 'building', 'package', 'truck', 'shield', 'wrench', 'users']),
+  "title": zod.string(),
+  "desc": zod.string()
+})).optional(),
+  "featuresHeading": zod.string().min(1).optional(),
+  "featuresSubtitle": zod.string().min(1).optional(),
+  "features": zod.array(zod.string()).optional(),
+  "footerText": zod.string().min(1).optional(),
+  "footerSignInLabel": zod.string().min(1).optional()
+})
+
+export const UpdateLandingContentResponse = zod.object({
+  "brandName": zod.string(),
+  "logoUrl": zod.string().nullish(),
+  "primaryColor": zod.string(),
+  "signInLabel": zod.string(),
+  "getStartedLabel": zod.string(),
+  "heroEyebrow": zod.string(),
+  "heroTitle": zod.string(),
+  "heroSubtitle": zod.string(),
+  "heroCtaLabel": zod.string(),
+  "heroImageUrl": zod.string().nullish(),
+  "rolesHeading": zod.string(),
+  "roles": zod.array(zod.object({
+  "icon": zod.enum(['car', 'building', 'package', 'truck', 'shield', 'wrench', 'users']),
+  "title": zod.string(),
+  "desc": zod.string()
+})),
+  "featuresHeading": zod.string(),
+  "featuresSubtitle": zod.string(),
+  "features": zod.array(zod.string()),
+  "footerText": zod.string(),
+  "footerSignInLabel": zod.string()
+})
+
+
 export const ListMechanicsForCenterParams = zod.object({
   "centerId": zod.coerce.string()
 })

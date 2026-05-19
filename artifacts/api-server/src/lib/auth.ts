@@ -129,3 +129,19 @@ export function requireAuth(
   }
   next();
 }
+
+export function requireSuperAdmin(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  if (!req.user) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+  if (req.user.role !== "super_admin") {
+    res.status(403).json({ error: "Super admin only" });
+    return;
+  }
+  next();
+}

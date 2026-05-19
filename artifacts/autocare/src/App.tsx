@@ -48,6 +48,7 @@ import AdminStaff from "@/pages/admin/Staff";
 import AdminPlans from "@/pages/admin/Plans";
 import AdminSubscriptions from "@/pages/admin/Subscriptions";
 import AdminRevenue from "@/pages/admin/Revenue";
+import SuperAdminLandingEditor from "@/pages/super_admin/LandingEditor";
 import AdminRentals from "@/pages/admin/Rentals";
 
 // Rentals Pages
@@ -119,7 +120,8 @@ const centerOnly = (c: ComponentType) => () => <RoleGuard allow={["center"]} com
 const vendorOnly = (c: ComponentType) => () => <RoleGuard allow={["vendor"]} component={c} />;
 const buyersOnly = (c: ComponentType) => () => <RoleGuard allow={["owner", "center"]} component={c} />;
 const deliveryOnly = (c: ComponentType) => () => <RoleGuard allow={["delivery"]} component={c} />;
-const adminOnly = (c: ComponentType) => () => <RoleGuard allow={["admin"]} component={c} />;
+const adminOnly = (c: ComponentType) => () => <RoleGuard allow={["admin", "super_admin"]} component={c} />;
+const superAdminOnly = (c: ComponentType) => () => <RoleGuard allow={["super_admin"]} component={c} />;
 
 function AppRouter() {
   return (
@@ -163,6 +165,9 @@ function AppRouter() {
         <Route path="/admin/subscriptions" component={adminOnly(AdminSubscriptions)} />
         <Route path="/admin/revenue" component={adminOnly(AdminRevenue)} />
         <Route path="/admin/rentals" component={adminOnly(AdminRentals)} />
+
+        {/* Super Admin Routes */}
+        <Route path="/super-admin/landing" component={superAdminOnly(SuperAdminLandingEditor)} />
 
         {/* Rentals Routes (owners + admins can browse; bookings open to any role using owner shell) */}
         <Route path="/rentals" component={RentalsBrowse} />

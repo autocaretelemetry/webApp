@@ -145,6 +145,78 @@ export interface Mechanic {
   active?: boolean;
 }
 
+export type LandingRoleCardIcon = typeof LandingRoleCardIcon[keyof typeof LandingRoleCardIcon];
+
+
+export const LandingRoleCardIcon = {
+  car: 'car',
+  building: 'building',
+  package: 'package',
+  truck: 'truck',
+  shield: 'shield',
+  wrench: 'wrench',
+  users: 'users',
+} as const;
+
+export interface LandingRoleCard {
+  icon: LandingRoleCardIcon;
+  title: string;
+  desc: string;
+}
+
+export interface LandingContent {
+  brandName: string;
+  logoUrl?: string | null;
+  primaryColor: string;
+  signInLabel: string;
+  getStartedLabel: string;
+  heroEyebrow: string;
+  heroTitle: string;
+  heroSubtitle: string;
+  heroCtaLabel: string;
+  heroImageUrl?: string | null;
+  rolesHeading: string;
+  roles: LandingRoleCard[];
+  featuresHeading: string;
+  featuresSubtitle: string;
+  features: string[];
+  footerText: string;
+  footerSignInLabel: string;
+}
+
+export interface UpdateLandingContentInput {
+  /** @minLength 1 */
+  brandName?: string;
+  logoUrl?: string | null;
+  /** @minLength 1 */
+  primaryColor?: string;
+  /** @minLength 1 */
+  signInLabel?: string;
+  /** @minLength 1 */
+  getStartedLabel?: string;
+  /** @minLength 1 */
+  heroEyebrow?: string;
+  /** @minLength 1 */
+  heroTitle?: string;
+  /** @minLength 1 */
+  heroSubtitle?: string;
+  /** @minLength 1 */
+  heroCtaLabel?: string;
+  heroImageUrl?: string | null;
+  /** @minLength 1 */
+  rolesHeading?: string;
+  roles?: LandingRoleCard[];
+  /** @minLength 1 */
+  featuresHeading?: string;
+  /** @minLength 1 */
+  featuresSubtitle?: string;
+  features?: string[];
+  /** @minLength 1 */
+  footerText?: string;
+  /** @minLength 1 */
+  footerSignInLabel?: string;
+}
+
 export interface CreateMechanicInput {
   /** @minLength 1 */
   name: string;

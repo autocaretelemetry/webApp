@@ -34,9 +34,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // admin by default and can impersonate any other role via the switcher.
     // Preserve a previously chosen impersonation if it's a valid base role.
     if (me.role === "super_admin") {
-      const stored = getRole();
-      if (stored !== "super_admin") return stored;
-      return "admin";
+      // Super admin can impersonate any role; preserve a previously chosen
+      // view including `super_admin` itself so the landing-page editor and
+      // other super-admin-only screens remain reachable.
+      return getRole();
     }
     return me.role as Role;
   }

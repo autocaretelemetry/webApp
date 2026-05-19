@@ -17,3 +17,4 @@ export * from "./retainers";
 export * from "./notifications";
 export * from "./pushSubscriptions";
 export * from "./users";
+export * from "./landingContent";

@@ -32,6 +32,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ChevronRight,
+  Paintbrush,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { AuthedUser } from "@workspace/api-client-react";
@@ -162,11 +163,22 @@ const ADMIN_NAV: NavSection[] = [
   },
 ];
 
+const SUPER_ADMIN_NAV: NavSection[] = [
+  ...ADMIN_NAV,
+  {
+    label: "Site",
+    items: [
+      { href: "/super-admin/landing", label: "Landing Page", icon: Paintbrush },
+    ],
+  },
+];
+
 function navFor(role: Role): NavSection[] {
   if (role === "owner") return OWNER_NAV;
   if (role === "center") return CENTER_NAV;
   if (role === "vendor") return VENDOR_NAV;
   if (role === "admin") return ADMIN_NAV;
+  if (role === "super_admin") return SUPER_ADMIN_NAV;
   return DELIVERY_NAV;
 }
 
@@ -199,36 +211,44 @@ function CartButton({ collapsed = false }: { collapsed?: boolean }) {
 function RoleTabs({
   role,
   setRole,
+  showSuperAdmin = false,
   className,
   triggerClassName,
 }: {
   role: Role;
   setRole: (r: Role) => void;
+  showSuperAdmin?: boolean;
   className?: string;
   triggerClassName?: string;
 }) {
-  const tabs: { value: Role; label: string }[] = [
+  const tabs: { value: Role; label: string; icon?: LucideIcon }[] = [
     { value: "owner", label: "Owner" },
     { value: "center", label: "Center" },
     { value: "vendor", label: "Vendor" },
     { value: "delivery", label: "Delivery" },
-    { value: "admin", label: "Admin" },
+    { value: "admin", label: "Admin", icon: ShieldCheck },
   ];
+  if (showSuperAdmin) {
+    tabs.push({ value: "super_admin", label: "Super", icon: Paintbrush });
+  }
   return (
     <Tabs value={role} onValueChange={(v) => setRole(v as Role)} className={className}>
-      <TabsList className="grid w-full grid-cols-5">
-        {tabs.map((t) => (
-          <TabsTrigger key={t.value} value={t.value} className={triggerClassName}>
-            {t.value === "admin" ? (
-              <span className="inline-flex items-center gap-0.5">
-                <ShieldCheck className="h-3 w-3" />
-                {t.label}
-              </span>
-            ) : (
-              t.label
-            )}
-          </TabsTrigger>
-        ))}
+      <TabsList className={cn("grid w-full", showSuperAdmin ? "grid-cols-6" : "grid-cols-5")}>
+        {tabs.map((t) => {
+          const Icon = t.icon;
+          return (
+            <TabsTrigger key={t.value} value={t.value} className={triggerClassName}>
+              {Icon ? (
+                <span className="inline-flex items-center gap-0.5">
+                  <Icon className="h-3 w-3" />
+                  {t.label}
+                </span>
+              ) : (
+                t.label
+              )}
+            </TabsTrigger>
+          );
+        })}
       </TabsList>
     </Tabs>
   );
@@ -397,6 +417,7 @@ function SidebarBody({
           <RoleTabs
             role={role}
             setRole={setRole}
+            showSuperAdmin
             className="w-full"
             triggerClassName="text-[10px] px-0.5"
           />

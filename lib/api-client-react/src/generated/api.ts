@@ -52,6 +52,7 @@ import type {
   GetVapidPublicKey503,
   HealthStatus,
   Invoice,
+  LandingContent,
   ListActivityParams,
   ListBookingsParams,
   ListDeliveryAgentsParams,
@@ -95,6 +96,7 @@ import type {
   UpdateActiveInput,
   UpdateBookingStatusInput,
   UpdateDeliveryAgentInput,
+  UpdateLandingContentInput,
   UpdateOrderStatusInput,
   UpdatePartInput,
   UpdatePlatformStaffInput,
@@ -1312,6 +1314,154 @@ export function useListMechanics<TData = Awaited<ReturnType<typeof listMechanics
 
 
 
+
+export const getGetLandingContentUrl = () => {
+
+
+
+
+  return `/api/landing-content`
+}
+
+/**
+ * @summary Public — content used to render the marketing landing page
+ */
+export const getLandingContent = async ( options?: RequestInit): Promise<LandingContent> => {
+
+  return customFetch<LandingContent>(getGetLandingContentUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetLandingContentQueryKey = () => {
+    return [
+    `/api/landing-content`
+    ] as const;
+    }
+
+
+export const getGetLandingContentQueryOptions = <TData = Awaited<ReturnType<typeof getLandingContent>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLandingContent>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetLandingContentQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLandingContent>>> = ({ signal }) => getLandingContent({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLandingContent>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetLandingContentQueryResult = NonNullable<Awaited<ReturnType<typeof getLandingContent>>>
+export type GetLandingContentQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Public — content used to render the marketing landing page
+ */
+
+export function useGetLandingContent<TData = Awaited<ReturnType<typeof getLandingContent>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLandingContent>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetLandingContentQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateLandingContentUrl = () => {
+
+
+
+
+  return `/api/landing-content`
+}
+
+/**
+ * @summary Super admin — replace any subset of landing-page fields
+ */
+export const updateLandingContent = async (updateLandingContentInput: UpdateLandingContentInput, options?: RequestInit): Promise<LandingContent> => {
+
+  return customFetch<LandingContent>(getUpdateLandingContentUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateLandingContentInput,)
+  }
+);}
+
+
+
+
+export const getUpdateLandingContentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateLandingContent>>, TError,{data: BodyType<UpdateLandingContentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateLandingContent>>, TError,{data: BodyType<UpdateLandingContentInput>}, TContext> => {
+
+const mutationKey = ['updateLandingContent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateLandingContent>>, {data: BodyType<UpdateLandingContentInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateLandingContent(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateLandingContentMutationResult = NonNullable<Awaited<ReturnType<typeof updateLandingContent>>>
+    export type UpdateLandingContentMutationBody = BodyType<UpdateLandingContentInput>
+    export type UpdateLandingContentMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Super admin — replace any subset of landing-page fields
+ */
+export const useUpdateLandingContent = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateLandingContent>>, TError,{data: BodyType<UpdateLandingContentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateLandingContent>>,
+        TError,
+        {data: BodyType<UpdateLandingContentInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateLandingContentMutationOptions(options));
+    }
 
 export const getListMechanicsForCenterUrl = (centerId: string,) => {
 

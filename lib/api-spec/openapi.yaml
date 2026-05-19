@@ -280,6 +280,33 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/Mechanic" }
 
+  /landing-content:
+    get:
+      operationId: getLandingContent
+      tags: [landing]
+      summary: Public — content used to render the marketing landing page
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LandingContent" }
+    put:
+      operationId: updateLandingContent
+      tags: [landing]
+      summary: Super admin — replace any subset of landing-page fields
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateLandingContentInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LandingContent" }
+
   /service-centers/{centerId}/mechanics:
     get:
       operationId: listMechanicsForCenter
@@ -1717,6 +1744,82 @@ components:
         completedJobs: { type: integer }
         avatarUrl: { type: string, nullable: true }
         active: { type: boolean }
+
+    LandingRoleCard:
+      type: object
+      required: [icon, title, desc]
+      properties:
+        icon:
+          type: string
+          enum: [car, building, package, truck, shield, wrench, users]
+        title: { type: string }
+        desc: { type: string }
+
+    LandingContent:
+      type: object
+      required:
+        - brandName
+        - primaryColor
+        - signInLabel
+        - getStartedLabel
+        - heroEyebrow
+        - heroTitle
+        - heroSubtitle
+        - heroCtaLabel
+        - rolesHeading
+        - roles
+        - featuresHeading
+        - featuresSubtitle
+        - features
+        - footerText
+        - footerSignInLabel
+      properties:
+        brandName: { type: string }
+        logoUrl: { type: string, nullable: true }
+        primaryColor: { type: string }
+        signInLabel: { type: string }
+        getStartedLabel: { type: string }
+        heroEyebrow: { type: string }
+        heroTitle: { type: string }
+        heroSubtitle: { type: string }
+        heroCtaLabel: { type: string }
+        heroImageUrl: { type: string, nullable: true }
+        rolesHeading: { type: string }
+        roles:
+          type: array
+          items: { $ref: "#/components/schemas/LandingRoleCard" }
+        featuresHeading: { type: string }
+        featuresSubtitle: { type: string }
+        features:
+          type: array
+          items: { type: string }
+        footerText: { type: string }
+        footerSignInLabel: { type: string }
+
+    UpdateLandingContentInput:
+      type: object
+      properties:
+        brandName: { type: string, minLength: 1 }
+        logoUrl: { type: string, nullable: true }
+        primaryColor: { type: string, minLength: 1 }
+        signInLabel: { type: string, minLength: 1 }
+        getStartedLabel: { type: string, minLength: 1 }
+        heroEyebrow: { type: string, minLength: 1 }
+        heroTitle: { type: string, minLength: 1 }
+        heroSubtitle: { type: string, minLength: 1 }
+        heroCtaLabel: { type: string, minLength: 1 }
+        heroImageUrl: { type: string, nullable: true }
+        rolesHeading: { type: string, minLength: 1 }
+        roles:
+          type: array
+          items: { $ref: "#/components/schemas/LandingRoleCard" }
+        featuresHeading: { type: string, minLength: 1 }
+        featuresSubtitle: { type: string, minLength: 1 }
+        features:
+          type: array
+          items: { type: string }
+        footerText: { type: string, minLength: 1 }
+        footerSignInLabel: { type: string, minLength: 1 }
 
     CreateMechanicInput:
       type: object
