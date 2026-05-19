@@ -44,6 +44,7 @@ const CENTER_NAV = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/jobs", label: "Jobs", icon: Wrench },
   { href: "/mechanics", label: "Mechanics", icon: Users },
+  { href: "/center/retainer-plans", label: "Retainer Plans", icon: ShieldCheck },
   { href: "/bookings", label: "All Bookings", icon: CalendarDays },
   { href: "/marketplace", label: "Parts Marketplace", icon: ShoppingBag },
   { href: "/orders", label: "Parts Orders", icon: Package },

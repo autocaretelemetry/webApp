@@ -35,6 +35,8 @@ export {
   getListRentalCarsQueryKey,
   getGetRentalCarQueryKey,
   getGetPublicRentalCarQueryKey,
+  getListRetainerPlansQueryKey,
+  getListRetainersQueryKey,
   getListRentalBookingsQueryKey,
   getGetRenterProfileByPhoneQueryKey,
   getGetRenterProfileQueryKey,

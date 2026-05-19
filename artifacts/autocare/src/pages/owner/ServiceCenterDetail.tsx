@@ -4,7 +4,8 @@ import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { MechanicCard } from "@/components/MechanicCard";
-import { MapPin, Phone, Star, Wrench, Info } from "lucide-react";
+import { RetainerPlansSection } from "@/components/RetainerPlansSection";
+import { MapPin, Phone, Star, Wrench, Info, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 export default function ServiceCenterDetail() {
@@ -67,6 +68,16 @@ export default function ServiceCenterDetail() {
                  </div>
                </CardContent>
              </Card>
+           </section>
+
+           <section>
+             <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+               <ShieldCheck className="h-6 w-6 text-primary" /> Retainer Plans
+             </h2>
+             <RetainerPlansSection
+               serviceCenterId={center.id}
+               serviceCenterName={center.name}
+             />
            </section>
 
            <section>

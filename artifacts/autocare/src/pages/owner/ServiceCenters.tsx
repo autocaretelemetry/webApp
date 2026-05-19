@@ -1,5 +1,7 @@
-import { useState } from "react";
-import { useListServiceCenters } from "@workspace/api-client-react";
+import { useMemo, useState } from "react";
+import { useListServiceCenters, useListRetainers } from "@workspace/api-client-react";
+import { getListRetainersQueryKey } from "@/lib/queryKeys";
+import { useCurrentVehicleOwner } from "@/lib/currentOwner";
 import { PageHeader } from "@/components/PageHeader";
 import { ServiceCenterCard } from "@/components/ServiceCenterCard";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +13,24 @@ export default function ServiceCenters() {
   
   const { data: centers, isLoading } = useListServiceCenters(
     specialty !== "All" ? { specialty: specialty.toLowerCase() } : {}
+  );
+
+  // Fetch the current owner's active retainers so each center card can show
+  // a "Retainer" pill where applicable, without N+1 per-card queries.
+  const owner = useCurrentVehicleOwner();
+  const retainerParams = useMemo(
+    () => ({ ownerPhone: owner?.phone, status: "active" as const }),
+    [owner?.phone],
+  );
+  const { data: myRetainers } = useListRetainers(retainerParams, {
+    query: {
+      enabled: !!owner?.phone,
+      queryKey: getListRetainersQueryKey(retainerParams),
+    },
+  });
+  const retainerCenterIds = useMemo(
+    () => new Set((myRetainers ?? []).map((r) => r.serviceCenterId)),
+    [myRetainers],
   );
 
   return (
@@ -42,7 +62,11 @@ export default function ServiceCenters() {
       ) : centers && centers.length > 0 ? (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {centers.map(center => (
-            <ServiceCenterCard key={center.id} center={center} />
+            <ServiceCenterCard
+              key={center.id}
+              center={center}
+              onRetainer={retainerCenterIds.has(center.id)}
+            />
           ))}
         </div>
       ) : (

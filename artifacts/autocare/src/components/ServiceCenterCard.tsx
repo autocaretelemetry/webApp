@@ -4,12 +4,14 @@ import { Badge } from "@/components/ui/badge";
 import { MapPin, Phone, Star, Wrench } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { RetainerBadge } from "@/components/RetainerBadge";
 
 interface ServiceCenterCardProps {
   center: ServiceCenter;
+  onRetainer?: boolean;
 }
 
-export function ServiceCenterCard({ center }: ServiceCenterCardProps) {
+export function ServiceCenterCard({ center, onRetainer = false }: ServiceCenterCardProps) {
   return (
     <Card className="flex flex-col h-full hover-elevate overflow-hidden">
       {center.imageUrl && (
@@ -23,9 +25,12 @@ export function ServiceCenterCard({ center }: ServiceCenterCardProps) {
       )}
       
       <CardHeader className="pb-2">
-        <div className="flex justify-between items-start">
-          <h3 className="text-xl font-bold line-clamp-1">{center.name}</h3>
-          <div className="flex items-center gap-1 bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full text-xs font-medium dark:bg-amber-900/30 dark:text-amber-400">
+        <div className="flex justify-between items-start gap-2">
+          <div className="min-w-0 space-y-1">
+            <h3 className="text-xl font-bold line-clamp-1">{center.name}</h3>
+            {onRetainer && <RetainerBadge serviceCenterId={center.id} asLink={false} />}
+          </div>
+          <div className="flex items-center gap-1 bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full text-xs font-medium dark:bg-amber-900/30 dark:text-amber-400 shrink-0">
             <Star className="h-3 w-3 fill-current" />
             <span>{center.rating}</span>
             <span className="text-amber-800/60 dark:text-amber-400/60 ml-0.5">({center.reviewsCount})</span>

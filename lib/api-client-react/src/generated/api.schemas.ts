@@ -853,6 +853,105 @@ export interface RentalCar {
   createdAt: string;
 }
 
+export type RetainerPlanCadence = typeof RetainerPlanCadence[keyof typeof RetainerPlanCadence];
+
+
+export const RetainerPlanCadence = {
+  monthly: 'monthly',
+  quarterly: 'quarterly',
+  annual: 'annual',
+} as const;
+
+export interface RetainerPlan {
+  id: string;
+  serviceCenterId: string;
+  cadence: RetainerPlanCadence;
+  price: number;
+  perks: string[];
+  active: boolean;
+  createdAt: string;
+}
+
+export type CreateRetainerPlanInputCadence = typeof CreateRetainerPlanInputCadence[keyof typeof CreateRetainerPlanInputCadence];
+
+
+export const CreateRetainerPlanInputCadence = {
+  monthly: 'monthly',
+  quarterly: 'quarterly',
+  annual: 'annual',
+} as const;
+
+export interface CreateRetainerPlanInput {
+  cadence: CreateRetainerPlanInputCadence;
+  /** @minimum 0 */
+  price: number;
+  perks?: string[];
+  active?: boolean;
+}
+
+export interface UpdateRetainerPlanInput {
+  /** @minimum 0 */
+  price?: number;
+  perks?: string[];
+  active?: boolean;
+}
+
+export type RetainerCadence = typeof RetainerCadence[keyof typeof RetainerCadence];
+
+
+export const RetainerCadence = {
+  monthly: 'monthly',
+  quarterly: 'quarterly',
+  annual: 'annual',
+} as const;
+
+export type RetainerStatus = typeof RetainerStatus[keyof typeof RetainerStatus];
+
+
+export const RetainerStatus = {
+  active: 'active',
+  cancelled: 'cancelled',
+  expired: 'expired',
+} as const;
+
+export interface Retainer {
+  id: string;
+  serviceCenterId: string;
+  serviceCenterName?: string | null;
+  planId?: string | null;
+  ownerName: string;
+  ownerPhone: string;
+  cadence: RetainerCadence;
+  price: number;
+  status: RetainerStatus;
+  startedAt: string;
+  currentPeriodEnd: string;
+  cancelledAt?: string | null;
+  createdAt: string;
+}
+
+export interface CreateRetainerInput {
+  serviceCenterId: string;
+  planId: string;
+  /** @minLength 1 */
+  ownerName: string;
+  /** @minLength 1 */
+  ownerPhone: string;
+}
+
+export type UpdateRetainerInputStatus = typeof UpdateRetainerInputStatus[keyof typeof UpdateRetainerInputStatus];
+
+
+export const UpdateRetainerInputStatus = {
+  active: 'active',
+  cancelled: 'cancelled',
+  expired: 'expired',
+} as const;
+
+export interface UpdateRetainerInput {
+  status?: UpdateRetainerInputStatus;
+}
+
 export type PublicRentalCarOwnerKind = typeof PublicRentalCarOwnerKind[keyof typeof PublicRentalCarOwnerKind];
 
 
@@ -1330,6 +1429,21 @@ status?: string;
 ownerKind?: string;
 includeInactive?: boolean;
 };
+
+export type ListRetainersParams = {
+ownerPhone?: string;
+serviceCenterId?: string;
+status?: ListRetainersStatus;
+};
+
+export type ListRetainersStatus = typeof ListRetainersStatus[keyof typeof ListRetainersStatus];
+
+
+export const ListRetainersStatus = {
+  active: 'active',
+  cancelled: 'cancelled',
+  expired: 'expired',
+} as const;
 
 export type ListRentalBookingsParams = {
 carId?: string;

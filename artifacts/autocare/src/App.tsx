@@ -21,6 +21,7 @@ import Book from "@/pages/owner/Book";
 import CenterDashboard from "@/pages/center/Dashboard";
 import Jobs from "@/pages/center/Jobs";
 import Mechanics from "@/pages/center/Mechanics";
+import CenterRetainerPlans from "@/pages/center/RetainerPlans";
 
 // Vendor Pages
 import VendorDashboard from "@/pages/vendor/Dashboard";
@@ -143,6 +144,7 @@ function Router() {
         {/* Center Routes */}
         <Route path="/jobs" component={centerOnly(Jobs)} />
         <Route path="/mechanics" component={centerOnly(Mechanics)} />
+        <Route path="/center/retainer-plans" component={centerOnly(CenterRetainerPlans)} />
 
         {/* Vendor Routes */}
         <Route path="/vendor/parts/new" component={vendorOnly(NewPart)} />

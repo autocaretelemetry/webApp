@@ -2154,6 +2154,145 @@ export const DeleteRentalCarParams = zod.object({
 
 
 /**
+ * Returns every plan (active and inactive). Owner-facing UIs should
+filter to `active === true`; the center-side management screen
+shows everything so plans can be re-activated.
+
+ * @summary All retainer plans defined by this service center
+ */
+export const ListRetainerPlansParams = zod.object({
+  "centerId": zod.coerce.string()
+})
+
+export const ListRetainerPlansResponseItem = zod.object({
+  "id": zod.string(),
+  "serviceCenterId": zod.string(),
+  "cadence": zod.enum(['monthly', 'quarterly', 'annual']),
+  "price": zod.number(),
+  "perks": zod.array(zod.string()),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+export const ListRetainerPlansResponse = zod.array(ListRetainerPlansResponseItem)
+
+
+/**
+ * @summary Service center adds a retainer plan
+ */
+export const CreateRetainerPlanParams = zod.object({
+  "centerId": zod.coerce.string()
+})
+
+export const createRetainerPlanBodyPriceMin = 0;
+
+
+
+export const CreateRetainerPlanBody = zod.object({
+  "cadence": zod.enum(['monthly', 'quarterly', 'annual']),
+  "price": zod.number().min(createRetainerPlanBodyPriceMin),
+  "perks": zod.array(zod.string()).optional(),
+  "active": zod.boolean().optional()
+})
+
+
+export const UpdateRetainerPlanParams = zod.object({
+  "planId": zod.coerce.string()
+})
+
+export const updateRetainerPlanBodyPriceMin = 0;
+
+
+
+export const UpdateRetainerPlanBody = zod.object({
+  "price": zod.number().min(updateRetainerPlanBodyPriceMin).optional(),
+  "perks": zod.array(zod.string()).optional(),
+  "active": zod.boolean().optional()
+})
+
+export const UpdateRetainerPlanResponse = zod.object({
+  "id": zod.string(),
+  "serviceCenterId": zod.string(),
+  "cadence": zod.enum(['monthly', 'quarterly', 'annual']),
+  "price": zod.number(),
+  "perks": zod.array(zod.string()),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+
+
+export const DeleteRetainerPlanParams = zod.object({
+  "planId": zod.coerce.string()
+})
+
+
+/**
+ * @summary List retainers, optionally filtered by owner phone, center, or status
+ */
+export const ListRetainersQueryParams = zod.object({
+  "ownerPhone": zod.coerce.string().optional(),
+  "serviceCenterId": zod.coerce.string().optional(),
+  "status": zod.enum(['active', 'cancelled', 'expired']).optional()
+})
+
+export const ListRetainersResponseItem = zod.object({
+  "id": zod.string(),
+  "serviceCenterId": zod.string(),
+  "serviceCenterName": zod.string().nullish(),
+  "planId": zod.string().nullish(),
+  "ownerName": zod.string(),
+  "ownerPhone": zod.string(),
+  "cadence": zod.enum(['monthly', 'quarterly', 'annual']),
+  "price": zod.number(),
+  "status": zod.enum(['active', 'cancelled', 'expired']),
+  "startedAt": zod.coerce.date(),
+  "currentPeriodEnd": zod.coerce.date(),
+  "cancelledAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
+})
+export const ListRetainersResponse = zod.array(ListRetainersResponseItem)
+
+
+/**
+ * @summary Vehicle owner subscribes to a retainer plan
+ */
+
+
+
+
+export const CreateRetainerBody = zod.object({
+  "serviceCenterId": zod.string(),
+  "planId": zod.string(),
+  "ownerName": zod.string().min(1),
+  "ownerPhone": zod.string().min(1)
+})
+
+
+export const UpdateRetainerParams = zod.object({
+  "retainerId": zod.coerce.string()
+})
+
+export const UpdateRetainerBody = zod.object({
+  "status": zod.enum(['active', 'cancelled', 'expired']).optional()
+})
+
+export const UpdateRetainerResponse = zod.object({
+  "id": zod.string(),
+  "serviceCenterId": zod.string(),
+  "serviceCenterName": zod.string().nullish(),
+  "planId": zod.string().nullish(),
+  "ownerName": zod.string(),
+  "ownerPhone": zod.string(),
+  "cadence": zod.enum(['monthly', 'quarterly', 'annual']),
+  "price": zod.number(),
+  "status": zod.enum(['active', 'cancelled', 'expired']),
+  "startedAt": zod.coerce.date(),
+  "currentPeriodEnd": zod.coerce.date(),
+  "cancelledAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
  * Returns a sanitized snapshot of a rental car suitable for anonymous
 visitors arriving via a shared link. Owner contact details and the
 plate number are omitted. Only listings that are approved AND active

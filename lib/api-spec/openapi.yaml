@@ -1127,6 +1127,121 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/DeleteConflict" }
 
+  /service-centers/{centerId}/retainer-plans:
+    get:
+      operationId: listRetainerPlans
+      tags: [retainers]
+      summary: All retainer plans defined by this service center
+      description: |
+        Returns every plan (active and inactive). Owner-facing UIs should
+        filter to `active === true`; the center-side management screen
+        shows everything so plans can be re-activated.
+      parameters:
+        - { name: centerId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/RetainerPlan" }
+    post:
+      operationId: createRetainerPlan
+      tags: [retainers]
+      summary: Service center adds a retainer plan
+      parameters:
+        - { name: centerId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateRetainerPlanInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RetainerPlan" }
+
+  /retainer-plans/{planId}:
+    patch:
+      operationId: updateRetainerPlan
+      tags: [retainers]
+      parameters:
+        - { name: planId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateRetainerPlanInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RetainerPlan" }
+    delete:
+      operationId: deleteRetainerPlan
+      tags: [retainers]
+      parameters:
+        - { name: planId, in: path, required: true, schema: { type: string } }
+      responses:
+        "204": { description: Deleted }
+
+  /retainers:
+    get:
+      operationId: listRetainers
+      tags: [retainers]
+      summary: List retainers, optionally filtered by owner phone, center, or status
+      parameters:
+        - { name: ownerPhone, in: query, required: false, schema: { type: string } }
+        - { name: serviceCenterId, in: query, required: false, schema: { type: string } }
+        - { name: status, in: query, required: false, schema: { type: string, enum: [active, cancelled, expired] } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Retainer" }
+    post:
+      operationId: createRetainer
+      tags: [retainers]
+      summary: Vehicle owner subscribes to a retainer plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateRetainerInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Retainer" }
+        "409":
+          description: Owner already has an active retainer with this center
+
+  /retainers/{retainerId}:
+    patch:
+      operationId: updateRetainer
+      tags: [retainers]
+      parameters:
+        - { name: retainerId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateRetainerInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Retainer" }
+
   /rental-cars/{carId}/public:
     get:
       operationId: getPublicRentalCar
@@ -2057,6 +2172,72 @@ components:
         status: { type: string, enum: [pending, approved, unavailable] }
         active: { type: boolean }
         createdAt: { type: string, format: date-time }
+
+    RetainerPlan:
+      type: object
+      required: [id, serviceCenterId, cadence, price, perks, active, createdAt]
+      properties:
+        id: { type: string }
+        serviceCenterId: { type: string }
+        cadence: { type: string, enum: [monthly, quarterly, annual] }
+        price: { type: number }
+        perks:
+          type: array
+          items: { type: string }
+        active: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    CreateRetainerPlanInput:
+      type: object
+      required: [cadence, price]
+      properties:
+        cadence: { type: string, enum: [monthly, quarterly, annual] }
+        price: { type: number, minimum: 0 }
+        perks:
+          type: array
+          items: { type: string }
+        active: { type: boolean }
+
+    UpdateRetainerPlanInput:
+      type: object
+      properties:
+        price: { type: number, minimum: 0 }
+        perks:
+          type: array
+          items: { type: string }
+        active: { type: boolean }
+
+    Retainer:
+      type: object
+      required: [id, serviceCenterId, ownerName, ownerPhone, cadence, price, status, startedAt, currentPeriodEnd, createdAt]
+      properties:
+        id: { type: string }
+        serviceCenterId: { type: string }
+        serviceCenterName: { type: string, nullable: true }
+        planId: { type: string, nullable: true }
+        ownerName: { type: string }
+        ownerPhone: { type: string }
+        cadence: { type: string, enum: [monthly, quarterly, annual] }
+        price: { type: number }
+        status: { type: string, enum: [active, cancelled, expired] }
+        startedAt: { type: string, format: date-time }
+        currentPeriodEnd: { type: string, format: date-time }
+        cancelledAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    CreateRetainerInput:
+      type: object
+      required: [serviceCenterId, planId, ownerName, ownerPhone]
+      properties:
+        serviceCenterId: { type: string }
+        planId: { type: string }
+        ownerName: { type: string, minLength: 1 }
+        ownerPhone: { type: string, minLength: 1 }
+
+    UpdateRetainerInput:
+      type: object
+      properties:
+        status: { type: string, enum: [active, cancelled, expired] }
 
     PublicRentalCar:
       type: object

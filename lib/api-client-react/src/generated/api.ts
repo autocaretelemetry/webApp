@@ -34,6 +34,8 @@ import type {
   CreatePlatformStaffInput,
   CreateRentalBookingInput,
   CreateRentalCarInput,
+  CreateRetainerInput,
+  CreateRetainerPlanInput,
   CreateSubscriptionInput,
   CreateSubscriptionPlanInput,
   CreateVehicleInput,
@@ -50,6 +52,7 @@ import type {
   ListPlatformStaffParams,
   ListRentalBookingsParams,
   ListRentalCarsParams,
+  ListRetainersParams,
   ListServiceCentersParams,
   ListSubscriptionPlansParams,
   ListSubscriptionsParams,
@@ -66,6 +69,8 @@ import type {
   RentalBooking,
   RentalCar,
   RenterProfile,
+  Retainer,
+  RetainerPlan,
   RevenueOverview,
   ServiceCenter,
   ServiceRecord,
@@ -82,6 +87,8 @@ import type {
   UpdateRentalBookingInput,
   UpdateRentalCarInput,
   UpdateRenterProfileInput,
+  UpdateRetainerInput,
+  UpdateRetainerPlanInput,
   UpdateSubscriptionInput,
   UpdateSubscriptionPlanInput,
   UpdateVehicleInput,
@@ -5322,6 +5329,510 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getDeleteRentalCarMutationOptions(options));
+    }
+
+export const getListRetainerPlansUrl = (centerId: string,) => {
+
+
+
+
+  return `/api/service-centers/${centerId}/retainer-plans`
+}
+
+/**
+ * Returns every plan (active and inactive). Owner-facing UIs should
+filter to `active === true`; the center-side management screen
+shows everything so plans can be re-activated.
+
+ * @summary All retainer plans defined by this service center
+ */
+export const listRetainerPlans = async (centerId: string, options?: RequestInit): Promise<RetainerPlan[]> => {
+
+  return customFetch<RetainerPlan[]>(getListRetainerPlansUrl(centerId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListRetainerPlansQueryKey = (centerId: string,) => {
+    return [
+    `/api/service-centers/${centerId}/retainer-plans`
+    ] as const;
+    }
+
+
+export const getListRetainerPlansQueryOptions = <TData = Awaited<ReturnType<typeof listRetainerPlans>>, TError = ErrorType<unknown>>(centerId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listRetainerPlans>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListRetainerPlansQueryKey(centerId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listRetainerPlans>>> = ({ signal }) => listRetainerPlans(centerId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(centerId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listRetainerPlans>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListRetainerPlansQueryResult = NonNullable<Awaited<ReturnType<typeof listRetainerPlans>>>
+export type ListRetainerPlansQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary All retainer plans defined by this service center
+ */
+
+export function useListRetainerPlans<TData = Awaited<ReturnType<typeof listRetainerPlans>>, TError = ErrorType<unknown>>(
+ centerId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listRetainerPlans>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListRetainerPlansQueryOptions(centerId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateRetainerPlanUrl = (centerId: string,) => {
+
+
+
+
+  return `/api/service-centers/${centerId}/retainer-plans`
+}
+
+/**
+ * @summary Service center adds a retainer plan
+ */
+export const createRetainerPlan = async (centerId: string,
+    createRetainerPlanInput: CreateRetainerPlanInput, options?: RequestInit): Promise<RetainerPlan> => {
+
+  return customFetch<RetainerPlan>(getCreateRetainerPlanUrl(centerId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createRetainerPlanInput,)
+  }
+);}
+
+
+
+
+export const getCreateRetainerPlanMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRetainerPlan>>, TError,{centerId: string;data: BodyType<CreateRetainerPlanInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createRetainerPlan>>, TError,{centerId: string;data: BodyType<CreateRetainerPlanInput>}, TContext> => {
+
+const mutationKey = ['createRetainerPlan'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createRetainerPlan>>, {centerId: string;data: BodyType<CreateRetainerPlanInput>}> = (props) => {
+          const {centerId,data} = props ?? {};
+
+          return  createRetainerPlan(centerId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateRetainerPlanMutationResult = NonNullable<Awaited<ReturnType<typeof createRetainerPlan>>>
+    export type CreateRetainerPlanMutationBody = BodyType<CreateRetainerPlanInput>
+    export type CreateRetainerPlanMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Service center adds a retainer plan
+ */
+export const useCreateRetainerPlan = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRetainerPlan>>, TError,{centerId: string;data: BodyType<CreateRetainerPlanInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createRetainerPlan>>,
+        TError,
+        {centerId: string;data: BodyType<CreateRetainerPlanInput>},
+        TContext
+      > => {
+      return useMutation(getCreateRetainerPlanMutationOptions(options));
+    }
+
+export const getUpdateRetainerPlanUrl = (planId: string,) => {
+
+
+
+
+  return `/api/retainer-plans/${planId}`
+}
+
+export const updateRetainerPlan = async (planId: string,
+    updateRetainerPlanInput: UpdateRetainerPlanInput, options?: RequestInit): Promise<RetainerPlan> => {
+
+  return customFetch<RetainerPlan>(getUpdateRetainerPlanUrl(planId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateRetainerPlanInput,)
+  }
+);}
+
+
+
+
+export const getUpdateRetainerPlanMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRetainerPlan>>, TError,{planId: string;data: BodyType<UpdateRetainerPlanInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateRetainerPlan>>, TError,{planId: string;data: BodyType<UpdateRetainerPlanInput>}, TContext> => {
+
+const mutationKey = ['updateRetainerPlan'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateRetainerPlan>>, {planId: string;data: BodyType<UpdateRetainerPlanInput>}> = (props) => {
+          const {planId,data} = props ?? {};
+
+          return  updateRetainerPlan(planId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateRetainerPlanMutationResult = NonNullable<Awaited<ReturnType<typeof updateRetainerPlan>>>
+    export type UpdateRetainerPlanMutationBody = BodyType<UpdateRetainerPlanInput>
+    export type UpdateRetainerPlanMutationError = ErrorType<unknown>
+
+    export const useUpdateRetainerPlan = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRetainerPlan>>, TError,{planId: string;data: BodyType<UpdateRetainerPlanInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateRetainerPlan>>,
+        TError,
+        {planId: string;data: BodyType<UpdateRetainerPlanInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateRetainerPlanMutationOptions(options));
+    }
+
+export const getDeleteRetainerPlanUrl = (planId: string,) => {
+
+
+
+
+  return `/api/retainer-plans/${planId}`
+}
+
+export const deleteRetainerPlan = async (planId: string, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteRetainerPlanUrl(planId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteRetainerPlanMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteRetainerPlan>>, TError,{planId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteRetainerPlan>>, TError,{planId: string}, TContext> => {
+
+const mutationKey = ['deleteRetainerPlan'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteRetainerPlan>>, {planId: string}> = (props) => {
+          const {planId} = props ?? {};
+
+          return  deleteRetainerPlan(planId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteRetainerPlanMutationResult = NonNullable<Awaited<ReturnType<typeof deleteRetainerPlan>>>
+
+    export type DeleteRetainerPlanMutationError = ErrorType<unknown>
+
+    export const useDeleteRetainerPlan = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteRetainerPlan>>, TError,{planId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteRetainerPlan>>,
+        TError,
+        {planId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteRetainerPlanMutationOptions(options));
+    }
+
+export const getListRetainersUrl = (params?: ListRetainersParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/retainers?${stringifiedParams}` : `/api/retainers`
+}
+
+/**
+ * @summary List retainers, optionally filtered by owner phone, center, or status
+ */
+export const listRetainers = async (params?: ListRetainersParams, options?: RequestInit): Promise<Retainer[]> => {
+
+  return customFetch<Retainer[]>(getListRetainersUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListRetainersQueryKey = (params?: ListRetainersParams,) => {
+    return [
+    `/api/retainers`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListRetainersQueryOptions = <TData = Awaited<ReturnType<typeof listRetainers>>, TError = ErrorType<unknown>>(params?: ListRetainersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listRetainers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListRetainersQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listRetainers>>> = ({ signal }) => listRetainers(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listRetainers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListRetainersQueryResult = NonNullable<Awaited<ReturnType<typeof listRetainers>>>
+export type ListRetainersQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List retainers, optionally filtered by owner phone, center, or status
+ */
+
+export function useListRetainers<TData = Awaited<ReturnType<typeof listRetainers>>, TError = ErrorType<unknown>>(
+ params?: ListRetainersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listRetainers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListRetainersQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateRetainerUrl = () => {
+
+
+
+
+  return `/api/retainers`
+}
+
+/**
+ * @summary Vehicle owner subscribes to a retainer plan
+ */
+export const createRetainer = async (createRetainerInput: CreateRetainerInput, options?: RequestInit): Promise<Retainer> => {
+
+  return customFetch<Retainer>(getCreateRetainerUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createRetainerInput,)
+  }
+);}
+
+
+
+
+export const getCreateRetainerMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRetainer>>, TError,{data: BodyType<CreateRetainerInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createRetainer>>, TError,{data: BodyType<CreateRetainerInput>}, TContext> => {
+
+const mutationKey = ['createRetainer'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createRetainer>>, {data: BodyType<CreateRetainerInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createRetainer(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateRetainerMutationResult = NonNullable<Awaited<ReturnType<typeof createRetainer>>>
+    export type CreateRetainerMutationBody = BodyType<CreateRetainerInput>
+    export type CreateRetainerMutationError = ErrorType<void>
+
+    /**
+ * @summary Vehicle owner subscribes to a retainer plan
+ */
+export const useCreateRetainer = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRetainer>>, TError,{data: BodyType<CreateRetainerInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createRetainer>>,
+        TError,
+        {data: BodyType<CreateRetainerInput>},
+        TContext
+      > => {
+      return useMutation(getCreateRetainerMutationOptions(options));
+    }
+
+export const getUpdateRetainerUrl = (retainerId: string,) => {
+
+
+
+
+  return `/api/retainers/${retainerId}`
+}
+
+export const updateRetainer = async (retainerId: string,
+    updateRetainerInput: UpdateRetainerInput, options?: RequestInit): Promise<Retainer> => {
+
+  return customFetch<Retainer>(getUpdateRetainerUrl(retainerId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateRetainerInput,)
+  }
+);}
+
+
+
+
+export const getUpdateRetainerMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRetainer>>, TError,{retainerId: string;data: BodyType<UpdateRetainerInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateRetainer>>, TError,{retainerId: string;data: BodyType<UpdateRetainerInput>}, TContext> => {
+
+const mutationKey = ['updateRetainer'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateRetainer>>, {retainerId: string;data: BodyType<UpdateRetainerInput>}> = (props) => {
+          const {retainerId,data} = props ?? {};
+
+          return  updateRetainer(retainerId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateRetainerMutationResult = NonNullable<Awaited<ReturnType<typeof updateRetainer>>>
+    export type UpdateRetainerMutationBody = BodyType<UpdateRetainerInput>
+    export type UpdateRetainerMutationError = ErrorType<unknown>
+
+    export const useUpdateRetainer = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRetainer>>, TError,{retainerId: string;data: BodyType<UpdateRetainerInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateRetainer>>,
+        TError,
+        {retainerId: string;data: BodyType<UpdateRetainerInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateRetainerMutationOptions(options));
     }
 
 export const getGetPublicRentalCarUrl = (carId: string,) => {
