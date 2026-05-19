@@ -2113,6 +2113,7 @@ export const ListRentalCarsResponseItem = zod.object({
   "pickupAddress": zod.string(),
   "description": zod.string().nullish(),
   "imageUrl": zod.string().nullish(),
+  "imageUrls": zod.array(zod.string()).optional(),
   "status": zod.enum(['pending', 'approved', 'unavailable']),
   "active": zod.boolean(),
   "createdAt": zod.coerce.date()
@@ -2157,7 +2158,8 @@ export const CreateRentalCarBody = zod.object({
   "city": zod.string().min(1),
   "pickupAddress": zod.string().min(1),
   "description": zod.string().optional(),
-  "imageUrl": zod.string().optional()
+  "imageUrl": zod.string().optional(),
+  "imageUrls": zod.array(zod.string()).optional()
 })
 
 
@@ -2184,6 +2186,7 @@ export const GetRentalCarResponse = zod.object({
   "pickupAddress": zod.string(),
   "description": zod.string().nullish(),
   "imageUrl": zod.string().nullish(),
+  "imageUrls": zod.array(zod.string()).optional(),
   "status": zod.enum(['pending', 'approved', 'unavailable']),
   "active": zod.boolean(),
   "createdAt": zod.coerce.date()
@@ -2204,7 +2207,8 @@ export const UpdateRentalCarBody = zod.object({
   "dailyRate": zod.number().min(updateRentalCarBodyDailyRateMin).optional(),
   "description": zod.string().optional(),
   "pickupAddress": zod.string().optional(),
-  "imageUrl": zod.string().optional()
+  "imageUrl": zod.string().optional(),
+  "imageUrls": zod.array(zod.string()).optional()
 })
 
 export const UpdateRentalCarResponse = zod.object({
@@ -2226,6 +2230,7 @@ export const UpdateRentalCarResponse = zod.object({
   "pickupAddress": zod.string(),
   "description": zod.string().nullish(),
   "imageUrl": zod.string().nullish(),
+  "imageUrls": zod.array(zod.string()).optional(),
   "status": zod.enum(['pending', 'approved', 'unavailable']),
   "active": zod.boolean(),
   "createdAt": zod.coerce.date()
@@ -2403,7 +2408,8 @@ export const GetPublicRentalCarResponse = zod.object({
   "city": zod.string(),
   "pickupAddress": zod.string(),
   "description": zod.string().nullish(),
-  "imageUrl": zod.string().nullish()
+  "imageUrl": zod.string().nullish(),
+  "imageUrls": zod.array(zod.string()).optional()
 }).describe('Sanitized rental car view served at \/rental-cars\/{carId}\/public for\nanonymous share-link visitors. Owner phone\/email and plate number are\nintentionally omitted.\n')
 
 

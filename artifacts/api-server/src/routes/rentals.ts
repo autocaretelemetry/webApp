@@ -223,6 +223,7 @@ router.get("/rental-cars/:carId/public", async (req, res): Promise<void> => {
     pickupAddress: row.pickupAddress,
     description: row.description,
     imageUrl: row.imageUrl,
+    imageUrls: row.imageUrls ?? [],
   });
 });
 
@@ -252,9 +253,26 @@ router.post("/rental-cars", async (req, res): Promise<void> => {
   // Public onboarding endpoint: every listing is treated as user-submitted
   // and starts pending admin review. Platform fleet cars are inserted via
   // the seed/admin tooling, not through this route.
+  // Cover/gallery invariant: when a gallery is supplied, `imageUrl` MUST
+  // equal `imageUrls[0]`. When only `imageUrl` is supplied (legacy client),
+  // promote it to a single-entry gallery so the two never desync.
+  const incomingGallery = body.data.imageUrls ?? [];
+  const imageUrls =
+    incomingGallery.length > 0
+      ? incomingGallery
+      : body.data.imageUrl
+        ? [body.data.imageUrl]
+        : [];
+  const imageUrl = imageUrls[0];
   const [row] = await db
     .insert(rentalCarsTable)
-    .values({ ...body.data, ownerKind: "user", status: "pending" })
+    .values({
+      ...body.data,
+      imageUrl,
+      imageUrls,
+      ownerKind: "user",
+      status: "pending",
+    })
     .returning();
   res.status(201).json(row);
 });
@@ -266,9 +284,18 @@ router.patch("/rental-cars/:carId", async (req, res): Promise<void> => {
     res.status(400).json({ error: (params.error ?? body.error)?.message });
     return;
   }
+  // Enforce the cover/gallery invariant on updates too. A caller cannot
+  // change cover and gallery independently — whichever field is supplied
+  // becomes the source of truth and the other is rewritten to match.
+  const patch: typeof body.data = { ...body.data };
+  if (patch.imageUrls !== undefined) {
+    patch.imageUrl = patch.imageUrls[0];
+  } else if (patch.imageUrl !== undefined) {
+    patch.imageUrls = [patch.imageUrl];
+  }
   const [row] = await db
     .update(rentalCarsTable)
-    .set(body.data)
+    .set(patch)
     .where(eq(rentalCarsTable.id, params.data.carId))
     .returning();
   if (!row) {

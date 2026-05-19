@@ -29,6 +29,7 @@ export interface RentalCar {
   pickupAddress: string;
   description?: string | null;
   imageUrl?: string | null;
+  imageUrls?: string[];
   status: RentalCarStatus;
   active: boolean;
   createdAt: Date;

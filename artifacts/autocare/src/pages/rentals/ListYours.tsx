@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Car, Banknote, ShieldCheck, Wrench, Camera } from "lucide-react";
 import { toast } from "sonner";
-import { ImageUploader } from "@/components/ImageUploader";
+import { MultiImageUploader } from "@/components/MultiImageUploader";
 
 const GHANA_CITIES = [
   "Accra",
@@ -56,7 +56,7 @@ export default function ListYourCar() {
     city: "Accra",
     pickupAddress: "",
     description: "",
-    imageUrl: "",
+    imageUrls: [] as string[],
   });
 
   const update = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
@@ -64,8 +64,8 @@ export default function ListYourCar() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.imageUrl) {
-      toast.error("Please upload a photo of the car before submitting.");
+    if (form.imageUrls.length === 0) {
+      toast.error("Please upload at least one photo of the car before submitting.");
       return;
     }
     try {
@@ -87,7 +87,8 @@ export default function ListYourCar() {
           city: form.city,
           pickupAddress: form.pickupAddress,
           description: form.description || undefined,
-          imageUrl: form.imageUrl,
+          imageUrl: form.imageUrls[0],
+          imageUrls: form.imageUrls,
         },
       });
       setRenterProfile({
@@ -205,19 +206,20 @@ export default function ListYourCar() {
             <Field
               label={
                 <span className="inline-flex items-center gap-1.5">
-                  <Camera className="h-3.5 w-3.5" /> Car photo
+                  <Camera className="h-3.5 w-3.5" /> Car photos
                 </span>
               }
               required
               className="sm:col-span-2"
             >
-              <ImageUploader
-                value={form.imageUrl}
-                onChange={(path) => update("imageUrl", path)}
-                label="Upload a photo of the car"
+              <MultiImageUploader
+                value={form.imageUrls}
+                onChange={(paths) => update("imageUrls", paths)}
+                max={8}
               />
               <p className="text-xs text-muted-foreground mt-1.5">
-                A clear exterior shot helps renters trust your listing.
+                Add several angles — exterior, interior, back, side. Renters
+                want to see what they're booking.
               </p>
             </Field>
             <Field label="Description (optional)" className="sm:col-span-2">

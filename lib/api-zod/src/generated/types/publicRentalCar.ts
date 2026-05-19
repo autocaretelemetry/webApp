@@ -31,4 +31,5 @@ export interface PublicRentalCar {
   pickupAddress: string;
   description?: string | null;
   imageUrl?: string | null;
+  imageUrls?: string[];
 }

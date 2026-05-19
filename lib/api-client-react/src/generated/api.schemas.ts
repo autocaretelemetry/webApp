@@ -897,6 +897,7 @@ export interface RentalCar {
   pickupAddress: string;
   description?: string | null;
   imageUrl?: string | null;
+  imageUrls?: string[];
   status: RentalCarStatus;
   active: boolean;
   createdAt: string;
@@ -1049,6 +1050,7 @@ export interface PublicRentalCar {
   pickupAddress: string;
   description?: string | null;
   imageUrl?: string | null;
+  imageUrls?: string[];
 }
 
 export type CreateRentalCarInputOwnerKind = typeof CreateRentalCarInputOwnerKind[keyof typeof CreateRentalCarInputOwnerKind];
@@ -1109,6 +1111,7 @@ export interface CreateRentalCarInput {
   pickupAddress: string;
   description?: string;
   imageUrl?: string;
+  imageUrls?: string[];
 }
 
 export type UpdateRentalCarInputStatus = typeof UpdateRentalCarInputStatus[keyof typeof UpdateRentalCarInputStatus];
@@ -1128,6 +1131,7 @@ export interface UpdateRentalCarInput {
   description?: string;
   pickupAddress?: string;
   imageUrl?: string;
+  imageUrls?: string[];
 }
 
 export type RentalBookingStatus = typeof RentalBookingStatus[keyof typeof RentalBookingStatus];

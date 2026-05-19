@@ -9,7 +9,8 @@ import { useRenterProfile, hasStoredRenterProfile } from "@/lib/profile";
 import { isProfileReadyForBooking } from "@/pages/rentals/Profile";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { formatCurrency, resolveImageUrl } from "@/lib/format";
+import { formatCurrency } from "@/lib/format";
+import { ImageGallery } from "@/components/ImageGallery";
 import {
   Car,
   MapPin,
@@ -123,15 +124,25 @@ export default function SharedCar() {
           <>
             <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
               <Card className="overflow-hidden">
-                <div className="aspect-video bg-muted">
-                  {car.imageUrl ? (
-                    <img src={resolveImageUrl(car.imageUrl)} alt={`${car.brand} ${car.model}`} className="w-full h-full object-cover" />
+                {(() => {
+                  const gallery =
+                    car.imageUrls && car.imageUrls.length > 0
+                      ? car.imageUrls
+                      : car.imageUrl
+                        ? [car.imageUrl]
+                        : [];
+                  return gallery.length > 0 ? (
+                    <ImageGallery
+                      images={gallery}
+                      alt={`${car.brand} ${car.model}`}
+                      className="p-2"
+                    />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                    <div className="aspect-video bg-muted flex items-center justify-center text-muted-foreground">
                       <Car className="h-16 w-16" />
                     </div>
-                  )}
-                </div>
+                  );
+                })()}
                 <CardContent className="p-5 space-y-4">
                   <div>
                     <h1 className="text-2xl font-semibold tracking-tight">

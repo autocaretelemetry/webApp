@@ -20,7 +20,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { formatCurrency, resolveImageUrl } from "@/lib/format";
+import { formatCurrency } from "@/lib/format";
+import { ImageGallery } from "@/components/ImageGallery";
 import {
   Car,
   MapPin,
@@ -135,15 +136,25 @@ export default function RentalDetail() {
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
         <Card className="overflow-hidden">
-          <div className="aspect-video bg-muted">
-            {car.imageUrl ? (
-              <img src={resolveImageUrl(car.imageUrl)} alt={`${car.brand} ${car.model}`} className="w-full h-full object-cover" />
+          {(() => {
+            const gallery =
+              car.imageUrls && car.imageUrls.length > 0
+                ? car.imageUrls
+                : car.imageUrl
+                  ? [car.imageUrl]
+                  : [];
+            return gallery.length > 0 ? (
+              <ImageGallery
+                images={gallery}
+                alt={`${car.brand} ${car.model}`}
+                className="p-2"
+              />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+              <div className="aspect-video bg-muted flex items-center justify-center text-muted-foreground">
                 <Car className="h-16 w-16" />
               </div>
-            )}
-          </div>
+            );
+          })()}
           <CardContent className="p-5 space-y-4">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
               <Spec icon={Users} label="Seats" value={`${car.seats}`} />

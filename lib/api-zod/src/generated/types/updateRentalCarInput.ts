@@ -15,4 +15,5 @@ export interface UpdateRentalCarInput {
   description?: string;
   pickupAddress?: string;
   imageUrl?: string;
+  imageUrls?: string[];
 }

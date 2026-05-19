@@ -19,6 +19,7 @@ export const rentalCarsTable = pgTable("rental_cars", {
   pickupAddress: text("pickup_address").notNull(),
   description: text("description"),
   imageUrl: text("image_url"),
+  imageUrls: text("image_urls").array().notNull().default([]),
   status: text("status").notNull().default("pending"),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

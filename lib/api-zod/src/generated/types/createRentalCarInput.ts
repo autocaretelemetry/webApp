@@ -41,4 +41,5 @@ export interface CreateRentalCarInput {
   pickupAddress: string;
   description?: string;
   imageUrl?: string;
+  imageUrls?: string[];
 }
