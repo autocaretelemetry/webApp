@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearch, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -8,6 +8,7 @@ import {
 import { getGetRenterProfileByPhoneQueryKey } from "@/lib/queryKeys";
 import { useRenterProfile, setRenterProfile } from "@/lib/profile";
 import { describeMutationError } from "@/lib/adminErrors";
+import { useUpload } from "@workspace/object-storage-web";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,9 @@ import {
   XCircle,
   CheckCircle2,
   User,
+  Loader2,
+  Image as ImageIcon,
+  Trash2,
 } from "lucide-react";
 
 function KycBadge({ status }: { status: string }) {
@@ -180,14 +184,11 @@ export default function RenterProfilePage() {
           <CardContent className="space-y-4">
             <p className="text-xs text-muted-foreground flex items-start gap-2">
               <UploadCloud className="h-4 w-4 mt-0.5 flex-shrink-0" />
-              Paste an image URL for each document. Owners review these before approving your booking.
+              Upload clear photos of your documents. JPG or PNG, up to 10 MB each. Owners review these before approving your booking.
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Driver's licence number" required>
                 <Input value={form.driverLicenseNumber} onChange={(e) => update("driverLicenseNumber", e.target.value)} placeholder="LAG-DL-…" />
-              </Field>
-              <Field label="Driver's licence photo URL" required>
-                <Input value={form.driverLicenseUrl} onChange={(e) => update("driverLicenseUrl", e.target.value)} placeholder="https://…" />
               </Field>
               <Field label="ID document type">
                 <Select value={form.idDocumentType} onValueChange={(v) => update("idDocumentType", v)}>
@@ -199,18 +200,26 @@ export default function RenterProfilePage() {
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="ID document photo URL" required>
-                <Input value={form.idDocumentUrl} onChange={(e) => update("idDocumentUrl", e.target.value)} placeholder="https://…" />
-              </Field>
-              <Field label="Selfie URL (optional)" className="sm:col-span-2">
-                <Input value={form.selfieUrl} onChange={(e) => update("selfieUrl", e.target.value)} placeholder="https://…" />
-              </Field>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
-              <Preview url={form.driverLicenseUrl} label="Licence" />
-              <Preview url={form.idDocumentUrl} label="ID" />
-              <Preview url={form.selfieUrl} label="Selfie" />
+            <div className="grid gap-4 sm:grid-cols-3">
+              <UploadField
+                label="Driver's licence photo"
+                required
+                url={form.driverLicenseUrl}
+                onChange={(url) => update("driverLicenseUrl", url)}
+              />
+              <UploadField
+                label="ID document photo"
+                required
+                url={form.idDocumentUrl}
+                onChange={(url) => update("idDocumentUrl", url)}
+              />
+              <UploadField
+                label="Selfie (optional)"
+                url={form.selfieUrl}
+                onChange={(url) => update("selfieUrl", url)}
+              />
             </div>
           </CardContent>
         </Card>
@@ -242,15 +251,86 @@ function Field({ label, required, children, className }: { label: string; requir
   );
 }
 
-function Preview({ url, label }: { url: string; label: string }) {
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+
+function UploadField({
+  label,
+  required,
+  url,
+  onChange,
+}: {
+  label: string;
+  required?: boolean;
+  url: string;
+  onChange: (url: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const { uploadFile, isUploading, progress } = useUpload({
+    onSuccess: (res) => onChange(`/api/storage${res.objectPath}`),
+    onError: (err) => toast.error(err.message || "Upload failed."),
+  });
+
+  const onPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please pick a JPG or PNG image.");
+      return;
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      toast.error("Image must be 10 MB or smaller.");
+      return;
+    }
+    await uploadFile(file);
+  };
+
   return (
-    <div className="aspect-[4/3] rounded-md bg-muted border overflow-hidden flex items-center justify-center relative">
-      {url ? (
-        <img src={url} alt={label} className="w-full h-full object-cover" />
-      ) : (
-        <span className="text-xs text-muted-foreground">{label}</span>
-      )}
-      <span className="absolute bottom-1 left-1 text-[10px] uppercase tracking-wide bg-background/80 px-1.5 rounded">{label}</span>
+    <div className="space-y-1.5">
+      <Label className="flex items-center justify-between">
+        <span>{label}{required && <span className="text-destructive ml-0.5">*</span>}</span>
+        {url && (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="text-xs text-muted-foreground hover:text-destructive inline-flex items-center gap-1"
+          >
+            <Trash2 className="h-3 w-3" /> Remove
+          </button>
+        )}
+      </Label>
+      <div
+        className="aspect-[4/3] rounded-md border border-dashed bg-muted/40 overflow-hidden flex items-center justify-center relative cursor-pointer hover:bg-muted/70 transition-colors"
+        onClick={() => inputRef.current?.click()}
+        role="button"
+        tabIndex={0}
+      >
+        {url ? (
+          <img src={url} alt={label} className="w-full h-full object-cover" />
+        ) : isUploading ? (
+          <div className="flex flex-col items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            Uploading… {progress}%
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-1.5 text-xs text-muted-foreground p-3 text-center">
+            <ImageIcon className="h-5 w-5" />
+            Click to upload
+          </div>
+        )}
+        {url && isUploading && (
+          <div className="absolute inset-0 bg-background/70 flex items-center justify-center text-xs">
+            <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> {progress}%
+          </div>
+        )}
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={onPick}
+        />
+      </div>
     </div>
   );
 }

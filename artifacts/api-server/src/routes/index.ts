@@ -15,6 +15,7 @@ import platformStaffRouter from "./platformStaff";
 import subscriptionsRouter from "./subscriptions";
 import revenueRouter from "./revenue";
 import rentalsRouter from "./rentals";
+import storageRouter from "./storage";
 
 const router: IRouter = Router();
 
@@ -34,5 +35,6 @@ router.use(platformStaffRouter);
 router.use(subscriptionsRouter);
 router.use(revenueRouter);
 router.use(rentalsRouter);
+router.use(storageRouter);
 
 export default router;
