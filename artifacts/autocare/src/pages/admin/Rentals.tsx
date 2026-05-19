@@ -43,17 +43,14 @@ export default function AdminRentals() {
   const remove = useDeleteRentalCar();
   const updateBooking = useUpdateRentalBooking();
 
-  const NEXT_STATUS: Record<string, { next: string; label: string } | null> = {
-    requested: { next: "confirmed", label: "Confirm" },
+  const NEXT_STATUS: Record<string, { next: "active" | "completed"; label: string } | null> = {
     confirmed: { next: "active", label: "Mark active" },
     active: { next: "completed", label: "Complete" },
-    completed: null,
-    cancelled: null,
   };
 
-  const advanceBooking = async (id: string, next: string, label: string) => {
+  const advanceBooking = async (id: string, next: "active" | "completed", label: string) => {
     try {
-      await updateBooking.mutateAsync({ rentalBookingId: id, data: { status: next as "confirmed" | "active" | "completed" | "cancelled" } });
+      await updateBooking.mutateAsync({ rentalBookingId: id, data: { status: next } });
       await queryClient.invalidateQueries({ queryKey: getListRentalBookingsQueryKey() });
       toast.success(`${label} succeeded.`);
     } catch (err) {
@@ -175,7 +172,7 @@ export default function AdminRentals() {
           )}
           {(bookings ?? []).map((b) => {
             const advance = NEXT_STATUS[b.status];
-            const canCancel = b.status === "requested" || b.status === "confirmed";
+            const canCancel = ["pending_review", "contract_pending", "awaiting_payment", "confirmed"].includes(b.status);
             return (
               <Card key={b.id}>
                 <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap">

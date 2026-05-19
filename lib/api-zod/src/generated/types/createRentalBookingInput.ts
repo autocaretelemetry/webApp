@@ -9,11 +9,7 @@ import type { CreateRentalBookingInputPurpose } from './createRentalBookingInput
 
 export interface CreateRentalBookingInput {
   carId: string;
-  /** @minLength 1 */
-  renterName: string;
-  /** @minLength 1 */
-  renterPhone: string;
-  renterEmail?: string;
+  renterId: string;
   startDate: Date;
   endDate: Date;
   purpose?: CreateRentalBookingInputPurpose;

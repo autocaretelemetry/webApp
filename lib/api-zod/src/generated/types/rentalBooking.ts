@@ -5,16 +5,26 @@
  * AutoCare API — vehicle owners book services, service centers fulfill them.
  * OpenAPI spec version: 0.1.0
  */
+import type { RentalBookingOwnerReviewStatus } from './rentalBookingOwnerReviewStatus';
+import type { RentalBookingPaymentMethod } from './rentalBookingPaymentMethod';
+import type { RentalBookingPaymentStatus } from './rentalBookingPaymentStatus';
 import type { RentalBookingPurpose } from './rentalBookingPurpose';
 import type { RentalBookingStatus } from './rentalBookingStatus';
+import type { RenterProfile } from './renterProfile';
 
 export interface RentalBooking {
   id: string;
   carId: string;
   carLabel?: string;
+  carImageUrl?: string | null;
+  carCity?: string | null;
+  ownerName?: string | null;
+  ownerPhone?: string | null;
+  renterId?: string | null;
   renterName: string;
   renterPhone: string;
   renterEmail?: string | null;
+  renter?: RenterProfile | null;
   startDate: Date;
   endDate: Date;
   days: number;
@@ -24,9 +34,22 @@ export interface RentalBooking {
   purpose: RentalBookingPurpose;
   serviceBookingId?: string | null;
   notes?: string | null;
+  ownerReviewStatus: RentalBookingOwnerReviewStatus;
+  ownerReviewNotes?: string | null;
+  ownerReviewedAt?: Date | null;
+  contractText?: string | null;
+  contractGeneratedAt?: Date | null;
+  renterSignatureName?: string | null;
+  renterSignedAt?: Date | null;
+  ownerSignatureName?: string | null;
+  ownerSignedAt?: Date | null;
+  paymentMethod?: RentalBookingPaymentMethod;
+  paymentStatus: RentalBookingPaymentStatus;
+  paidAt?: Date | null;
   createdAt: Date;
   confirmedAt?: Date | null;
   startedAt?: Date | null;
   completedAt?: Date | null;
   cancelledAt?: Date | null;
+  rejectedAt?: Date | null;
 }

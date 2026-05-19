@@ -5,9 +5,19 @@
  * AutoCare API — vehicle owners book services, service centers fulfill them.
  * OpenAPI spec version: 0.1.0
  */
+import type { UpdateRentalBookingInputOwnerReview } from './updateRentalBookingInputOwnerReview';
+import type { UpdateRentalBookingInputPayment } from './updateRentalBookingInputPayment';
+import type { UpdateRentalBookingInputSign } from './updateRentalBookingInputSign';
 import type { UpdateRentalBookingInputStatus } from './updateRentalBookingInputStatus';
 
+/**
+ * Drive booking lifecycle. Provide exactly one action group per request (ownerReview / sign / payment / status / notes).
+
+ */
 export interface UpdateRentalBookingInput {
   status?: UpdateRentalBookingInputStatus;
   notes?: string;
+  ownerReview?: UpdateRentalBookingInputOwnerReview;
+  sign?: UpdateRentalBookingInputSign;
+  payment?: UpdateRentalBookingInputPayment;
 }

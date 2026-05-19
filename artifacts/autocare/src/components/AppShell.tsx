@@ -32,8 +32,10 @@ const OWNER_NAV = [
   { href: "/service-centers", label: "Service Centers", icon: Store },
   { href: "/bookings", label: "Bookings", icon: CalendarDays },
   { href: "/rentals", label: "Rent a Car", icon: KeyRound },
-  { href: "/rentals/my-listings", label: "My Listings", icon: KeyRound },
   { href: "/rentals/my-bookings", label: "My Rentals", icon: KeyRound },
+  { href: "/rentals/profile", label: "Renter Profile", icon: KeyRound },
+  { href: "/rentals/my-listings", label: "My Listings", icon: KeyRound },
+  { href: "/rentals/listing-requests", label: "Requests on my cars", icon: KeyRound },
   { href: "/marketplace", label: "Marketplace", icon: ShoppingBag },
   { href: "/orders", label: "My Orders", icon: Package },
 ];

@@ -2107,9 +2107,130 @@ export const DeleteRentalCarParams = zod.object({
 })
 
 
+/**
+ * @summary Create or update a renter profile by phone (idempotent)
+ */
+
+
+
+
+export const UpsertRenterProfileBody = zod.object({
+  "name": zod.string().min(1),
+  "phone": zod.string().min(1),
+  "email": zod.string().optional(),
+  "address": zod.string().optional(),
+  "dateOfBirth": zod.string().optional(),
+  "driverLicenseNumber": zod.string().optional(),
+  "driverLicenseUrl": zod.string().optional(),
+  "idDocumentType": zod.string().optional(),
+  "idDocumentUrl": zod.string().optional(),
+  "selfieUrl": zod.string().optional()
+})
+
+export const UpsertRenterProfileResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "email": zod.string().nullish(),
+  "address": zod.string().nullish(),
+  "dateOfBirth": zod.string().nullish(),
+  "driverLicenseNumber": zod.string().nullish(),
+  "driverLicenseUrl": zod.string().nullish(),
+  "idDocumentType": zod.string().nullish(),
+  "idDocumentUrl": zod.string().nullish(),
+  "selfieUrl": zod.string().nullish(),
+  "kycStatus": zod.enum(['pending', 'verified', 'rejected']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+export const GetRenterProfileByPhoneParams = zod.object({
+  "phone": zod.coerce.string()
+})
+
+export const GetRenterProfileByPhoneResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "email": zod.string().nullish(),
+  "address": zod.string().nullish(),
+  "dateOfBirth": zod.string().nullish(),
+  "driverLicenseNumber": zod.string().nullish(),
+  "driverLicenseUrl": zod.string().nullish(),
+  "idDocumentType": zod.string().nullish(),
+  "idDocumentUrl": zod.string().nullish(),
+  "selfieUrl": zod.string().nullish(),
+  "kycStatus": zod.enum(['pending', 'verified', 'rejected']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+export const GetRenterProfileParams = zod.object({
+  "renterId": zod.coerce.string()
+})
+
+export const GetRenterProfileResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "email": zod.string().nullish(),
+  "address": zod.string().nullish(),
+  "dateOfBirth": zod.string().nullish(),
+  "driverLicenseNumber": zod.string().nullish(),
+  "driverLicenseUrl": zod.string().nullish(),
+  "idDocumentType": zod.string().nullish(),
+  "idDocumentUrl": zod.string().nullish(),
+  "selfieUrl": zod.string().nullish(),
+  "kycStatus": zod.enum(['pending', 'verified', 'rejected']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+export const UpdateRenterProfileParams = zod.object({
+  "renterId": zod.coerce.string()
+})
+
+
+
+
+export const UpdateRenterProfileBody = zod.object({
+  "name": zod.string().min(1).optional(),
+  "email": zod.string().optional(),
+  "address": zod.string().optional(),
+  "dateOfBirth": zod.string().optional(),
+  "driverLicenseNumber": zod.string().optional(),
+  "driverLicenseUrl": zod.string().optional(),
+  "idDocumentType": zod.string().optional(),
+  "idDocumentUrl": zod.string().optional(),
+  "selfieUrl": zod.string().optional()
+})
+
+export const UpdateRenterProfileResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "email": zod.string().nullish(),
+  "address": zod.string().nullish(),
+  "dateOfBirth": zod.string().nullish(),
+  "driverLicenseNumber": zod.string().nullish(),
+  "driverLicenseUrl": zod.string().nullish(),
+  "idDocumentType": zod.string().nullish(),
+  "idDocumentUrl": zod.string().nullish(),
+  "selfieUrl": zod.string().nullish(),
+  "kycStatus": zod.enum(['pending', 'verified', 'rejected']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
 export const ListRentalBookingsQueryParams = zod.object({
   "carId": zod.coerce.string().optional(),
+  "ownerPhone": zod.coerce.string().optional(),
   "renterPhone": zod.coerce.string().optional(),
+  "renterId": zod.coerce.string().optional(),
   "status": zod.coerce.string().optional()
 })
 
@@ -2117,36 +2238,64 @@ export const ListRentalBookingsResponseItem = zod.object({
   "id": zod.string(),
   "carId": zod.string(),
   "carLabel": zod.string().optional(),
+  "carImageUrl": zod.string().nullish(),
+  "carCity": zod.string().nullish(),
+  "ownerName": zod.string().nullish(),
+  "ownerPhone": zod.string().nullish(),
+  "renterId": zod.string().nullish(),
   "renterName": zod.string(),
   "renterPhone": zod.string(),
   "renterEmail": zod.string().nullish(),
+  "renter": zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "email": zod.string().nullish(),
+  "address": zod.string().nullish(),
+  "dateOfBirth": zod.string().nullish(),
+  "driverLicenseNumber": zod.string().nullish(),
+  "driverLicenseUrl": zod.string().nullish(),
+  "idDocumentType": zod.string().nullish(),
+  "idDocumentUrl": zod.string().nullish(),
+  "selfieUrl": zod.string().nullish(),
+  "kycStatus": zod.enum(['pending', 'verified', 'rejected']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}).nullish(),
   "startDate": zod.coerce.date(),
   "endDate": zod.coerce.date(),
   "days": zod.number(),
   "dailyRate": zod.number(),
   "total": zod.number(),
-  "status": zod.enum(['requested', 'confirmed', 'active', 'completed', 'cancelled']),
+  "status": zod.enum(['pending_review', 'rejected', 'contract_pending', 'awaiting_payment', 'confirmed', 'active', 'completed', 'cancelled']),
   "purpose": zod.enum(['general', 'loaner']),
   "serviceBookingId": zod.string().nullish(),
   "notes": zod.string().nullish(),
+  "ownerReviewStatus": zod.enum(['pending', 'approved', 'rejected']),
+  "ownerReviewNotes": zod.string().nullish(),
+  "ownerReviewedAt": zod.coerce.date().nullish(),
+  "contractText": zod.string().nullish(),
+  "contractGeneratedAt": zod.coerce.date().nullish(),
+  "renterSignatureName": zod.string().nullish(),
+  "renterSignedAt": zod.coerce.date().nullish(),
+  "ownerSignatureName": zod.string().nullish(),
+  "ownerSignedAt": zod.coerce.date().nullish(),
+  "paymentMethod": zod.enum(['online', 'cash_on_pickup']).nullish(),
+  "paymentStatus": zod.enum(['unpaid', 'paid']),
+  "paidAt": zod.coerce.date().nullish(),
   "createdAt": zod.coerce.date(),
   "confirmedAt": zod.coerce.date().nullish(),
   "startedAt": zod.coerce.date().nullish(),
   "completedAt": zod.coerce.date().nullish(),
-  "cancelledAt": zod.coerce.date().nullish()
+  "cancelledAt": zod.coerce.date().nullish(),
+  "rejectedAt": zod.coerce.date().nullish()
 })
 export const ListRentalBookingsResponse = zod.array(ListRentalBookingsResponseItem)
 
 
-
-
-
-
 export const CreateRentalBookingBody = zod.object({
   "carId": zod.string(),
-  "renterName": zod.string().min(1),
-  "renterPhone": zod.string().min(1),
-  "renterEmail": zod.string().optional(),
+  "renterId": zod.string(),
   "startDate": zod.coerce.date(),
   "endDate": zod.coerce.date(),
   "purpose": zod.enum(['general', 'loaner']).optional(),
@@ -2159,32 +2308,81 @@ export const UpdateRentalBookingParams = zod.object({
   "rentalBookingId": zod.coerce.string()
 })
 
+
+
+
 export const UpdateRentalBookingBody = zod.object({
-  "status": zod.enum(['requested', 'confirmed', 'active', 'completed', 'cancelled']).optional(),
+  "status": zod.enum(['cancelled', 'active', 'completed']).optional(),
+  "notes": zod.string().optional(),
+  "ownerReview": zod.object({
+  "decision": zod.enum(['approve', 'reject']),
   "notes": zod.string().optional()
-})
+}).optional(),
+  "sign": zod.object({
+  "party": zod.enum(['renter', 'owner']),
+  "name": zod.string().min(1)
+}).optional(),
+  "payment": zod.object({
+  "method": zod.enum(['online', 'cash_on_pickup']),
+  "markPaid": zod.boolean().optional()
+}).optional()
+}).describe('Drive booking lifecycle. Provide exactly one action group per request (ownerReview \/ sign \/ payment \/ status \/ notes).\n')
 
 export const UpdateRentalBookingResponse = zod.object({
   "id": zod.string(),
   "carId": zod.string(),
   "carLabel": zod.string().optional(),
+  "carImageUrl": zod.string().nullish(),
+  "carCity": zod.string().nullish(),
+  "ownerName": zod.string().nullish(),
+  "ownerPhone": zod.string().nullish(),
+  "renterId": zod.string().nullish(),
   "renterName": zod.string(),
   "renterPhone": zod.string(),
   "renterEmail": zod.string().nullish(),
+  "renter": zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "email": zod.string().nullish(),
+  "address": zod.string().nullish(),
+  "dateOfBirth": zod.string().nullish(),
+  "driverLicenseNumber": zod.string().nullish(),
+  "driverLicenseUrl": zod.string().nullish(),
+  "idDocumentType": zod.string().nullish(),
+  "idDocumentUrl": zod.string().nullish(),
+  "selfieUrl": zod.string().nullish(),
+  "kycStatus": zod.enum(['pending', 'verified', 'rejected']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}).nullish(),
   "startDate": zod.coerce.date(),
   "endDate": zod.coerce.date(),
   "days": zod.number(),
   "dailyRate": zod.number(),
   "total": zod.number(),
-  "status": zod.enum(['requested', 'confirmed', 'active', 'completed', 'cancelled']),
+  "status": zod.enum(['pending_review', 'rejected', 'contract_pending', 'awaiting_payment', 'confirmed', 'active', 'completed', 'cancelled']),
   "purpose": zod.enum(['general', 'loaner']),
   "serviceBookingId": zod.string().nullish(),
   "notes": zod.string().nullish(),
+  "ownerReviewStatus": zod.enum(['pending', 'approved', 'rejected']),
+  "ownerReviewNotes": zod.string().nullish(),
+  "ownerReviewedAt": zod.coerce.date().nullish(),
+  "contractText": zod.string().nullish(),
+  "contractGeneratedAt": zod.coerce.date().nullish(),
+  "renterSignatureName": zod.string().nullish(),
+  "renterSignedAt": zod.coerce.date().nullish(),
+  "ownerSignatureName": zod.string().nullish(),
+  "ownerSignedAt": zod.coerce.date().nullish(),
+  "paymentMethod": zod.enum(['online', 'cash_on_pickup']).nullish(),
+  "paymentStatus": zod.enum(['unpaid', 'paid']),
+  "paidAt": zod.coerce.date().nullish(),
   "createdAt": zod.coerce.date(),
   "confirmedAt": zod.coerce.date().nullish(),
   "startedAt": zod.coerce.date().nullish(),
   "completedAt": zod.coerce.date().nullish(),
-  "cancelledAt": zod.coerce.date().nullish()
+  "cancelledAt": zod.coerce.date().nullish(),
+  "rejectedAt": zod.coerce.date().nullish()
 })
 
 

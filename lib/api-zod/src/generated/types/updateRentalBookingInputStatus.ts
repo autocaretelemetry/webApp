@@ -10,9 +10,7 @@ export type UpdateRentalBookingInputStatus = typeof UpdateRentalBookingInputStat
 
 
 export const UpdateRentalBookingInputStatus = {
-  requested: 'requested',
-  confirmed: 'confirmed',
+  cancelled: 'cancelled',
   active: 'active',
   completed: 'completed',
-  cancelled: 'cancelled',
 } as const;

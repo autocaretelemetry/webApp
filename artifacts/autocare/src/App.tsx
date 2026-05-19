@@ -51,6 +51,8 @@ import RentalDetail from "@/pages/rentals/Detail";
 import ListYourCar from "@/pages/rentals/ListYours";
 import MyListings from "@/pages/rentals/MyListings";
 import MyRentals from "@/pages/rentals/MyRentals";
+import RenterProfilePage from "@/pages/rentals/Profile";
+import ListingRequests from "@/pages/rentals/ListingRequests";
 
 // Shared Pages
 import Bookings from "@/pages/shared/Bookings";
@@ -159,6 +161,8 @@ function Router() {
         <Route path="/rentals/list-yours" component={ownerOnly(ListYourCar)} />
         <Route path="/rentals/my-listings" component={ownerOnly(MyListings)} />
         <Route path="/rentals/my-bookings" component={ownerOnly(MyRentals)} />
+        <Route path="/rentals/profile" component={ownerOnly(RenterProfilePage)} />
+        <Route path="/rentals/listing-requests" component={ownerOnly(ListingRequests)} />
         <Route path="/rentals/:id" component={RentalDetail} />
 
         {/* Marketplace (shared) */}

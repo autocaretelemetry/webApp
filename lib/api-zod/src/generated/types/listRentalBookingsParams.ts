@@ -8,6 +8,8 @@
 
 export type ListRentalBookingsParams = {
 carId?: string;
+ownerPhone?: string;
 renterPhone?: string;
+renterId?: string;
 status?: string;
 };

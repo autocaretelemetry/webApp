@@ -64,6 +64,7 @@ import type {
   RegisterDeliveryAgentInput,
   RentalBooking,
   RentalCar,
+  RenterProfile,
   RevenueOverview,
   ServiceCenter,
   ServiceRecord,
@@ -78,9 +79,11 @@ import type {
   UpdatePlatformStaffInput,
   UpdateRentalBookingInput,
   UpdateRentalCarInput,
+  UpdateRenterProfileInput,
   UpdateSubscriptionInput,
   UpdateSubscriptionPlanInput,
   UpdateVehicleInput,
+  UpsertRenterProfileInput,
   Vehicle,
   Vendor,
   VendorDashboard
@@ -5090,6 +5093,285 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getDeleteRentalCarMutationOptions(options));
+    }
+
+export const getUpsertRenterProfileUrl = () => {
+
+
+
+
+  return `/api/renter-profiles`
+}
+
+/**
+ * @summary Create or update a renter profile by phone (idempotent)
+ */
+export const upsertRenterProfile = async (upsertRenterProfileInput: UpsertRenterProfileInput, options?: RequestInit): Promise<RenterProfile> => {
+
+  return customFetch<RenterProfile>(getUpsertRenterProfileUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      upsertRenterProfileInput,)
+  }
+);}
+
+
+
+
+export const getUpsertRenterProfileMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertRenterProfile>>, TError,{data: BodyType<UpsertRenterProfileInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof upsertRenterProfile>>, TError,{data: BodyType<UpsertRenterProfileInput>}, TContext> => {
+
+const mutationKey = ['upsertRenterProfile'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof upsertRenterProfile>>, {data: BodyType<UpsertRenterProfileInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  upsertRenterProfile(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpsertRenterProfileMutationResult = NonNullable<Awaited<ReturnType<typeof upsertRenterProfile>>>
+    export type UpsertRenterProfileMutationBody = BodyType<UpsertRenterProfileInput>
+    export type UpsertRenterProfileMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create or update a renter profile by phone (idempotent)
+ */
+export const useUpsertRenterProfile = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertRenterProfile>>, TError,{data: BodyType<UpsertRenterProfileInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof upsertRenterProfile>>,
+        TError,
+        {data: BodyType<UpsertRenterProfileInput>},
+        TContext
+      > => {
+      return useMutation(getUpsertRenterProfileMutationOptions(options));
+    }
+
+export const getGetRenterProfileByPhoneUrl = (phone: string,) => {
+
+
+
+
+  return `/api/renter-profiles/by-phone/${phone}`
+}
+
+export const getRenterProfileByPhone = async (phone: string, options?: RequestInit): Promise<RenterProfile> => {
+
+  return customFetch<RenterProfile>(getGetRenterProfileByPhoneUrl(phone),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRenterProfileByPhoneQueryKey = (phone: string,) => {
+    return [
+    `/api/renter-profiles/by-phone/${phone}`
+    ] as const;
+    }
+
+
+export const getGetRenterProfileByPhoneQueryOptions = <TData = Awaited<ReturnType<typeof getRenterProfileByPhone>>, TError = ErrorType<void>>(phone: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRenterProfileByPhone>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRenterProfileByPhoneQueryKey(phone);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRenterProfileByPhone>>> = ({ signal }) => getRenterProfileByPhone(phone, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(phone), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRenterProfileByPhone>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRenterProfileByPhoneQueryResult = NonNullable<Awaited<ReturnType<typeof getRenterProfileByPhone>>>
+export type GetRenterProfileByPhoneQueryError = ErrorType<void>
+
+
+
+export function useGetRenterProfileByPhone<TData = Awaited<ReturnType<typeof getRenterProfileByPhone>>, TError = ErrorType<void>>(
+ phone: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRenterProfileByPhone>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRenterProfileByPhoneQueryOptions(phone,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetRenterProfileUrl = (renterId: string,) => {
+
+
+
+
+  return `/api/renter-profiles/${renterId}`
+}
+
+export const getRenterProfile = async (renterId: string, options?: RequestInit): Promise<RenterProfile> => {
+
+  return customFetch<RenterProfile>(getGetRenterProfileUrl(renterId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRenterProfileQueryKey = (renterId: string,) => {
+    return [
+    `/api/renter-profiles/${renterId}`
+    ] as const;
+    }
+
+
+export const getGetRenterProfileQueryOptions = <TData = Awaited<ReturnType<typeof getRenterProfile>>, TError = ErrorType<unknown>>(renterId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRenterProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRenterProfileQueryKey(renterId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRenterProfile>>> = ({ signal }) => getRenterProfile(renterId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(renterId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRenterProfile>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRenterProfileQueryResult = NonNullable<Awaited<ReturnType<typeof getRenterProfile>>>
+export type GetRenterProfileQueryError = ErrorType<unknown>
+
+
+
+export function useGetRenterProfile<TData = Awaited<ReturnType<typeof getRenterProfile>>, TError = ErrorType<unknown>>(
+ renterId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRenterProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRenterProfileQueryOptions(renterId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateRenterProfileUrl = (renterId: string,) => {
+
+
+
+
+  return `/api/renter-profiles/${renterId}`
+}
+
+export const updateRenterProfile = async (renterId: string,
+    updateRenterProfileInput: UpdateRenterProfileInput, options?: RequestInit): Promise<RenterProfile> => {
+
+  return customFetch<RenterProfile>(getUpdateRenterProfileUrl(renterId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateRenterProfileInput,)
+  }
+);}
+
+
+
+
+export const getUpdateRenterProfileMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRenterProfile>>, TError,{renterId: string;data: BodyType<UpdateRenterProfileInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateRenterProfile>>, TError,{renterId: string;data: BodyType<UpdateRenterProfileInput>}, TContext> => {
+
+const mutationKey = ['updateRenterProfile'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateRenterProfile>>, {renterId: string;data: BodyType<UpdateRenterProfileInput>}> = (props) => {
+          const {renterId,data} = props ?? {};
+
+          return  updateRenterProfile(renterId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateRenterProfileMutationResult = NonNullable<Awaited<ReturnType<typeof updateRenterProfile>>>
+    export type UpdateRenterProfileMutationBody = BodyType<UpdateRenterProfileInput>
+    export type UpdateRenterProfileMutationError = ErrorType<unknown>
+
+    export const useUpdateRenterProfile = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRenterProfile>>, TError,{renterId: string;data: BodyType<UpdateRenterProfileInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateRenterProfile>>,
+        TError,
+        {renterId: string;data: BodyType<UpdateRenterProfileInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateRenterProfileMutationOptions(options));
     }
 
 export const getListRentalBookingsUrl = (params?: ListRentalBookingsParams,) => {

@@ -10,7 +10,10 @@ export type RentalBookingStatus = typeof RentalBookingStatus[keyof typeof Rental
 
 
 export const RentalBookingStatus = {
-  requested: 'requested',
+  pending_review: 'pending_review',
+  rejected: 'rejected',
+  contract_pending: 'contract_pending',
+  awaiting_payment: 'awaiting_payment',
   confirmed: 'confirmed',
   active: 'active',
   completed: 'completed',

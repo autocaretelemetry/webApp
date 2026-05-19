@@ -11,4 +11,5 @@ export * from "./platformStaff";
 export * from "./subscriptionPlans";
 export * from "./subscriptions";
 export * from "./rentalCars";
+export * from "./renterProfiles";
 export * from "./rentalBookings";

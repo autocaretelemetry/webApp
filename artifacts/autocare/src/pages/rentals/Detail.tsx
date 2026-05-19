@@ -3,14 +3,17 @@ import { Link, useParams, useSearch, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetRentalCar,
+  useGetRenterProfileByPhone,
   useCreateRentalBooking,
 } from "@workspace/api-client-react";
 import {
   getGetRentalCarQueryKey,
+  getGetRenterProfileByPhoneQueryKey,
   getListRentalBookingsQueryKey,
 } from "@/lib/queryKeys";
 import { describeMutationError } from "@/lib/adminErrors";
 import { useRenterProfile } from "@/lib/profile";
+import { isProfileReadyForBooking } from "@/pages/rentals/Profile";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +31,8 @@ import {
   User,
   Calendar,
   ArrowLeft,
+  ShieldAlert,
+  IdCard,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -42,7 +47,7 @@ export default function RentalDetail() {
   const search = useSearch();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
-  const { profile } = useRenterProfile();
+  const { profile: local } = useRenterProfile();
 
   const loanerFor = useMemo(() => new URLSearchParams(search).get("loaner"), [search]);
 
@@ -50,13 +55,18 @@ export default function RentalDetail() {
     query: { enabled: !!id, queryKey: getGetRentalCarQueryKey(id) },
   });
 
+  const { data: renter, isLoading: renterLoading } = useGetRenterProfileByPhone(local.phone, {
+    query: {
+      enabled: !!local.phone,
+      queryKey: getGetRenterProfileByPhoneQueryKey(local.phone),
+      retry: false,
+    },
+  });
+
   const create = useCreateRentalBooking();
 
   const [startDate, setStartDate] = useState(todayISO(1));
   const [endDate, setEndDate] = useState(todayISO(3));
-  const [renterName, setRenterName] = useState(profile.name);
-  const [renterPhone, setRenterPhone] = useState(profile.phone);
-  const [renterEmail, setRenterEmail] = useState(profile.email);
   const [notes, setNotes] = useState("");
 
   const days = useMemo(() => {
@@ -71,19 +81,24 @@ export default function RentalDetail() {
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>;
   if (!car) return <p className="text-sm text-muted-foreground">Rental car not found.</p>;
 
+  const profileReady = renter && isProfileReadyForBooking(renter);
+  const nextUrl = `/rentals/${car.id}${loanerFor ? `?loaner=${loanerFor}` : ""}`;
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!renter) {
+      toast.error("Create your renter profile first.");
+      return;
+    }
     if (new Date(endDate) <= new Date(startDate)) {
       toast.error("End date must be after start date.");
       return;
     }
     try {
-      const booking = await create.mutateAsync({
+      await create.mutateAsync({
         data: {
           carId: car.id,
-          renterName,
-          renterPhone,
-          renterEmail: renterEmail || undefined,
+          renterId: renter.id,
           startDate: new Date(startDate).toISOString(),
           endDate: new Date(endDate).toISOString(),
           purpose: loanerFor ? "loaner" : "general",
@@ -94,9 +109,8 @@ export default function RentalDetail() {
       await queryClient.invalidateQueries({
         queryKey: getListRentalBookingsQueryKey(),
       });
-      toast.success("Rental request sent. We'll confirm shortly.");
+      toast.success("Rental request sent. The owner will review your KYC and respond shortly.");
       setLocation(`/rentals/my-bookings`);
-      void booking;
     } catch (err) {
       toast.error(describeMutationError(err, "Failed to create rental booking."));
     }
@@ -168,82 +182,70 @@ export default function RentalDetail() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={onSubmit} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="start">Pickup date</Label>
-                  <Input
-                    id="start"
-                    type="date"
-                    value={startDate}
-                    min={todayISO()}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    required
-                  />
+            {renterLoading ? (
+              <p className="text-sm text-muted-foreground">Checking your profile…</p>
+            ) : !profileReady ? (
+              <div className="space-y-3 text-sm">
+                <div className="rounded-md bg-amber-500/10 border border-amber-500/30 p-3 flex items-start gap-2">
+                  <ShieldAlert className="h-4 w-4 mt-0.5 text-amber-700 dark:text-amber-300 flex-shrink-0" />
+                  <p className="text-amber-800 dark:text-amber-200">
+                    {renter
+                      ? "Your profile is missing a driver's licence or ID document. Add them to request this rental."
+                      : "Create your renter profile and upload KYC documents to request a rental."}
+                  </p>
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="end">Return date</Label>
-                  <Input
-                    id="end"
-                    type="date"
-                    value={endDate}
-                    min={startDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    required
-                  />
-                </div>
+                <Link href={`/rentals/profile?next=${encodeURIComponent(nextUrl)}`}>
+                  <Button className="w-full gap-2">
+                    <IdCard className="h-4 w-4" /> Complete renter profile
+                  </Button>
+                </Link>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="name">Your name</Label>
-                <Input id="name" value={renterName} onChange={(e) => setRenterName(e.target.value)} required />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="phone">Phone</Label>
-                <Input id="phone" value={renterPhone} onChange={(e) => setRenterPhone(e.target.value)} required />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="email">Email (optional)</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={renterEmail}
-                  onChange={(e) => setRenterEmail(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="notes">Notes (optional)</Label>
-                <Textarea
-                  id="notes"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={2}
-                  placeholder="Any special requests…"
-                />
-              </div>
-
-              <div className="rounded-md bg-muted/50 p-3 text-sm space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    {formatCurrency(car.dailyRate)} × {days} day{days === 1 ? "" : "s"}
-                  </span>
-                  <span className="font-semibold">{formatCurrency(estimate)}</span>
-                </div>
-                <div className="flex justify-between text-base">
-                  <span className="font-semibold">Estimated total</span>
-                  <span className="font-bold text-primary">{formatCurrency(estimate)}</span>
-                </div>
-              </div>
-
-              {loanerFor && (
+            ) : (
+              <form onSubmit={onSubmit} className="space-y-3">
                 <p className="text-xs text-muted-foreground">
-                  This rental will be linked to your service booking as a loaner.
+                  Booking as <span className="font-medium text-foreground">{renter!.name}</span> · {renter!.phone}
                 </p>
-              )}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="start">Pickup date</Label>
+                    <Input id="start" type="date" value={startDate} min={todayISO()} onChange={(e) => setStartDate(e.target.value)} required />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="end">Return date</Label>
+                    <Input id="end" type="date" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} required />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="notes">Notes for the owner (optional)</Label>
+                  <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Trip purpose, pickup time…" />
+                </div>
 
-              <Button type="submit" className="w-full" disabled={create.isPending}>
-                {create.isPending ? "Sending request…" : "Request booking"}
-              </Button>
-            </form>
+                <div className="rounded-md bg-muted/50 p-3 text-sm space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">{formatCurrency(car.dailyRate)} × {days} day{days === 1 ? "" : "s"}</span>
+                    <span className="font-semibold">{formatCurrency(estimate)}</span>
+                  </div>
+                  <div className="flex justify-between text-base">
+                    <span className="font-semibold">Estimated total</span>
+                    <span className="font-bold text-primary">{formatCurrency(estimate)}</span>
+                  </div>
+                </div>
+
+                {loanerFor && (
+                  <p className="text-xs text-muted-foreground">
+                    This rental will be linked to your service booking as a loaner.
+                  </p>
+                )}
+
+                <p className="text-xs text-muted-foreground">
+                  Your KYC will be sent to the owner for review. Once approved, you'll both sign the contract and choose how to pay.
+                </p>
+
+                <Button type="submit" className="w-full" disabled={create.isPending}>
+                  {create.isPending ? "Sending request…" : "Request booking"}
+                </Button>
+              </form>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -251,15 +253,7 @@ export default function RentalDetail() {
   );
 }
 
-function Spec({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-}) {
+function Spec({ icon: Icon, label, value }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string }) {
   return (
     <div>
       <p className="text-xs text-muted-foreground flex items-center gap-1">

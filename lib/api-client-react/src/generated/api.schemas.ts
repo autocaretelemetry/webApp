@@ -936,7 +936,10 @@ export type RentalBookingStatus = typeof RentalBookingStatus[keyof typeof Rental
 
 
 export const RentalBookingStatus = {
-  requested: 'requested',
+  pending_review: 'pending_review',
+  rejected: 'rejected',
+  contract_pending: 'contract_pending',
+  awaiting_payment: 'awaiting_payment',
   confirmed: 'confirmed',
   active: 'active',
   completed: 'completed',
@@ -951,13 +954,70 @@ export const RentalBookingPurpose = {
   loaner: 'loaner',
 } as const;
 
+export type RentalBookingOwnerReviewStatus = typeof RentalBookingOwnerReviewStatus[keyof typeof RentalBookingOwnerReviewStatus];
+
+
+export const RentalBookingOwnerReviewStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+export type RentalBookingPaymentMethod = typeof RentalBookingPaymentMethod[keyof typeof RentalBookingPaymentMethod] | null;
+
+
+export const RentalBookingPaymentMethod = {
+  online: 'online',
+  cash_on_pickup: 'cash_on_pickup',
+} as const;
+
+export type RentalBookingPaymentStatus = typeof RentalBookingPaymentStatus[keyof typeof RentalBookingPaymentStatus];
+
+
+export const RentalBookingPaymentStatus = {
+  unpaid: 'unpaid',
+  paid: 'paid',
+} as const;
+
+export type RenterProfileKycStatus = typeof RenterProfileKycStatus[keyof typeof RenterProfileKycStatus];
+
+
+export const RenterProfileKycStatus = {
+  pending: 'pending',
+  verified: 'verified',
+  rejected: 'rejected',
+} as const;
+
+export interface RenterProfile {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string | null;
+  address?: string | null;
+  dateOfBirth?: string | null;
+  driverLicenseNumber?: string | null;
+  driverLicenseUrl?: string | null;
+  idDocumentType?: string | null;
+  idDocumentUrl?: string | null;
+  selfieUrl?: string | null;
+  kycStatus: RenterProfileKycStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface RentalBooking {
   id: string;
   carId: string;
   carLabel?: string;
+  carImageUrl?: string | null;
+  carCity?: string | null;
+  ownerName?: string | null;
+  ownerPhone?: string | null;
+  renterId?: string | null;
   renterName: string;
   renterPhone: string;
   renterEmail?: string | null;
+  renter?: RenterProfile | null;
   startDate: string;
   endDate: string;
   days: number;
@@ -967,11 +1027,24 @@ export interface RentalBooking {
   purpose: RentalBookingPurpose;
   serviceBookingId?: string | null;
   notes?: string | null;
+  ownerReviewStatus: RentalBookingOwnerReviewStatus;
+  ownerReviewNotes?: string | null;
+  ownerReviewedAt?: string | null;
+  contractText?: string | null;
+  contractGeneratedAt?: string | null;
+  renterSignatureName?: string | null;
+  renterSignedAt?: string | null;
+  ownerSignatureName?: string | null;
+  ownerSignedAt?: string | null;
+  paymentMethod?: RentalBookingPaymentMethod;
+  paymentStatus: RentalBookingPaymentStatus;
+  paidAt?: string | null;
   createdAt: string;
   confirmedAt?: string | null;
   startedAt?: string | null;
   completedAt?: string | null;
   cancelledAt?: string | null;
+  rejectedAt?: string | null;
 }
 
 export type CreateRentalBookingInputPurpose = typeof CreateRentalBookingInputPurpose[keyof typeof CreateRentalBookingInputPurpose];
@@ -984,11 +1057,7 @@ export const CreateRentalBookingInputPurpose = {
 
 export interface CreateRentalBookingInput {
   carId: string;
-  /** @minLength 1 */
-  renterName: string;
-  /** @minLength 1 */
-  renterPhone: string;
-  renterEmail?: string;
+  renterId: string;
   startDate: string;
   endDate: string;
   purpose?: CreateRentalBookingInputPurpose;
@@ -1000,16 +1069,89 @@ export type UpdateRentalBookingInputStatus = typeof UpdateRentalBookingInputStat
 
 
 export const UpdateRentalBookingInputStatus = {
-  requested: 'requested',
-  confirmed: 'confirmed',
+  cancelled: 'cancelled',
   active: 'active',
   completed: 'completed',
-  cancelled: 'cancelled',
 } as const;
 
+export type UpdateRentalBookingInputOwnerReviewDecision = typeof UpdateRentalBookingInputOwnerReviewDecision[keyof typeof UpdateRentalBookingInputOwnerReviewDecision];
+
+
+export const UpdateRentalBookingInputOwnerReviewDecision = {
+  approve: 'approve',
+  reject: 'reject',
+} as const;
+
+export type UpdateRentalBookingInputOwnerReview = {
+  decision: UpdateRentalBookingInputOwnerReviewDecision;
+  notes?: string;
+};
+
+export type UpdateRentalBookingInputSignParty = typeof UpdateRentalBookingInputSignParty[keyof typeof UpdateRentalBookingInputSignParty];
+
+
+export const UpdateRentalBookingInputSignParty = {
+  renter: 'renter',
+  owner: 'owner',
+} as const;
+
+export type UpdateRentalBookingInputSign = {
+  party: UpdateRentalBookingInputSignParty;
+  /** @minLength 1 */
+  name: string;
+};
+
+export type UpdateRentalBookingInputPaymentMethod = typeof UpdateRentalBookingInputPaymentMethod[keyof typeof UpdateRentalBookingInputPaymentMethod];
+
+
+export const UpdateRentalBookingInputPaymentMethod = {
+  online: 'online',
+  cash_on_pickup: 'cash_on_pickup',
+} as const;
+
+export type UpdateRentalBookingInputPayment = {
+  method: UpdateRentalBookingInputPaymentMethod;
+  markPaid?: boolean;
+};
+
+/**
+ * Drive booking lifecycle. Provide exactly one action group per request (ownerReview / sign / payment / status / notes).
+
+ */
 export interface UpdateRentalBookingInput {
   status?: UpdateRentalBookingInputStatus;
   notes?: string;
+  ownerReview?: UpdateRentalBookingInputOwnerReview;
+  sign?: UpdateRentalBookingInputSign;
+  payment?: UpdateRentalBookingInputPayment;
+}
+
+export interface UpsertRenterProfileInput {
+  /** @minLength 1 */
+  name: string;
+  /** @minLength 1 */
+  phone: string;
+  email?: string;
+  address?: string;
+  dateOfBirth?: string;
+  driverLicenseNumber?: string;
+  driverLicenseUrl?: string;
+  idDocumentType?: string;
+  idDocumentUrl?: string;
+  selfieUrl?: string;
+}
+
+export interface UpdateRenterProfileInput {
+  /** @minLength 1 */
+  name?: string;
+  email?: string;
+  address?: string;
+  dateOfBirth?: string;
+  driverLicenseNumber?: string;
+  driverLicenseUrl?: string;
+  idDocumentType?: string;
+  idDocumentUrl?: string;
+  selfieUrl?: string;
 }
 
 export type ListServiceCentersParams = {
@@ -1122,7 +1264,9 @@ includeInactive?: boolean;
 
 export type ListRentalBookingsParams = {
 carId?: string;
+ownerPhone?: string;
 renterPhone?: string;
+renterId?: string;
 status?: string;
 };
 

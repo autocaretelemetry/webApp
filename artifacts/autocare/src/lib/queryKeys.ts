@@ -35,4 +35,6 @@ export {
   getListRentalCarsQueryKey,
   getGetRentalCarQueryKey,
   getListRentalBookingsQueryKey,
+  getGetRenterProfileByPhoneQueryKey,
+  getGetRenterProfileQueryKey,
 } from "@workspace/api-client-react";

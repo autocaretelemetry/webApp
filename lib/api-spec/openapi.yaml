@@ -1053,13 +1053,76 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/DeleteConflict" }
 
+  /renter-profiles:
+    post:
+      operationId: upsertRenterProfile
+      tags: [rentals]
+      summary: Create or update a renter profile by phone (idempotent)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpsertRenterProfileInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RenterProfile" }
+
+  /renter-profiles/by-phone/{phone}:
+    get:
+      operationId: getRenterProfileByPhone
+      tags: [rentals]
+      parameters:
+        - { name: phone, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RenterProfile" }
+        "404":
+          description: No profile for this phone
+
+  /renter-profiles/{renterId}:
+    get:
+      operationId: getRenterProfile
+      tags: [rentals]
+      parameters:
+        - { name: renterId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RenterProfile" }
+    patch:
+      operationId: updateRenterProfile
+      tags: [rentals]
+      parameters:
+        - { name: renterId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateRenterProfileInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RenterProfile" }
+
   /rental-bookings:
     get:
       operationId: listRentalBookings
       tags: [rentals]
       parameters:
         - { name: carId, in: query, required: false, schema: { type: string } }
+        - { name: ownerPhone, in: query, required: false, schema: { type: string } }
         - { name: renterPhone, in: query, required: false, schema: { type: string } }
+        - { name: renterId, in: query, required: false, schema: { type: string } }
         - { name: status, in: query, required: false, schema: { type: string } }
       responses:
         "200":
@@ -1934,37 +1997,66 @@ components:
 
     RentalBooking:
       type: object
-      required: [id, carId, renterName, renterPhone, startDate, endDate, days, dailyRate, total, status, purpose, createdAt]
+      required: [id, carId, renterName, renterPhone, startDate, endDate, days, dailyRate, total, status, purpose, ownerReviewStatus, paymentStatus, createdAt]
       properties:
         id: { type: string }
         carId: { type: string }
         carLabel: { type: string }
+        carImageUrl: { type: string, nullable: true }
+        carCity: { type: string, nullable: true }
+        ownerName: { type: string, nullable: true }
+        ownerPhone: { type: string, nullable: true }
+        renterId: { type: string, nullable: true }
         renterName: { type: string }
         renterPhone: { type: string }
         renterEmail: { type: string, nullable: true }
+        renter: { $ref: "#/components/schemas/RenterProfile", nullable: true }
         startDate: { type: string, format: date-time }
         endDate: { type: string, format: date-time }
         days: { type: integer }
         dailyRate: { type: number }
         total: { type: number }
-        status: { type: string, enum: [requested, confirmed, active, completed, cancelled] }
+        status:
+          type: string
+          enum:
+            [
+              pending_review,
+              rejected,
+              contract_pending,
+              awaiting_payment,
+              confirmed,
+              active,
+              completed,
+              cancelled,
+            ]
         purpose: { type: string, enum: [general, loaner] }
         serviceBookingId: { type: string, nullable: true }
         notes: { type: string, nullable: true }
+        ownerReviewStatus: { type: string, enum: [pending, approved, rejected] }
+        ownerReviewNotes: { type: string, nullable: true }
+        ownerReviewedAt: { type: string, format: date-time, nullable: true }
+        contractText: { type: string, nullable: true }
+        contractGeneratedAt: { type: string, format: date-time, nullable: true }
+        renterSignatureName: { type: string, nullable: true }
+        renterSignedAt: { type: string, format: date-time, nullable: true }
+        ownerSignatureName: { type: string, nullable: true }
+        ownerSignedAt: { type: string, format: date-time, nullable: true }
+        paymentMethod: { type: string, enum: [online, cash_on_pickup], nullable: true }
+        paymentStatus: { type: string, enum: [unpaid, paid] }
+        paidAt: { type: string, format: date-time, nullable: true }
         createdAt: { type: string, format: date-time }
         confirmedAt: { type: string, format: date-time, nullable: true }
         startedAt: { type: string, format: date-time, nullable: true }
         completedAt: { type: string, format: date-time, nullable: true }
         cancelledAt: { type: string, format: date-time, nullable: true }
+        rejectedAt: { type: string, format: date-time, nullable: true }
 
     CreateRentalBookingInput:
       type: object
-      required: [carId, renterName, renterPhone, startDate, endDate]
+      required: [carId, renterId, startDate, endDate]
       properties:
         carId: { type: string }
-        renterName: { type: string, minLength: 1 }
-        renterPhone: { type: string, minLength: 1 }
-        renterEmail: { type: string }
+        renterId: { type: string }
         startDate: { type: string, format: date-time }
         endDate: { type: string, format: date-time }
         purpose: { type: string, enum: [general, loaner] }
@@ -1973,6 +2065,76 @@ components:
 
     UpdateRentalBookingInput:
       type: object
+      description: >
+        Drive booking lifecycle. Provide exactly one action group per request
+        (ownerReview / sign / payment / status / notes).
       properties:
-        status: { type: string, enum: [requested, confirmed, active, completed, cancelled] }
+        status: { type: string, enum: [cancelled, active, completed] }
         notes: { type: string }
+        ownerReview:
+          type: object
+          required: [decision]
+          properties:
+            decision: { type: string, enum: [approve, reject] }
+            notes: { type: string }
+        sign:
+          type: object
+          required: [party, name]
+          properties:
+            party: { type: string, enum: [renter, owner] }
+            name: { type: string, minLength: 1 }
+        payment:
+          type: object
+          required: [method]
+          properties:
+            method: { type: string, enum: [online, cash_on_pickup] }
+            markPaid: { type: boolean }
+
+    RenterProfile:
+      type: object
+      required: [id, name, phone, kycStatus, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        phone: { type: string }
+        email: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        dateOfBirth: { type: string, nullable: true }
+        driverLicenseNumber: { type: string, nullable: true }
+        driverLicenseUrl: { type: string, nullable: true }
+        idDocumentType: { type: string, nullable: true }
+        idDocumentUrl: { type: string, nullable: true }
+        selfieUrl: { type: string, nullable: true }
+        kycStatus: { type: string, enum: [pending, verified, rejected] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    UpsertRenterProfileInput:
+      type: object
+      required: [name, phone]
+      properties:
+        name: { type: string, minLength: 1 }
+        phone: { type: string, minLength: 1 }
+        email: { type: string }
+        address: { type: string }
+        dateOfBirth: { type: string }
+        driverLicenseNumber: { type: string }
+        driverLicenseUrl: { type: string }
+        idDocumentType: { type: string }
+        idDocumentUrl: { type: string }
+        selfieUrl: { type: string }
+
+    UpdateRenterProfileInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        email: { type: string }
+        address: { type: string }
+        dateOfBirth: { type: string }
+        driverLicenseNumber: { type: string }
+        driverLicenseUrl: { type: string }
+        idDocumentType: { type: string }
+        idDocumentUrl: { type: string }
+        selfieUrl: { type: string }
+        # Note: kycStatus intentionally omitted — it is set by AutoCare staff,
+        # never by the renter themselves.
