@@ -13,6 +13,8 @@ import {
   GetMechanicParams,
   UpdateServiceCenterBody,
   UpdateServiceCenterParams,
+  UpdateServiceCenterSettingsBody,
+  UpdateServiceCenterSettingsParams,
   DeleteServiceCenterParams,
   UpdateMechanicBody,
   UpdateMechanicParams,
@@ -91,6 +93,38 @@ router.get("/service-centers/:centerId", async (req, res): Promise<void> => {
   const openMap = await openJobsByCenter([row.id]);
   res.json({ ...row, openJobs: openMap.get(row.id) ?? 0 });
 });
+
+router.patch(
+  "/service-centers/:centerId/settings",
+  async (req, res): Promise<void> => {
+    const params = UpdateServiceCenterSettingsParams.safeParse(req.params);
+    const body = UpdateServiceCenterSettingsBody.safeParse(req.body);
+    if (!params.success || !body.success) {
+      res
+        .status(400)
+        .json({ error: (params.success ? body : params).error!.message });
+      return;
+    }
+    const updates: Partial<typeof serviceCentersTable.$inferInsert> = {};
+    if (body.data.whatsappOptIn !== undefined)
+      updates.whatsappOptIn = body.data.whatsappOptIn;
+    if (Object.keys(updates).length === 0) {
+      res.status(400).json({ error: "No settings provided" });
+      return;
+    }
+    const [row] = await db
+      .update(serviceCentersTable)
+      .set(updates)
+      .where(eq(serviceCentersTable.id, params.data.centerId))
+      .returning();
+    if (!row) {
+      res.status(404).json({ error: "Service center not found" });
+      return;
+    }
+    const openMap = await openJobsByCenter([row.id]);
+    res.json({ ...row, openJobs: openMap.get(row.id) ?? 0 });
+  },
+);
 
 router.patch("/service-centers/:centerId", async (req, res): Promise<void> => {
   const params = UpdateServiceCenterParams.safeParse(req.params);

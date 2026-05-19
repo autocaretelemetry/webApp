@@ -13,6 +13,7 @@ export const serviceCentersTable = pgTable("service_centers", {
   imageUrl: text("image_url"),
   bio: text("bio"),
   active: boolean("active").notNull().default(true),
+  whatsappOptIn: boolean("whatsapp_opt_in").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

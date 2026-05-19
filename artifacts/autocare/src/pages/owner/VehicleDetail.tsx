@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Car, Settings, Hash, Calendar, AlertCircle } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
+import { ServiceIntervalCard } from "@/components/ServiceIntervalCard";
 
 export default function VehicleDetail() {
   const params = useParams();
@@ -144,6 +145,8 @@ export default function VehicleDetail() {
           </Tabs>
         </div>
       </div>
+
+      <ServiceIntervalCard vehicle={vehicle} />
     </div>
   );
 }

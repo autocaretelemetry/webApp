@@ -18,6 +18,7 @@ import {
   AssignMechanicParams,
   AssignMechanicBody,
 } from "@workspace/api-zod";
+import { notifyCenterNewBooking } from "../lib/centerAlerts";
 
 const router: IRouter = Router();
 
@@ -152,6 +153,12 @@ router.post("/bookings", async (req, res): Promise<void> => {
   });
 
   const [hydrated] = await hydrateBookings([row]);
+
+  // Fire-and-forget WhatsApp alert; never block the response.
+  notifyCenterNewBooking(row).catch((err) =>
+    req.log.warn({ err }, "WhatsApp new-booking alert failed"),
+  );
+
   res.status(201).json(hydrated);
 });
 

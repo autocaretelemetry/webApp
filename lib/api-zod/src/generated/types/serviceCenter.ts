@@ -20,4 +20,5 @@ export interface ServiceCenter {
   imageUrl?: string | null;
   bio?: string | null;
   active?: boolean;
+  whatsappOptIn?: boolean;
 }

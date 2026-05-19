@@ -65,6 +65,10 @@ export const HealthCheckResponse = zod.object({
 /**
  * @summary List all vehicles for the current owner
  */
+
+
+
+
 export const ListVehiclesResponseItem = zod.object({
   "id": zod.string(),
   "ownerName": zod.string(),
@@ -80,6 +84,10 @@ export const ListVehiclesResponseItem = zod.object({
   "imageUrl": zod.string().nullish(),
   "nextServiceDate": zod.coerce.date().nullish(),
   "insuranceProvider": zod.string().nullish(),
+  "serviceIntervalDays": zod.number().min(1),
+  "serviceIntervalKm": zod.number().min(1),
+  "lastServicedAt": zod.coerce.date().nullish(),
+  "lastServicedMileage": zod.number().nullish(),
   "createdAt": zod.coerce.date()
 })
 export const ListVehiclesResponse = zod.array(ListVehiclesResponseItem)
@@ -100,6 +108,8 @@ export const createVehicleBodyMileageMin = 0;
 
 
 
+
+
 export const CreateVehicleBody = zod.object({
   "ownerName": zod.string().min(1),
   "ownerPhone": zod.string().nullish(),
@@ -112,13 +122,19 @@ export const CreateVehicleBody = zod.object({
   "engineType": zod.string().nullish(),
   "mileage": zod.number().min(createVehicleBodyMileageMin),
   "imageUrl": zod.string().nullish(),
-  "insuranceProvider": zod.string().nullish()
+  "insuranceProvider": zod.string().nullish(),
+  "serviceIntervalDays": zod.number().min(1).optional(),
+  "serviceIntervalKm": zod.number().min(1).optional()
 })
 
 
 export const GetVehicleParams = zod.object({
   "vehicleId": zod.coerce.string()
 })
+
+
+
+
 
 export const GetVehicleResponse = zod.object({
   "id": zod.string(),
@@ -135,6 +151,10 @@ export const GetVehicleResponse = zod.object({
   "imageUrl": zod.string().nullish(),
   "nextServiceDate": zod.coerce.date().nullish(),
   "insuranceProvider": zod.string().nullish(),
+  "serviceIntervalDays": zod.number().min(1),
+  "serviceIntervalKm": zod.number().min(1),
+  "lastServicedAt": zod.coerce.date().nullish(),
+  "lastServicedMileage": zod.number().nullish(),
   "createdAt": zod.coerce.date()
 })
 
@@ -142,6 +162,10 @@ export const GetVehicleResponse = zod.object({
 export const UpdateVehicleParams = zod.object({
   "vehicleId": zod.coerce.string()
 })
+
+
+
+
 
 export const UpdateVehicleBody = zod.object({
   "ownerName": zod.string().optional(),
@@ -155,8 +179,16 @@ export const UpdateVehicleBody = zod.object({
   "engineType": zod.string().nullish(),
   "mileage": zod.number().optional(),
   "imageUrl": zod.string().nullish(),
-  "insuranceProvider": zod.string().nullish()
+  "insuranceProvider": zod.string().nullish(),
+  "serviceIntervalDays": zod.number().min(1).optional(),
+  "serviceIntervalKm": zod.number().min(1).optional(),
+  "lastServicedAt": zod.coerce.date().nullish(),
+  "lastServicedMileage": zod.number().nullish()
 })
+
+
+
+
 
 export const UpdateVehicleResponse = zod.object({
   "id": zod.string(),
@@ -173,6 +205,10 @@ export const UpdateVehicleResponse = zod.object({
   "imageUrl": zod.string().nullish(),
   "nextServiceDate": zod.coerce.date().nullish(),
   "insuranceProvider": zod.string().nullish(),
+  "serviceIntervalDays": zod.number().min(1),
+  "serviceIntervalKm": zod.number().min(1),
+  "lastServicedAt": zod.coerce.date().nullish(),
+  "lastServicedMileage": zod.number().nullish(),
   "createdAt": zod.coerce.date()
 })
 
@@ -242,7 +278,8 @@ export const ListServiceCentersResponseItem = zod.object({
   "openJobs": zod.number(),
   "imageUrl": zod.string().nullish(),
   "bio": zod.string().nullish(),
-  "active": zod.boolean().optional()
+  "active": zod.boolean().optional(),
+  "whatsappOptIn": zod.boolean().optional()
 })
 export const ListServiceCentersResponse = zod.array(ListServiceCentersResponseItem)
 
@@ -264,7 +301,8 @@ export const GetServiceCenterResponse = zod.object({
   "openJobs": zod.number(),
   "imageUrl": zod.string().nullish(),
   "bio": zod.string().nullish(),
-  "active": zod.boolean().optional()
+  "active": zod.boolean().optional(),
+  "whatsappOptIn": zod.boolean().optional()
 })
 
 
@@ -292,7 +330,8 @@ export const UpdateServiceCenterResponse = zod.object({
   "openJobs": zod.number(),
   "imageUrl": zod.string().nullish(),
   "bio": zod.string().nullish(),
-  "active": zod.boolean().optional()
+  "active": zod.boolean().optional(),
+  "whatsappOptIn": zod.boolean().optional()
 })
 
 
@@ -404,6 +443,10 @@ export const ListBookingsQueryParams = zod.object({
   "status": zod.enum(['requested', 'accepted', 'in_progress', 'awaiting_approval', 'approved', 'completed', 'cancelled']).optional()
 })
 
+
+
+
+
 export const ListBookingsResponseItem = zod.object({
   "id": zod.string(),
   "vehicleId": zod.string(),
@@ -431,6 +474,10 @@ export const ListBookingsResponseItem = zod.object({
   "imageUrl": zod.string().nullish(),
   "nextServiceDate": zod.coerce.date().nullish(),
   "insuranceProvider": zod.string().nullish(),
+  "serviceIntervalDays": zod.number().min(1),
+  "serviceIntervalKm": zod.number().min(1),
+  "lastServicedAt": zod.coerce.date().nullish(),
+  "lastServicedMileage": zod.number().nullish(),
   "createdAt": zod.coerce.date()
 }).optional(),
   "serviceCenter": zod.object({
@@ -446,7 +493,8 @@ export const ListBookingsResponseItem = zod.object({
   "openJobs": zod.number(),
   "imageUrl": zod.string().nullish(),
   "bio": zod.string().nullish(),
-  "active": zod.boolean().optional()
+  "active": zod.boolean().optional(),
+  "whatsappOptIn": zod.boolean().optional()
 }).optional(),
   "mechanic": zod.union([zod.object({
   "id": zod.string(),
@@ -481,6 +529,10 @@ export const GetBookingParams = zod.object({
   "bookingId": zod.coerce.string()
 })
 
+
+
+
+
 export const GetBookingResponse = zod.object({
   "id": zod.string(),
   "vehicleId": zod.string(),
@@ -508,6 +560,10 @@ export const GetBookingResponse = zod.object({
   "imageUrl": zod.string().nullish(),
   "nextServiceDate": zod.coerce.date().nullish(),
   "insuranceProvider": zod.string().nullish(),
+  "serviceIntervalDays": zod.number().min(1),
+  "serviceIntervalKm": zod.number().min(1),
+  "lastServicedAt": zod.coerce.date().nullish(),
+  "lastServicedMileage": zod.number().nullish(),
   "createdAt": zod.coerce.date()
 }).optional(),
   "serviceCenter": zod.object({
@@ -523,7 +579,8 @@ export const GetBookingResponse = zod.object({
   "openJobs": zod.number(),
   "imageUrl": zod.string().nullish(),
   "bio": zod.string().nullish(),
-  "active": zod.boolean().optional()
+  "active": zod.boolean().optional(),
+  "whatsappOptIn": zod.boolean().optional()
 }).optional(),
   "mechanic": zod.union([zod.object({
   "id": zod.string(),
@@ -579,6 +636,10 @@ export const UpdateBookingStatusBody = zod.object({
   "scheduledAt": zod.coerce.date().nullish()
 })
 
+
+
+
+
 export const UpdateBookingStatusResponse = zod.object({
   "id": zod.string(),
   "vehicleId": zod.string(),
@@ -606,6 +667,10 @@ export const UpdateBookingStatusResponse = zod.object({
   "imageUrl": zod.string().nullish(),
   "nextServiceDate": zod.coerce.date().nullish(),
   "insuranceProvider": zod.string().nullish(),
+  "serviceIntervalDays": zod.number().min(1),
+  "serviceIntervalKm": zod.number().min(1),
+  "lastServicedAt": zod.coerce.date().nullish(),
+  "lastServicedMileage": zod.number().nullish(),
   "createdAt": zod.coerce.date()
 }).optional(),
   "serviceCenter": zod.object({
@@ -621,7 +686,8 @@ export const UpdateBookingStatusResponse = zod.object({
   "openJobs": zod.number(),
   "imageUrl": zod.string().nullish(),
   "bio": zod.string().nullish(),
-  "active": zod.boolean().optional()
+  "active": zod.boolean().optional(),
+  "whatsappOptIn": zod.boolean().optional()
 }).optional(),
   "mechanic": zod.union([zod.object({
   "id": zod.string(),
@@ -650,6 +716,10 @@ export const AssignMechanicBody = zod.object({
   "mechanicId": zod.string()
 })
 
+
+
+
+
 export const AssignMechanicResponse = zod.object({
   "id": zod.string(),
   "vehicleId": zod.string(),
@@ -677,6 +747,10 @@ export const AssignMechanicResponse = zod.object({
   "imageUrl": zod.string().nullish(),
   "nextServiceDate": zod.coerce.date().nullish(),
   "insuranceProvider": zod.string().nullish(),
+  "serviceIntervalDays": zod.number().min(1),
+  "serviceIntervalKm": zod.number().min(1),
+  "lastServicedAt": zod.coerce.date().nullish(),
+  "lastServicedMileage": zod.number().nullish(),
   "createdAt": zod.coerce.date()
 }).optional(),
   "serviceCenter": zod.object({
@@ -692,7 +766,8 @@ export const AssignMechanicResponse = zod.object({
   "openJobs": zod.number(),
   "imageUrl": zod.string().nullish(),
   "bio": zod.string().nullish(),
-  "active": zod.boolean().optional()
+  "active": zod.boolean().optional(),
+  "whatsappOptIn": zod.boolean().optional()
 }).optional(),
   "mechanic": zod.union([zod.object({
   "id": zod.string(),
@@ -1522,6 +1597,10 @@ export const GetVendorDashboardResponse = zod.object({
 /**
  * @summary Platform-wide overview for the super admin / platform owner
  */
+
+
+
+
 export const GetAdminOverviewResponse = zod.object({
   "counts": zod.object({
   "vehicles": zod.number(),
@@ -1574,6 +1653,10 @@ export const GetAdminOverviewResponse = zod.object({
   "imageUrl": zod.string().nullish(),
   "nextServiceDate": zod.coerce.date().nullish(),
   "insuranceProvider": zod.string().nullish(),
+  "serviceIntervalDays": zod.number().min(1),
+  "serviceIntervalKm": zod.number().min(1),
+  "lastServicedAt": zod.coerce.date().nullish(),
+  "lastServicedMileage": zod.number().nullish(),
   "createdAt": zod.coerce.date()
 }).optional(),
   "serviceCenter": zod.object({
@@ -1589,7 +1672,8 @@ export const GetAdminOverviewResponse = zod.object({
   "openJobs": zod.number(),
   "imageUrl": zod.string().nullish(),
   "bio": zod.string().nullish(),
-  "active": zod.boolean().optional()
+  "active": zod.boolean().optional(),
+  "whatsappOptIn": zod.boolean().optional()
 }).optional(),
   "mechanic": zod.union([zod.object({
   "id": zod.string(),
@@ -2614,5 +2698,118 @@ export const ListServiceTypesResponseItem = zod.object({
   "icon": zod.string().nullish()
 })
 export const ListServiceTypesResponse = zod.array(ListServiceTypesResponseItem)
+
+
+/**
+ * @summary Update center self-service settings (WhatsApp notifications, etc.)
+ */
+export const UpdateServiceCenterSettingsParams = zod.object({
+  "centerId": zod.coerce.string()
+})
+
+export const UpdateServiceCenterSettingsBody = zod.object({
+  "whatsappOptIn": zod.boolean().optional()
+})
+
+export const UpdateServiceCenterSettingsResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "address": zod.string(),
+  "city": zod.string().optional(),
+  "region": zod.string().optional(),
+  "phone": zod.string(),
+  "specialties": zod.array(zod.string()),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "openJobs": zod.number(),
+  "imageUrl": zod.string().nullish(),
+  "bio": zod.string().nullish(),
+  "active": zod.boolean().optional(),
+  "whatsappOptIn": zod.boolean().optional()
+})
+
+
+export const ListNotificationsQueryParams = zod.object({
+  "ownerPhone": zod.coerce.string(),
+  "unreadOnly": zod.coerce.boolean().optional(),
+  "limit": zod.coerce.number().optional()
+})
+
+export const ListNotificationsResponseItem = zod.object({
+  "id": zod.string(),
+  "ownerPhone": zod.string(),
+  "kind": zod.string(),
+  "title": zod.string(),
+  "body": zod.string(),
+  "vehicleId": zod.string().nullish(),
+  "bookingId": zod.string().nullish(),
+  "dedupeKey": zod.string(),
+  "readAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
+})
+export const ListNotificationsResponse = zod.array(ListNotificationsResponseItem)
+
+
+export const MarkNotificationReadParams = zod.object({
+  "notificationId": zod.coerce.string()
+})
+
+export const MarkNotificationReadResponse = zod.object({
+  "id": zod.string(),
+  "ownerPhone": zod.string(),
+  "kind": zod.string(),
+  "title": zod.string(),
+  "body": zod.string(),
+  "vehicleId": zod.string().nullish(),
+  "bookingId": zod.string().nullish(),
+  "dedupeKey": zod.string(),
+  "readAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+
+export const MarkAllNotificationsReadBody = zod.object({
+  "ownerPhone": zod.string()
+})
+
+
+/**
+ * @summary Run the service-reminder generator on demand
+ */
+export const GenerateReminderNotificationsBody = zod.object({
+  "triggeredBy": zod.string().optional()
+})
+
+export const GenerateReminderNotificationsResponse = zod.object({
+  "created": zod.number()
+})
+
+
+export const GetVapidPublicKeyResponse = zod.object({
+  "publicKey": zod.string()
+})
+
+
+
+
+
+
+
+
+export const CreatePushSubscriptionBody = zod.object({
+  "ownerPhone": zod.string().min(1),
+  "endpoint": zod.string().min(1),
+  "p256dh": zod.string().min(1),
+  "auth": zod.string().min(1),
+  "userAgent": zod.string().nullish()
+})
+
+
+
+
+
+export const DeletePushSubscriptionBody = zod.object({
+  "endpoint": zod.string().min(1)
+})
 
 

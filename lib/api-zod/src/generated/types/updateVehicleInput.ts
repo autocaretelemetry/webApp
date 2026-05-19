@@ -19,4 +19,10 @@ export interface UpdateVehicleInput {
   mileage?: number;
   imageUrl?: string | null;
   insuranceProvider?: string | null;
+  /** @minimum 1 */
+  serviceIntervalDays?: number;
+  /** @minimum 1 */
+  serviceIntervalKm?: number;
+  lastServicedAt?: Date | null;
+  lastServicedMileage?: number | null;
 }

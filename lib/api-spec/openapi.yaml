@@ -1389,6 +1389,138 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/ServiceType" }
 
+  /service-centers/{centerId}/settings:
+    patch:
+      operationId: updateServiceCenterSettings
+      tags: [serviceCenters]
+      summary: Update center self-service settings (WhatsApp notifications, etc.)
+      parameters:
+        - { name: centerId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateServiceCenterSettingsInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServiceCenter" }
+
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      parameters:
+        - { name: ownerPhone, in: query, required: true, schema: { type: string } }
+        - { name: unreadOnly, in: query, required: false, schema: { type: boolean } }
+        - { name: limit, in: query, required: false, schema: { type: integer } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Notification" }
+
+  /notifications/{notificationId}/read:
+    patch:
+      operationId: markNotificationRead
+      tags: [notifications]
+      parameters:
+        - { name: notificationId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Notification" }
+
+  /notifications/mark-all-read:
+    post:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MarkAllNotificationsReadInput" }
+      responses:
+        "204": { description: Marked }
+
+  /notifications/generate-reminders:
+    post:
+      operationId: generateReminderNotifications
+      tags: [notifications]
+      summary: Run the service-reminder generator on demand
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GenerateReminderNotificationsInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [created]
+                properties:
+                  created: { type: integer }
+
+  /push/vapid-public-key:
+    get:
+      operationId: getVapidPublicKey
+      tags: [push]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [publicKey]
+                properties:
+                  publicKey: { type: string }
+        "503":
+          description: Push not configured
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error: { type: string }
+
+  /push/subscriptions:
+    post:
+      operationId: createPushSubscription
+      tags: [push]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreatePushSubscriptionInput" }
+      responses:
+        "201":
+          description: Subscribed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PushSubscription" }
+    delete:
+      operationId: deletePushSubscription
+      tags: [push]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DeletePushSubscriptionInput" }
+      responses:
+        "204": { description: Unsubscribed }
+
 components:
   schemas:
     HealthStatus:
@@ -1399,7 +1531,7 @@ components:
 
     Vehicle:
       type: object
-      required: [id, ownerName, brand, model, year, plateNumber, color, mileage, createdAt]
+      required: [id, ownerName, brand, model, year, plateNumber, color, mileage, serviceIntervalDays, serviceIntervalKm, createdAt]
       properties:
         id: { type: string }
         ownerName: { type: string }
@@ -1415,6 +1547,10 @@ components:
         imageUrl: { type: string, nullable: true }
         nextServiceDate: { type: string, format: date-time, nullable: true }
         insuranceProvider: { type: string, nullable: true }
+        serviceIntervalDays: { type: integer, minimum: 1 }
+        serviceIntervalKm: { type: integer, minimum: 1 }
+        lastServicedAt: { type: string, format: date-time, nullable: true }
+        lastServicedMileage: { type: integer, nullable: true }
         createdAt: { type: string, format: date-time }
 
     CreateVehicleInput:
@@ -1433,6 +1569,8 @@ components:
         mileage: { type: integer, minimum: 0 }
         imageUrl: { type: string, nullable: true }
         insuranceProvider: { type: string, nullable: true }
+        serviceIntervalDays: { type: integer, minimum: 1 }
+        serviceIntervalKm: { type: integer, minimum: 1 }
 
     UpdateVehicleInput:
       type: object
@@ -1449,6 +1587,10 @@ components:
         mileage: { type: integer }
         imageUrl: { type: string, nullable: true }
         insuranceProvider: { type: string, nullable: true }
+        serviceIntervalDays: { type: integer, minimum: 1 }
+        serviceIntervalKm: { type: integer, minimum: 1 }
+        lastServicedAt: { type: string, format: date-time, nullable: true }
+        lastServicedMileage: { type: integer, nullable: true }
 
     ServiceCenter:
       type: object
@@ -1469,6 +1611,7 @@ components:
         imageUrl: { type: string, nullable: true }
         bio: { type: string, nullable: true }
         active: { type: boolean }
+        whatsappOptIn: { type: boolean }
 
     Mechanic:
       type: object
@@ -2458,3 +2601,62 @@ components:
       required: [error]
       properties:
         error: { type: string }
+
+    UpdateServiceCenterSettingsInput:
+      type: object
+      properties:
+        whatsappOptIn: { type: boolean }
+
+    Notification:
+      type: object
+      required: [id, ownerPhone, kind, title, body, dedupeKey, createdAt]
+      properties:
+        id: { type: string }
+        ownerPhone: { type: string }
+        kind: { type: string }
+        title: { type: string }
+        body: { type: string }
+        vehicleId: { type: string, nullable: true }
+        bookingId: { type: string, nullable: true }
+        dedupeKey: { type: string }
+        readAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    MarkAllNotificationsReadInput:
+      type: object
+      required: [ownerPhone]
+      properties:
+        ownerPhone: { type: string }
+
+    GenerateReminderNotificationsInput:
+      type: object
+      properties:
+        triggeredBy: { type: string }
+
+    PushSubscription:
+      type: object
+      required: [id, ownerPhone, endpoint, p256dh, auth, createdAt]
+      properties:
+        id: { type: string }
+        ownerPhone: { type: string }
+        endpoint: { type: string }
+        p256dh: { type: string }
+        auth: { type: string }
+        userAgent: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    CreatePushSubscriptionInput:
+      type: object
+      required: [ownerPhone, endpoint, p256dh, auth]
+      properties:
+        ownerPhone: { type: string, minLength: 1 }
+        endpoint: { type: string, minLength: 1 }
+        p256dh: { type: string, minLength: 1 }
+        auth: { type: string, minLength: 1 }
+        userAgent: { type: string, nullable: true }
+
+    DeletePushSubscriptionInput:
+      type: object
+      required: [endpoint]
+      properties:
+        endpoint: { type: string, minLength: 1 }

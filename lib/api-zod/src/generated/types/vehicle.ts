@@ -21,5 +21,11 @@ export interface Vehicle {
   imageUrl?: string | null;
   nextServiceDate?: Date | null;
   insuranceProvider?: string | null;
+  /** @minimum 1 */
+  serviceIntervalDays: number;
+  /** @minimum 1 */
+  serviceIntervalKm: number;
+  lastServicedAt?: Date | null;
+  lastServicedMileage?: number | null;
   createdAt: Date;
 }

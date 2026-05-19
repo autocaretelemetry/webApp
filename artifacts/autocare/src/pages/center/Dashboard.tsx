@@ -7,6 +7,7 @@ import { Wrench, Clock, CheckCircle, DollarSign, Activity } from "lucide-react";
 import { formatCurrency, formatRelative } from "@/lib/format";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { CenterWhatsAppCard } from "@/components/CenterWhatsAppCard";
 
 export default function CenterDashboard() {
   const { data: dashboard, isLoading: isLoadingDashboard } = useGetCenterDashboard();
@@ -99,6 +100,8 @@ export default function CenterDashboard() {
         </Card>
       </div>
       
+      <CenterWhatsAppCard />
+
       {dashboard.topMechanics && dashboard.topMechanics.length > 0 && (
         <div>
           <h2 className="text-xl font-bold mb-4">Top Mechanics</h2>

@@ -5,6 +5,7 @@ import {
   bookingsTable,
   bookingEventsTable,
   invoicesTable,
+  vehiclesTable,
 } from "@workspace/db";
 import {
   CreateInvoiceBody,
@@ -13,6 +14,10 @@ import {
   ApproveInvoiceParams,
   PayInvoiceParams,
 } from "@workspace/api-zod";
+import {
+  notifyCenterInvoiceApproved,
+  notifyCenterPaymentReceived,
+} from "../lib/centerAlerts";
 
 const router: IRouter = Router();
 
@@ -140,6 +145,9 @@ router.post(
       actor: "Owner",
       kind: "invoice_approved",
     });
+    notifyCenterInvoiceApproved(row.bookingId, row.total).catch((err) =>
+      req.log.warn({ err }, "WhatsApp invoice-approved alert failed"),
+    );
     res.json(row);
   },
 );
@@ -169,16 +177,38 @@ router.post("/invoices/:invoiceId/pay", async (req, res): Promise<void> => {
     .set({ status: "paid", paidAt: new Date() })
     .where(eq(invoicesTable.id, params.data.invoiceId))
     .returning();
-  await db
+  const completedAt = new Date();
+  const [bookingRow] = await db
     .update(bookingsTable)
-    .set({ status: "completed", completedAt: new Date() })
-    .where(eq(bookingsTable.id, row.bookingId));
+    .set({ status: "completed", completedAt })
+    .where(eq(bookingsTable.id, row.bookingId))
+    .returning();
+  if (bookingRow) {
+    // Snapshot the vehicle's current mileage as the "last serviced" baseline
+    // so the next reminder window is computed from this completed job.
+    const [veh] = await db
+      .select()
+      .from(vehiclesTable)
+      .where(eq(vehiclesTable.id, bookingRow.vehicleId));
+    if (veh) {
+      await db
+        .update(vehiclesTable)
+        .set({
+          lastServicedAt: completedAt,
+          lastServicedMileage: veh.mileage,
+        })
+        .where(eq(vehiclesTable.id, veh.id));
+    }
+  }
   await db.insert(bookingEventsTable).values({
     bookingId: row.bookingId,
     label: "Payment received — job marked complete",
     actor: "Owner",
     kind: "invoice_paid",
   });
+  notifyCenterPaymentReceived(row.bookingId, row.total).catch((err) =>
+    req.log.warn({ err }, "WhatsApp payment-received alert failed"),
+  );
   res.json(row);
 });
 

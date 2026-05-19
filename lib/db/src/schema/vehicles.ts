@@ -15,6 +15,10 @@ export const vehiclesTable = pgTable("vehicles", {
   imageUrl: text("image_url"),
   nextServiceDate: timestamp("next_service_date", { withTimezone: true }),
   insuranceProvider: text("insurance_provider"),
+  lastServicedAt: timestamp("last_serviced_at", { withTimezone: true }),
+  lastServicedMileage: integer("last_serviced_mileage"),
+  serviceIntervalDays: integer("service_interval_days").notNull().default(90),
+  serviceIntervalKm: integer("service_interval_km").notNull().default(5000),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

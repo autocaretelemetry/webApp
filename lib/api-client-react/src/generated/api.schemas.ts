@@ -24,6 +24,12 @@ export interface Vehicle {
   imageUrl?: string | null;
   nextServiceDate?: string | null;
   insuranceProvider?: string | null;
+  /** @minimum 1 */
+  serviceIntervalDays: number;
+  /** @minimum 1 */
+  serviceIntervalKm: number;
+  lastServicedAt?: string | null;
+  lastServicedMileage?: number | null;
   createdAt: string;
 }
 
@@ -50,6 +56,10 @@ export interface CreateVehicleInput {
   mileage: number;
   imageUrl?: string | null;
   insuranceProvider?: string | null;
+  /** @minimum 1 */
+  serviceIntervalDays?: number;
+  /** @minimum 1 */
+  serviceIntervalKm?: number;
 }
 
 export interface UpdateVehicleInput {
@@ -65,6 +75,12 @@ export interface UpdateVehicleInput {
   mileage?: number;
   imageUrl?: string | null;
   insuranceProvider?: string | null;
+  /** @minimum 1 */
+  serviceIntervalDays?: number;
+  /** @minimum 1 */
+  serviceIntervalKm?: number;
+  lastServicedAt?: string | null;
+  lastServicedMileage?: number | null;
 }
 
 export interface ServiceCenter {
@@ -81,6 +97,7 @@ export interface ServiceCenter {
   imageUrl?: string | null;
   bio?: string | null;
   active?: boolean;
+  whatsappOptIn?: boolean;
 }
 
 export interface Mechanic {
@@ -1322,6 +1339,58 @@ export interface StorageError {
   error: string;
 }
 
+export interface UpdateServiceCenterSettingsInput {
+  whatsappOptIn?: boolean;
+}
+
+export interface Notification {
+  id: string;
+  ownerPhone: string;
+  kind: string;
+  title: string;
+  body: string;
+  vehicleId?: string | null;
+  bookingId?: string | null;
+  dedupeKey: string;
+  readAt?: string | null;
+  createdAt: string;
+}
+
+export interface MarkAllNotificationsReadInput {
+  ownerPhone: string;
+}
+
+export interface GenerateReminderNotificationsInput {
+  triggeredBy?: string;
+}
+
+export interface PushSubscription {
+  id: string;
+  ownerPhone: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  userAgent?: string | null;
+  createdAt: string;
+}
+
+export interface CreatePushSubscriptionInput {
+  /** @minLength 1 */
+  ownerPhone: string;
+  /** @minLength 1 */
+  endpoint: string;
+  /** @minLength 1 */
+  p256dh: string;
+  /** @minLength 1 */
+  auth: string;
+  userAgent?: string | null;
+}
+
+export interface DeletePushSubscriptionInput {
+  /** @minLength 1 */
+  endpoint: string;
+}
+
 export type ListServiceCentersParams = {
 specialty?: string;
 includeInactive?: boolean;
@@ -1451,5 +1520,23 @@ ownerPhone?: string;
 renterPhone?: string;
 renterId?: string;
 status?: string;
+};
+
+export type ListNotificationsParams = {
+ownerPhone: string;
+unreadOnly?: boolean;
+limit?: number;
+};
+
+export type GenerateReminderNotifications200 = {
+  created: number;
+};
+
+export type GetVapidPublicKey200 = {
+  publicKey: string;
+};
+
+export type GetVapidPublicKey503 = {
+  error: string;
 };
 

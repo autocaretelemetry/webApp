@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useRole, type Role } from "@/lib/role";
 import { useCart } from "@/lib/cart";
 import { cn } from "@/lib/utils";
+import { NotificationBell } from "@/components/NotificationBell";
 import {
   Car,
   Wrench,
@@ -151,6 +152,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const navItems = navFor(role);
   const showCart = role === "owner" || role === "center";
+  const showBell = role === "owner";
 
   return (
     <div className="flex min-h-screen bg-background flex-col md:flex-row">
@@ -161,6 +163,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <span>AutoCare</span>
         </div>
         <div className="flex items-center gap-2">
+          {showBell && <NotificationBell />}
           {showCart && <CartButton />}
           <RoleTabs role={role} setRole={setRole} triggerClassName="text-[10px] px-1" />
         </div>
@@ -173,7 +176,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Wrench className="h-8 w-8" />
             <span>AutoCare</span>
           </div>
-          {showCart && <CartButton />}
+          <div className="flex items-center gap-1">
+            {showBell && <NotificationBell />}
+            {showCart && <CartButton />}
+          </div>
         </div>
 
         <RoleTabs role={role} setRole={setRole} className="w-full" triggerClassName="text-[10px] px-0.5" />

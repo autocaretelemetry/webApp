@@ -17,6 +17,8 @@ import revenueRouter from "./revenue";
 import rentalsRouter from "./rentals";
 import storageRouter from "./storage";
 import retainersRouter from "./retainers";
+import notificationsRouter from "./notifications";
+import pushRouter from "./push";
 
 const router: IRouter = Router();
 
@@ -38,5 +40,7 @@ router.use(revenueRouter);
 router.use(rentalsRouter);
 router.use(storageRouter);
 router.use(retainersRouter);
+router.use(notificationsRouter);
+router.use(pushRouter);
 
 export default router;
