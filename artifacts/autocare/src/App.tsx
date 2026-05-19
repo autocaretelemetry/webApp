@@ -34,6 +34,7 @@ import VendorOrders from "@/pages/vendor/Orders";
 import VendorDeliveryTeam from "@/pages/vendor/DeliveryTeam";
 import VendorStaff from "@/pages/vendor/Staff";
 import ProfilePage from "@/pages/shared/Profile";
+import CenterStaffPage from "@/pages/center/Staff";
 
 // Delivery Pages
 import DeliveryDashboard from "@/pages/delivery/Dashboard";
@@ -195,6 +196,7 @@ function AppRouter() {
         <Route path="/invoices/:id" component={InvoiceDetail} />
         <Route path="/settings" component={Settings} />
         <Route path="/profile" component={ProfilePage} />
+        <Route path="/center/staff" component={centerOnly(CenterStaffPage)} />
 
             <Route component={NotFound} />
           </Switch>

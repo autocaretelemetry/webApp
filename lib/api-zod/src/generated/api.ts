@@ -1317,6 +1317,86 @@ export const DeleteVendorStaffParams = zod.object({
 
 
 /**
+ * @summary List a service center's staff members (includes inactive)
+ */
+export const ListCenterStaffParams = zod.object({
+  "centerId": zod.coerce.string()
+})
+
+export const ListCenterStaffResponseItem = zod.object({
+  "id": zod.string(),
+  "centerId": zod.string(),
+  "userId": zod.string().nullish(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "role": zod.enum(['manager', 'staff']),
+  "permissions": zod.array(zod.string()),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+export const ListCenterStaffResponse = zod.array(ListCenterStaffResponseItem)
+
+
+/**
+ * @summary Add a new staff member to a service center
+ */
+export const CreateCenterStaffParams = zod.object({
+  "centerId": zod.coerce.string()
+})
+
+
+export const createCenterStaffBodyPasswordMin = 8;
+
+
+
+export const CreateCenterStaffBody = zod.object({
+  "name": zod.string().min(1),
+  "email": zod.string().email(),
+  "password": zod.string().min(createCenterStaffBodyPasswordMin),
+  "phone": zod.string().nullish(),
+  "role": zod.enum(['manager', 'staff']).optional(),
+  "permissions": zod.array(zod.string()).optional()
+})
+
+
+export const UpdateCenterStaffParams = zod.object({
+  "centerId": zod.coerce.string(),
+  "staffId": zod.coerce.string()
+})
+
+export const UpdateCenterStaffBody = zod.object({
+  "name": zod.string().optional(),
+  "email": zod.string().email().optional(),
+  "phone": zod.string().nullish(),
+  "role": zod.enum(['manager', 'staff']).optional(),
+  "permissions": zod.array(zod.string()).optional(),
+  "active": zod.boolean().optional()
+})
+
+export const UpdateCenterStaffResponse = zod.object({
+  "id": zod.string(),
+  "centerId": zod.string(),
+  "userId": zod.string().nullish(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "role": zod.enum(['manager', 'staff']),
+  "permissions": zod.array(zod.string()),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+
+
+export const DeleteCenterStaffParams = zod.object({
+  "centerId": zod.coerce.string(),
+  "staffId": zod.coerce.string()
+})
+
+
+/**
  * @summary Browse the marketplace catalog
  */
 export const ListPartsQueryParams = zod.object({

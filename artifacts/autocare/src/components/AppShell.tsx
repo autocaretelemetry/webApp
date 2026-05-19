@@ -103,6 +103,12 @@ const CENTER_NAV: NavSection[] = [
       { href: "/orders", label: "Parts Orders", icon: Package },
     ],
   },
+  {
+    label: "Team",
+    items: [
+      { href: "/center/staff", label: "Staff", icon: UserCog },
+    ],
+  },
 ];
 
 const VENDOR_NAV: NavSection[] = [

@@ -28,8 +28,10 @@ import type {
   BookingDetail,
   CategoryCount,
   CenterDashboard,
+  CenterStaff,
   ChangePasswordInput,
   CreateBookingInput,
+  CreateCenterStaffInput,
   CreateInvoiceInput,
   CreateMechanicInput,
   CreateOrderInput,
@@ -97,6 +99,7 @@ import type {
   SubscriptionPlan,
   UpdateActiveInput,
   UpdateBookingStatusInput,
+  UpdateCenterStaffInput,
   UpdateDeliveryAgentInput,
   UpdateLandingContentInput,
   UpdateOrderStatusInput,
@@ -3448,6 +3451,289 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getDeleteVendorStaffMutationOptions(options));
+    }
+
+export const getListCenterStaffUrl = (centerId: string,) => {
+
+
+
+
+  return `/api/service-centers/${centerId}/staff`
+}
+
+/**
+ * @summary List a service center's staff members (includes inactive)
+ */
+export const listCenterStaff = async (centerId: string, options?: RequestInit): Promise<CenterStaff[]> => {
+
+  return customFetch<CenterStaff[]>(getListCenterStaffUrl(centerId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCenterStaffQueryKey = (centerId: string,) => {
+    return [
+    `/api/service-centers/${centerId}/staff`
+    ] as const;
+    }
+
+
+export const getListCenterStaffQueryOptions = <TData = Awaited<ReturnType<typeof listCenterStaff>>, TError = ErrorType<unknown>>(centerId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCenterStaff>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCenterStaffQueryKey(centerId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCenterStaff>>> = ({ signal }) => listCenterStaff(centerId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(centerId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCenterStaff>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCenterStaffQueryResult = NonNullable<Awaited<ReturnType<typeof listCenterStaff>>>
+export type ListCenterStaffQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List a service center's staff members (includes inactive)
+ */
+
+export function useListCenterStaff<TData = Awaited<ReturnType<typeof listCenterStaff>>, TError = ErrorType<unknown>>(
+ centerId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCenterStaff>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCenterStaffQueryOptions(centerId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateCenterStaffUrl = (centerId: string,) => {
+
+
+
+
+  return `/api/service-centers/${centerId}/staff`
+}
+
+/**
+ * @summary Add a new staff member to a service center
+ */
+export const createCenterStaff = async (centerId: string,
+    createCenterStaffInput: CreateCenterStaffInput, options?: RequestInit): Promise<CenterStaff> => {
+
+  return customFetch<CenterStaff>(getCreateCenterStaffUrl(centerId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createCenterStaffInput,)
+  }
+);}
+
+
+
+
+export const getCreateCenterStaffMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCenterStaff>>, TError,{centerId: string;data: BodyType<CreateCenterStaffInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCenterStaff>>, TError,{centerId: string;data: BodyType<CreateCenterStaffInput>}, TContext> => {
+
+const mutationKey = ['createCenterStaff'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCenterStaff>>, {centerId: string;data: BodyType<CreateCenterStaffInput>}> = (props) => {
+          const {centerId,data} = props ?? {};
+
+          return  createCenterStaff(centerId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCenterStaffMutationResult = NonNullable<Awaited<ReturnType<typeof createCenterStaff>>>
+    export type CreateCenterStaffMutationBody = BodyType<CreateCenterStaffInput>
+    export type CreateCenterStaffMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Add a new staff member to a service center
+ */
+export const useCreateCenterStaff = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCenterStaff>>, TError,{centerId: string;data: BodyType<CreateCenterStaffInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCenterStaff>>,
+        TError,
+        {centerId: string;data: BodyType<CreateCenterStaffInput>},
+        TContext
+      > => {
+      return useMutation(getCreateCenterStaffMutationOptions(options));
+    }
+
+export const getUpdateCenterStaffUrl = (centerId: string,
+    staffId: string,) => {
+
+
+
+
+  return `/api/service-centers/${centerId}/staff/${staffId}`
+}
+
+export const updateCenterStaff = async (centerId: string,
+    staffId: string,
+    updateCenterStaffInput: UpdateCenterStaffInput, options?: RequestInit): Promise<CenterStaff> => {
+
+  return customFetch<CenterStaff>(getUpdateCenterStaffUrl(centerId,staffId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateCenterStaffInput,)
+  }
+);}
+
+
+
+
+export const getUpdateCenterStaffMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCenterStaff>>, TError,{centerId: string;staffId: string;data: BodyType<UpdateCenterStaffInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCenterStaff>>, TError,{centerId: string;staffId: string;data: BodyType<UpdateCenterStaffInput>}, TContext> => {
+
+const mutationKey = ['updateCenterStaff'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCenterStaff>>, {centerId: string;staffId: string;data: BodyType<UpdateCenterStaffInput>}> = (props) => {
+          const {centerId,staffId,data} = props ?? {};
+
+          return  updateCenterStaff(centerId,staffId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCenterStaffMutationResult = NonNullable<Awaited<ReturnType<typeof updateCenterStaff>>>
+    export type UpdateCenterStaffMutationBody = BodyType<UpdateCenterStaffInput>
+    export type UpdateCenterStaffMutationError = ErrorType<unknown>
+
+    export const useUpdateCenterStaff = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCenterStaff>>, TError,{centerId: string;staffId: string;data: BodyType<UpdateCenterStaffInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateCenterStaff>>,
+        TError,
+        {centerId: string;staffId: string;data: BodyType<UpdateCenterStaffInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateCenterStaffMutationOptions(options));
+    }
+
+export const getDeleteCenterStaffUrl = (centerId: string,
+    staffId: string,) => {
+
+
+
+
+  return `/api/service-centers/${centerId}/staff/${staffId}`
+}
+
+export const deleteCenterStaff = async (centerId: string,
+    staffId: string, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteCenterStaffUrl(centerId,staffId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteCenterStaffMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCenterStaff>>, TError,{centerId: string;staffId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteCenterStaff>>, TError,{centerId: string;staffId: string}, TContext> => {
+
+const mutationKey = ['deleteCenterStaff'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCenterStaff>>, {centerId: string;staffId: string}> = (props) => {
+          const {centerId,staffId} = props ?? {};
+
+          return  deleteCenterStaff(centerId,staffId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteCenterStaffMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCenterStaff>>>
+
+    export type DeleteCenterStaffMutationError = ErrorType<unknown>
+
+    export const useDeleteCenterStaff = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCenterStaff>>, TError,{centerId: string;staffId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteCenterStaff>>,
+        TError,
+        {centerId: string;staffId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteCenterStaffMutationOptions(options));
     }
 
 export const getListPartsUrl = (params?: ListPartsParams,) => {

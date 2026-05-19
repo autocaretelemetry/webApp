@@ -734,6 +734,66 @@ paths:
       responses:
         "204": { description: Deleted }
 
+  /service-centers/{centerId}/staff:
+    get:
+      operationId: listCenterStaff
+      tags: [centerStaff]
+      summary: List a service center's staff members (includes inactive)
+      parameters:
+        - { name: centerId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CenterStaff" }
+    post:
+      operationId: createCenterStaff
+      tags: [centerStaff]
+      summary: Add a new staff member to a service center
+      parameters:
+        - { name: centerId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateCenterStaffInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CenterStaff" }
+
+  /service-centers/{centerId}/staff/{staffId}:
+    patch:
+      operationId: updateCenterStaff
+      tags: [centerStaff]
+      parameters:
+        - { name: centerId, in: path, required: true, schema: { type: string } }
+        - { name: staffId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateCenterStaffInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CenterStaff" }
+    delete:
+      operationId: deleteCenterStaff
+      tags: [centerStaff]
+      parameters:
+        - { name: centerId, in: path, required: true, schema: { type: string } }
+        - { name: staffId, in: path, required: true, schema: { type: string } }
+      responses:
+        "204": { description: Deleted }
+
   /parts:
     get:
       operationId: listParts
@@ -2555,6 +2615,49 @@ components:
           items: { type: string }
 
     UpdateVendorStaffInput:
+      type: object
+      properties:
+        name: { type: string }
+        email: { type: string, format: email }
+        phone: { type: string, nullable: true }
+        role: { type: string, enum: [manager, staff] }
+        permissions:
+          type: array
+          items: { type: string }
+        active: { type: boolean }
+
+    CenterStaff:
+      type: object
+      required: [id, centerId, name, email, role, permissions, active, createdAt]
+      properties:
+        id: { type: string }
+        centerId: { type: string }
+        userId: { type: string, nullable: true }
+        name: { type: string }
+        email: { type: string }
+        phone: { type: string, nullable: true }
+        avatarUrl: { type: string, nullable: true }
+        role: { type: string, enum: [manager, staff] }
+        permissions:
+          type: array
+          items: { type: string }
+        active: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    CreateCenterStaffInput:
+      type: object
+      required: [name, email, password]
+      properties:
+        name: { type: string, minLength: 1 }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        phone: { type: string, nullable: true }
+        role: { type: string, enum: [manager, staff] }
+        permissions:
+          type: array
+          items: { type: string }
+
+    UpdateCenterStaffInput:
       type: object
       properties:
         name: { type: string }

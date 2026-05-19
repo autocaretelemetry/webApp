@@ -876,6 +876,64 @@ export interface UpdateVendorStaffInput {
   active?: boolean;
 }
 
+export type CenterStaffRole = typeof CenterStaffRole[keyof typeof CenterStaffRole];
+
+
+export const CenterStaffRole = {
+  manager: 'manager',
+  staff: 'staff',
+} as const;
+
+export interface CenterStaff {
+  id: string;
+  centerId: string;
+  userId?: string | null;
+  name: string;
+  email: string;
+  phone?: string | null;
+  avatarUrl?: string | null;
+  role: CenterStaffRole;
+  permissions: string[];
+  active: boolean;
+  createdAt: string;
+}
+
+export type CreateCenterStaffInputRole = typeof CreateCenterStaffInputRole[keyof typeof CreateCenterStaffInputRole];
+
+
+export const CreateCenterStaffInputRole = {
+  manager: 'manager',
+  staff: 'staff',
+} as const;
+
+export interface CreateCenterStaffInput {
+  /** @minLength 1 */
+  name: string;
+  email: string;
+  /** @minLength 8 */
+  password: string;
+  phone?: string | null;
+  role?: CreateCenterStaffInputRole;
+  permissions?: string[];
+}
+
+export type UpdateCenterStaffInputRole = typeof UpdateCenterStaffInputRole[keyof typeof UpdateCenterStaffInputRole];
+
+
+export const UpdateCenterStaffInputRole = {
+  manager: 'manager',
+  staff: 'staff',
+} as const;
+
+export interface UpdateCenterStaffInput {
+  name?: string;
+  email?: string;
+  phone?: string | null;
+  role?: UpdateCenterStaffInputRole;
+  permissions?: string[];
+  active?: boolean;
+}
+
 export type SubscriptionPlanAudience = typeof SubscriptionPlanAudience[keyof typeof SubscriptionPlanAudience];
 
 
