@@ -1,7 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { useListVendors, useCreatePart } from "@workspace/api-client-react";
+import {
+  useListVendors,
+  useCreatePart,
+  useListPartCategories,
+} from "@workspace/api-client-react";
 import {
   getListPartsForVendorQueryKey,
   getListPartsQueryKey,
@@ -13,10 +17,26 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ImageUploader } from "@/components/ImageUploader";
+import { ArrowLeft, Loader2, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
-const CATEGORY_SUGGESTIONS = ["Brakes", "Engine", "Suspension", "Body", "Electrical", "Fluids", "Filters", "Performance", "Tires", "Interior"];
+const CATEGORY_SUGGESTIONS = [
+  "Brakes",
+  "Engine",
+  "Suspension",
+  "Body",
+  "Electrical",
+  "Fluids",
+  "Filters",
+  "Performance",
+  "Tires",
+  "Interior",
+];
+
+// Sentinel value used by the category <select> to switch into "type your own"
+// mode. We intentionally pick a value that cannot collide with a real category.
+const ADD_NEW_CATEGORY = "__add_new__";
 
 export default function NewPart() {
   const [, navigate] = useLocation();
@@ -24,10 +44,23 @@ export default function NewPart() {
   const vendor = vendors?.[0];
   const createPart = useCreatePart();
   const queryClient = useQueryClient();
+  const { data: categoryRows } = useListPartCategories();
+
+  // Merge categories already on the marketplace with the curated suggestions
+  // so first-time vendors still see useful options.
+  const categories = useMemo(() => {
+    const known = new Set<string>(CATEGORY_SUGGESTIONS);
+    for (const row of categoryRows ?? []) {
+      if (row.category.trim()) known.add(row.category.trim());
+    }
+    return Array.from(known).sort((a, b) => a.localeCompare(b));
+  }, [categoryRows]);
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Brakes");
+  const [addingCategory, setAddingCategory] = useState(false);
+  const [newCategory, setNewCategory] = useState("");
   const [brand, setBrand] = useState("");
   const [sku, setSku] = useState("");
   const [price, setPrice] = useState(0);
@@ -42,8 +75,17 @@ export default function NewPart() {
       toast.error("Please fill in name, description, brand, and SKU.");
       return;
     }
+    const finalCategory = addingCategory ? newCategory.trim() : category.trim();
+    if (!finalCategory) {
+      toast.error("Please choose or add a category.");
+      return;
+    }
     if (price <= 0) {
       toast.error("Price must be greater than zero.");
+      return;
+    }
+    if (!imageUrl) {
+      toast.error("Please upload a photo of the part.");
       return;
     }
     try {
@@ -52,12 +94,12 @@ export default function NewPart() {
         data: {
           name: name.trim(),
           description: description.trim(),
-          category: category.trim(),
+          category: finalCategory,
           brand: brand.trim(),
           sku: sku.trim(),
           price,
           stock,
-          imageUrl: imageUrl.trim() || null,
+          imageUrl,
           compatibleBrands: compat
             .split(",")
             .map((s) => s.trim())
@@ -96,16 +138,58 @@ export default function NewPart() {
           <div className="grid sm:grid-cols-3 gap-4">
             <div>
               <Label htmlFor="cat">Category</Label>
-              <select
-                id="cat"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="mt-1.5 w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
-              >
-                {CATEGORY_SUGGESTIONS.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
+              {addingCategory ? (
+                <div className="mt-1.5 flex gap-1.5">
+                  <Input
+                    id="cat-new"
+                    autoFocus
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value)}
+                    placeholder="e.g. Exhaust"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="flex-shrink-0"
+                    onClick={() => {
+                      setAddingCategory(false);
+                      setNewCategory("");
+                    }}
+                    aria-label="Cancel new category"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <select
+                  id="cat"
+                  value={category}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === ADD_NEW_CATEGORY) {
+                      setAddingCategory(true);
+                    } else {
+                      setCategory(v);
+                    }
+                  }}
+                  className="mt-1.5 w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  {categories.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                  <option value={ADD_NEW_CATEGORY}>+ Add new category…</option>
+                </select>
+              )}
+              {!addingCategory && (
+                <button
+                  type="button"
+                  onClick={() => setAddingCategory(true)}
+                  className="mt-1.5 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                >
+                  <Plus className="h-3 w-3" /> Add custom category
+                </button>
+              )}
             </div>
             <div>
               <Label htmlFor="brand">Brand</Label>
@@ -127,8 +211,19 @@ export default function NewPart() {
             </div>
           </div>
           <div>
-            <Label htmlFor="img">Image URL (optional)</Label>
-            <Input id="img" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} className="mt-1.5" placeholder="https://..." />
+            <Label>
+              Part photo <span className="text-destructive">*</span>
+            </Label>
+            <div className="mt-1.5">
+              <ImageUploader
+                value={imageUrl}
+                onChange={setImageUrl}
+                label="Upload a photo of the part"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1.5">
+              A clear product shot helps buyers pick the right part.
+            </p>
           </div>
           <div>
             <Label htmlFor="compat">Compatible vehicle brands (comma-separated)</Label>

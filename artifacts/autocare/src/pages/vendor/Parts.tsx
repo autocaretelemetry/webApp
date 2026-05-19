@@ -18,7 +18,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, resolveImageUrl } from "@/lib/format";
 import { toast } from "sonner";
 import { Plus, Package, Save } from "lucide-react";
 
@@ -135,7 +135,7 @@ export default function VendorParts() {
               <CardContent className="p-4 flex items-start gap-4 flex-wrap">
                 <div className="w-20 h-20 rounded-md bg-muted overflow-hidden flex-shrink-0 flex items-center justify-center">
                   {p.imageUrl ? (
-                    <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
+                    <img src={resolveImageUrl(p.imageUrl)} alt={p.name} className="w-full h-full object-cover" />
                   ) : (
                     <Package className="h-6 w-6 text-muted-foreground/40" />
                   )}

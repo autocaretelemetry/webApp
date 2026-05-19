@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Package, ShoppingCart, Plus, Minus, Store, Truck, ShieldCheck, ArrowLeft } from "lucide-react";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, resolveImageUrl } from "@/lib/format";
 import { addToCart } from "@/lib/cart";
 import { toast } from "sonner";
 
@@ -39,7 +39,7 @@ export default function PartDetail() {
       <div className="grid gap-8 md:grid-cols-2">
         <div className="aspect-square rounded-lg bg-muted overflow-hidden border">
           {part.imageUrl ? (
-            <img src={part.imageUrl} alt={part.name} className="w-full h-full object-cover" />
+            <img src={resolveImageUrl(part.imageUrl)} alt={part.name} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <Package className="h-24 w-24 text-muted-foreground/40" />

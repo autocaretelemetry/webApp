@@ -3,7 +3,7 @@ import type { Part } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Package, Store } from "lucide-react";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, resolveImageUrl } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export function PartCard({ part }: { part: Part }) {
@@ -15,7 +15,7 @@ export function PartCard({ part }: { part: Part }) {
         <div className="aspect-[4/3] bg-muted relative">
           {part.imageUrl ? (
             <img
-              src={part.imageUrl}
+              src={resolveImageUrl(part.imageUrl)}
               alt={part.name}
               className="w-full h-full object-cover"
             />
