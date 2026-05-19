@@ -173,13 +173,29 @@ const SUPER_ADMIN_NAV: NavSection[] = [
   },
 ];
 
-function navFor(role: Role): NavSection[] {
-  if (role === "owner") return OWNER_NAV;
-  if (role === "center") return CENTER_NAV;
-  if (role === "vendor") return VENDOR_NAV;
-  if (role === "admin") return ADMIN_NAV;
-  if (role === "super_admin") return SUPER_ADMIN_NAV;
-  return DELIVERY_NAV;
+function navFor(role: Role, isSuperAdmin: boolean): NavSection[] {
+  const base = (() => {
+    if (role === "owner") return OWNER_NAV;
+    if (role === "center") return CENTER_NAV;
+    if (role === "vendor") return VENDOR_NAV;
+    if (role === "admin") return ADMIN_NAV;
+    if (role === "super_admin") return SUPER_ADMIN_NAV;
+    return DELIVERY_NAV;
+  })();
+  // The Landing Page editor is a super-admin tool that should be reachable
+  // no matter which role the super admin is currently impersonating.
+  if (isSuperAdmin && role !== "super_admin") {
+    return [
+      ...base,
+      {
+        label: "Site",
+        items: [
+          { href: "/super-admin/landing", label: "Landing Page", icon: Paintbrush },
+        ],
+      },
+    ];
+  }
+  return base;
 }
 
 function CartButton({ collapsed = false }: { collapsed?: boolean }) {
@@ -331,7 +347,7 @@ function SidebarBody({
   location: string;
   onNavigate?: () => void;
 }) {
-  const sections = navFor(role);
+  const sections = navFor(role, user?.role === "super_admin");
   const showCart = role === "owner" || role === "center";
   const showBell = role === "owner";
 
