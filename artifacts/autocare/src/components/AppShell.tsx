@@ -212,11 +212,10 @@ function RoleTabs({
     { value: "vendor", label: "Vendor" },
     { value: "delivery", label: "Delivery" },
     { value: "admin", label: "Admin" },
-    { value: "super_admin", label: "Root" },
   ];
   return (
     <Tabs value={role} onValueChange={(v) => setRole(v as Role)} className={className}>
-      <TabsList className="grid w-full grid-cols-6">
+      <TabsList className="grid w-full grid-cols-5">
         {tabs.map((t) => (
           <TabsTrigger key={t.value} value={t.value} className={triggerClassName}>
             {t.value === "admin" ? (

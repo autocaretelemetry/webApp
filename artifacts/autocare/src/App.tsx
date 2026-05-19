@@ -85,7 +85,7 @@ function HomeRoute() {
   if (role === "owner") return <OwnerDashboard />;
   if (role === "center") return <CenterDashboard />;
   if (role === "vendor") return <VendorDashboard />;
-  if (role === "admin") return <AdminDashboard />;
+  if (role === "admin" || role === "super_admin") return <AdminDashboard />;
   return <DeliveryDashboard />;
 }
 

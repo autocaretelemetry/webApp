@@ -29,13 +29,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const queryClient = useQueryClient();
 
+  function effectiveRoleFor(me: AuthedUser): Role {
+    // Super admin doesn't have a dashboard of its own — it operates as an
+    // admin by default and can impersonate any other role via the switcher.
+    // Preserve a previously chosen impersonation if it's a valid base role.
+    if (me.role === "super_admin") {
+      const stored = getRole();
+      if (stored !== "super_admin") return stored;
+      return "admin";
+    }
+    return me.role as Role;
+  }
+
   async function refresh() {
     try {
       const me = await getCurrentUser();
       setUser(me);
-      // Sync the active "view" role with the authed identity. Super admins
-      // start as themselves but can impersonate other roles via the switcher.
-      setRole(me.role as Role);
+      setRole(effectiveRoleFor(me));
     } catch {
       setUser(null);
     } finally {
@@ -68,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function login(email: string, password: string) {
     const me = await loginApi({ email, password });
     setUser(me);
-    setRole(me.role as Role);
+    setRole(effectiveRoleFor(me));
     await queryClient.invalidateQueries();
     return me;
   }
