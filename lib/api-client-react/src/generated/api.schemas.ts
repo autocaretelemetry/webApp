@@ -33,8 +33,23 @@ export interface AuthedUser {
   name: string;
   role: AuthedUserRole;
   phone?: string | null;
+  avatarUrl?: string | null;
   active: boolean;
   createdAt: string;
+}
+
+export interface UpdateProfileInput {
+  /** @minLength 1 */
+  name?: string;
+  phone?: string | null;
+  avatarUrl?: string | null;
+}
+
+export interface ChangePasswordInput {
+  /** @minLength 1 */
+  currentPassword: string;
+  /** @minLength 8 */
+  newPassword: string;
 }
 
 export interface HealthStatus {
@@ -759,11 +774,13 @@ export const PlatformStaffRole = {
 
 export interface PlatformStaff {
   id: string;
+  userId?: string | null;
   name: string;
   email: string;
   role: PlatformStaffRole;
   permissions: string[];
   active: boolean;
+  avatarUrl?: string | null;
   createdAt: string;
 }
 
@@ -779,6 +796,8 @@ export interface CreatePlatformStaffInput {
   /** @minLength 1 */
   name: string;
   email: string;
+  /** @minLength 8 */
+  password: string;
   role?: CreatePlatformStaffInputRole;
   permissions?: string[];
 }
@@ -810,9 +829,11 @@ export const VendorStaffRole = {
 export interface VendorStaff {
   id: string;
   vendorId: string;
+  userId?: string | null;
   name: string;
   email: string;
   phone?: string | null;
+  avatarUrl?: string | null;
   role: VendorStaffRole;
   permissions: string[];
   active: boolean;
@@ -831,6 +852,8 @@ export interface CreateVendorStaffInput {
   /** @minLength 1 */
   name: string;
   email: string;
+  /** @minLength 8 */
+  password: string;
   phone?: string | null;
   role?: CreateVendorStaffInputRole;
   permissions?: string[];

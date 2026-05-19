@@ -33,6 +33,7 @@ import NewPart from "@/pages/vendor/NewPart";
 import VendorOrders from "@/pages/vendor/Orders";
 import VendorDeliveryTeam from "@/pages/vendor/DeliveryTeam";
 import VendorStaff from "@/pages/vendor/Staff";
+import ProfilePage from "@/pages/shared/Profile";
 
 // Delivery Pages
 import DeliveryDashboard from "@/pages/delivery/Dashboard";
@@ -193,6 +194,7 @@ function AppRouter() {
         <Route path="/bookings/:id" component={BookingDetail} />
         <Route path="/invoices/:id" component={InvoiceDetail} />
         <Route path="/settings" component={Settings} />
+        <Route path="/profile" component={ProfilePage} />
 
             <Route component={NotFound} />
           </Switch>

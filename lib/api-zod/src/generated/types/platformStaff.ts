@@ -9,10 +9,12 @@ import type { PlatformStaffRole } from './platformStaffRole';
 
 export interface PlatformStaff {
   id: string;
+  userId?: string | null;
   name: string;
   email: string;
   role: PlatformStaffRole;
   permissions: string[];
   active: boolean;
+  avatarUrl?: string | null;
   createdAt: Date;
 }

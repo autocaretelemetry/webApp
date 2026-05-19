@@ -1668,6 +1668,46 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+    patch:
+      operationId: updateMyProfile
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateProfileInput" }
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthedUser" }
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /auth/change-password:
+    post:
+      operationId: changePassword
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChangePasswordInput" }
+      responses:
+        "204": { description: Password changed }
+        "400":
+          description: Invalid input or current password incorrect
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 
 components:
   schemas:
@@ -1695,8 +1735,23 @@ components:
           type: string
           enum: [owner, center, vendor, delivery, admin, super_admin]
         phone: { type: string, nullable: true }
+        avatarUrl: { type: string, nullable: true }
         active: { type: boolean }
         createdAt: { type: string, format: date-time }
+
+    UpdateProfileInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        phone: { type: string, nullable: true }
+        avatarUrl: { type: string, nullable: true }
+
+    ChangePasswordInput:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword: { type: string, minLength: 1 }
+        newPassword: { type: string, minLength: 8 }
 
     HealthStatus:
       type: object
@@ -2434,6 +2489,7 @@ components:
       required: [id, name, email, role, permissions, active, createdAt]
       properties:
         id: { type: string }
+        userId: { type: string, nullable: true }
         name: { type: string }
         email: { type: string }
         role: { type: string, enum: [admin, staff] }
@@ -2441,14 +2497,16 @@ components:
           type: array
           items: { type: string }
         active: { type: boolean }
+        avatarUrl: { type: string, nullable: true }
         createdAt: { type: string, format: date-time }
 
     CreatePlatformStaffInput:
       type: object
-      required: [name, email]
+      required: [name, email, password]
       properties:
         name: { type: string, minLength: 1 }
         email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
         role: { type: string, enum: [admin, staff] }
         permissions:
           type: array
@@ -2471,9 +2529,11 @@ components:
       properties:
         id: { type: string }
         vendorId: { type: string }
+        userId: { type: string, nullable: true }
         name: { type: string }
         email: { type: string }
         phone: { type: string, nullable: true }
+        avatarUrl: { type: string, nullable: true }
         role: { type: string, enum: [manager, staff] }
         permissions:
           type: array
@@ -2483,10 +2543,11 @@ components:
 
     CreateVendorStaffInput:
       type: object
-      required: [name, email]
+      required: [name, email, password]
       properties:
         name: { type: string, minLength: 1 }
         email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
         phone: { type: string, nullable: true }
         role: { type: string, enum: [manager, staff] }
         permissions:

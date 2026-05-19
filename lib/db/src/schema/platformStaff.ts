@@ -1,7 +1,9 @@
 import { pgTable, uuid, text, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { usersTable } from "./users";
 
 export const platformStaffTable = pgTable("platform_staff", {
   id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => usersTable.id, { onDelete: "set null" }),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   role: text("role").notNull().default("staff"),

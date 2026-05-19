@@ -10,9 +10,11 @@ import type { VendorStaffRole } from './vendorStaffRole';
 export interface VendorStaff {
   id: string;
   vendorId: string;
+  userId?: string | null;
   name: string;
   email: string;
   phone?: string | null;
+  avatarUrl?: string | null;
   role: VendorStaffRole;
   permissions: string[];
   active: boolean;

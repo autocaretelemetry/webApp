@@ -5,6 +5,7 @@ import { useCart } from "@/lib/cart";
 import { cn } from "@/lib/utils";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useAuth } from "@/lib/auth";
+import { resolveImageUrl } from "@/lib/format";
 import {
   Car,
   Wrench,
@@ -391,9 +392,19 @@ function SidebarBody({
           {collapsed ? (
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
-                <div className="flex items-center justify-center h-10 w-10 mx-auto rounded-full bg-primary/10 text-primary font-semibold uppercase">
-                  {user.name.charAt(0)}
-                </div>
+                <Link href="/profile">
+                  <div className="flex items-center justify-center h-10 w-10 mx-auto rounded-full bg-primary/10 text-primary font-semibold uppercase overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/40 transition">
+                    {user.avatarUrl ? (
+                      <img
+                        src={resolveImageUrl(user.avatarUrl)}
+                        alt={user.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      user.name.charAt(0)
+                    )}
+                  </div>
+                </Link>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={8}>
                 <div className="text-xs">
@@ -404,19 +415,33 @@ function SidebarBody({
             </Tooltip>
           ) : (
             <div className="rounded-lg border border-sidebar-border/60 bg-card/60 px-3 py-2.5 flex items-center gap-2.5">
-              <div className="h-9 w-9 rounded-full bg-primary/10 text-primary font-semibold uppercase flex items-center justify-center shrink-0">
-                {user.name.charAt(0)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold truncate">{user.name}</div>
-                <div className="text-[10px] text-muted-foreground uppercase tracking-wider truncate">
-                  {ROLE_LABEL[user.role as Role]}
+              <Link
+                href="/profile"
+                onClick={onNavigate}
+                className="flex items-center gap-2.5 flex-1 min-w-0 hover:opacity-80 transition"
+              >
+                <div className="h-9 w-9 rounded-full bg-primary/10 text-primary font-semibold uppercase flex items-center justify-center shrink-0 overflow-hidden">
+                  {user.avatarUrl ? (
+                    <img
+                      src={resolveImageUrl(user.avatarUrl)}
+                      alt={user.name}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    user.name.charAt(0)
+                  )}
                 </div>
-              </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold truncate">{user.name}</div>
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wider truncate">
+                    {ROLE_LABEL[user.role as Role]}
+                  </div>
+                </div>
+              </Link>
               <button
                 aria-label="Sign out"
                 onClick={() => void logout()}
-                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-muted text-muted-foreground transition-colors"
+                className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-muted text-muted-foreground transition-colors shrink-0"
               >
                 <LogOut className="h-3.5 w-3.5" />
               </button>
@@ -474,7 +499,13 @@ function SidebarBody({
       </nav>
 
       {/* Footer */}
-      <div className={cn("border-t border-sidebar-border/60 p-3", collapsed && "px-2")}>
+      <div className={cn("border-t border-sidebar-border/60 p-3 space-y-0.5", collapsed && "px-2")}>
+        <SidebarItem
+          item={{ href: "/profile", label: "My Profile", icon: UserCircle2 }}
+          active={location === "/profile"}
+          collapsed={collapsed}
+          onNavigate={onNavigate}
+        />
         <SidebarItem
           item={{ href: "/settings", label: "Settings", icon: Settings }}
           active={location === "/settings"}

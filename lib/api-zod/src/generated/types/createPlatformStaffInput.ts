@@ -11,6 +11,8 @@ export interface CreatePlatformStaffInput {
   /** @minLength 1 */
   name: string;
   email: string;
+  /** @minLength 8 */
+  password: string;
   role?: CreatePlatformStaffInputRole;
   permissions?: string[];
 }

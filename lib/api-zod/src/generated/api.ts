@@ -1246,9 +1246,11 @@ export const ListVendorStaffParams = zod.object({
 export const ListVendorStaffResponseItem = zod.object({
   "id": zod.string(),
   "vendorId": zod.string(),
+  "userId": zod.string().nullish(),
   "name": zod.string(),
   "email": zod.string(),
   "phone": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
   "role": zod.enum(['manager', 'staff']),
   "permissions": zod.array(zod.string()),
   "active": zod.boolean(),
@@ -1265,11 +1267,14 @@ export const CreateVendorStaffParams = zod.object({
 })
 
 
+export const createVendorStaffBodyPasswordMin = 8;
+
 
 
 export const CreateVendorStaffBody = zod.object({
   "name": zod.string().min(1),
   "email": zod.string().email(),
+  "password": zod.string().min(createVendorStaffBodyPasswordMin),
   "phone": zod.string().nullish(),
   "role": zod.enum(['manager', 'staff']).optional(),
   "permissions": zod.array(zod.string()).optional()
@@ -1293,9 +1298,11 @@ export const UpdateVendorStaffBody = zod.object({
 export const UpdateVendorStaffResponse = zod.object({
   "id": zod.string(),
   "vendorId": zod.string(),
+  "userId": zod.string().nullish(),
   "name": zod.string(),
   "email": zod.string(),
   "phone": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
   "role": zod.enum(['manager', 'staff']),
   "permissions": zod.array(zod.string()),
   "active": zod.boolean(),
@@ -2120,11 +2127,13 @@ export const ListPlatformStaffQueryParams = zod.object({
 
 export const ListPlatformStaffResponseItem = zod.object({
   "id": zod.string(),
+  "userId": zod.string().nullish(),
   "name": zod.string(),
   "email": zod.string(),
   "role": zod.enum(['admin', 'staff']),
   "permissions": zod.array(zod.string()),
   "active": zod.boolean(),
+  "avatarUrl": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 })
 export const ListPlatformStaffResponse = zod.array(ListPlatformStaffResponseItem)
@@ -2134,11 +2143,14 @@ export const ListPlatformStaffResponse = zod.array(ListPlatformStaffResponseItem
  * @summary Add a new platform staff member
  */
 
+export const createPlatformStaffBodyPasswordMin = 8;
+
 
 
 export const CreatePlatformStaffBody = zod.object({
   "name": zod.string().min(1),
   "email": zod.string().email(),
+  "password": zod.string().min(createPlatformStaffBodyPasswordMin),
   "role": zod.enum(['admin', 'staff']).optional(),
   "permissions": zod.array(zod.string()).optional()
 })
@@ -2158,11 +2170,13 @@ export const UpdatePlatformStaffBody = zod.object({
 
 export const UpdatePlatformStaffResponse = zod.object({
   "id": zod.string(),
+  "userId": zod.string().nullish(),
   "name": zod.string(),
   "email": zod.string(),
   "role": zod.enum(['admin', 'staff']),
   "permissions": zod.array(zod.string()),
   "active": zod.boolean(),
+  "avatarUrl": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 })
 
@@ -3075,6 +3089,7 @@ export const LoginResponse = zod.object({
   "name": zod.string(),
   "role": zod.enum(['owner', 'center', 'vendor', 'delivery', 'admin', 'super_admin']),
   "phone": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
   "active": zod.boolean(),
   "createdAt": zod.coerce.date()
 })
@@ -3086,8 +3101,41 @@ export const GetCurrentUserResponse = zod.object({
   "name": zod.string(),
   "role": zod.enum(['owner', 'center', 'vendor', 'delivery', 'admin', 'super_admin']),
   "phone": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
   "active": zod.boolean(),
   "createdAt": zod.coerce.date()
+})
+
+
+
+
+
+export const UpdateMyProfileBody = zod.object({
+  "name": zod.string().min(1).optional(),
+  "phone": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish()
+})
+
+export const UpdateMyProfileResponse = zod.object({
+  "id": zod.string(),
+  "email": zod.string(),
+  "name": zod.string(),
+  "role": zod.enum(['owner', 'center', 'vendor', 'delivery', 'admin', 'super_admin']),
+  "phone": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+
+
+
+export const changePasswordBodyNewPasswordMin = 8;
+
+
+
+export const ChangePasswordBody = zod.object({
+  "currentPassword": zod.string().min(1),
+  "newPassword": zod.string().min(changePasswordBodyNewPasswordMin)
 })
 
 

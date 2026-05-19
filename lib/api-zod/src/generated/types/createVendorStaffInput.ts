@@ -11,6 +11,8 @@ export interface CreateVendorStaffInput {
   /** @minLength 1 */
   name: string;
   email: string;
+  /** @minLength 8 */
+  password: string;
   phone?: string | null;
   role?: CreateVendorStaffInputRole;
   permissions?: string[];

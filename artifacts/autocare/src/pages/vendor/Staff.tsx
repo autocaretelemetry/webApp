@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { UserCog, Plus, Mail, Phone, ShieldCheck, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { resolveImageUrl } from "@/lib/format";
 
 // Vendor-scoped permissions. Each one maps to a specific section of the
 // vendor workspace; the server stores them as a string[] on vendor_staff.
@@ -59,16 +60,18 @@ type Draft = {
   name: string;
   email: string;
   phone: string;
+  password: string;
   role: Role;
   permissions: string[];
 };
 
-type EditState = Draft & { id: string };
+type EditState = Omit<Draft, "password"> & { id: string };
 
 const emptyDraft = (): Draft => ({
   name: "",
   email: "",
   phone: "",
+  password: "",
   role: "staff",
   permissions: [],
 });
@@ -114,6 +117,10 @@ export default function VendorStaff() {
       toast.error("Name and email are required.");
       return;
     }
+    if (draft.password.length < 8) {
+      toast.error("Initial password must be at least 8 characters.");
+      return;
+    }
     if (draft.role === "staff" && draft.permissions.length === 0) {
       toast.error("Pick at least one permission, or set role to Manager for full access.");
       return;
@@ -124,6 +131,7 @@ export default function VendorStaff() {
         data: {
           name: draft.name.trim(),
           email: draft.email.trim(),
+          password: draft.password,
           phone: draft.phone.trim() || null,
           role: draft.role,
           permissions: permsFor(draft.role, draft.permissions),
@@ -229,13 +237,19 @@ export default function VendorStaff() {
             <Card key={s.id} className={s.active ? "" : "opacity-60"}>
               <CardContent className="p-4 flex items-center gap-4">
                 <div
-                  className={`h-11 w-11 rounded-md flex items-center justify-center flex-shrink-0 ${
+                  className={`h-11 w-11 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 ${
                     isManager
                       ? "bg-primary/10 text-primary"
                       : "bg-secondary/30 text-secondary-foreground"
                   }`}
                 >
-                  {isManager ? (
+                  {s.avatarUrl ? (
+                    <img
+                      src={resolveImageUrl(s.avatarUrl)}
+                      alt={s.name}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : isManager ? (
                     <ShieldCheck className="h-5 w-5" />
                   ) : (
                     <UserCog className="h-5 w-5" />
@@ -365,7 +379,7 @@ export default function VendorStaff() {
               Managers automatically get every permission. Staff get exactly what you tick.
             </DialogDescription>
           </DialogHeader>
-          <StaffForm draft={draft} setDraft={setDraft} />
+          <StaffForm draft={draft} setDraft={setDraft} showPassword />
           <DialogFooter>
             <Button variant="ghost" onClick={() => setOpenNew(false)}>
               Cancel
@@ -407,12 +421,14 @@ export default function VendorStaff() {
   );
 }
 
-function StaffForm<T extends Draft>({
+function StaffForm<T extends Omit<Draft, "password"> & { password?: string }>({
   draft,
   setDraft,
+  showPassword,
 }: {
   draft: T;
   setDraft: (updater: T | ((prev: T) => T)) => void;
+  showPassword?: boolean;
 }) {
   const patch = (p: Partial<T>) =>
     setDraft((prev) => ({ ...prev, ...p }) as T);
@@ -447,6 +463,21 @@ function StaffForm<T extends Draft>({
           />
         </div>
       </div>
+      {showPassword && (
+        <div className="space-y-1.5">
+          <Label htmlFor="vs-password">Initial password</Label>
+          <Input
+            id="vs-password"
+            type="password"
+            autoComplete="new-password"
+            value={draft.password ?? ""}
+            onChange={(e) => patch({ password: e.target.value } as Partial<T>)}
+          />
+          <p className="text-[11px] text-muted-foreground">
+            Share this with the staff member. They can change it from their profile after they sign in.
+          </p>
+        </div>
+      )}
       <div className="space-y-1.5">
         <Label>Role</Label>
         <Select

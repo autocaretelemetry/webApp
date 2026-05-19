@@ -32,6 +32,7 @@ import {
 import { AdminEntityActions } from "@/components/admin/AdminEntityActions";
 import { UserCog, Plus, Mail, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
+import { resolveImageUrl } from "@/lib/format";
 
 const ALL_PERMS: { key: string; label: string }[] = [
   { key: "manage_centers", label: "Service Centers" },
@@ -67,9 +68,10 @@ export default function AdminStaff() {
   const [draft, setDraft] = useState<{
     name: string;
     email: string;
+    password: string;
     role: "admin" | "staff";
     permissions: string[];
-  }>({ name: "", email: "", role: "staff", permissions: [] });
+  }>({ name: "", email: "", password: "", role: "staff", permissions: [] });
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: getListPlatformStaffQueryKey() });
@@ -79,11 +81,16 @@ export default function AdminStaff() {
       toast.error("Name and email are required.");
       return;
     }
+    if (draft.password.length < 8) {
+      toast.error("Initial password must be at least 8 characters.");
+      return;
+    }
     try {
       await create.mutateAsync({
         data: {
           name: draft.name.trim(),
           email: draft.email.trim(),
+          password: draft.password,
           role: draft.role,
           permissions: draft.role === "admin" ? ALL_PERMS.map((p) => p.key) : draft.permissions,
         },
@@ -91,7 +98,7 @@ export default function AdminStaff() {
       await invalidate();
       toast.success(`${draft.name} added.`);
       setOpenNew(false);
-      setDraft({ name: "", email: "", role: "staff", permissions: [] });
+      setDraft({ name: "", email: "", password: "", role: "staff", permissions: [] });
     } catch (err) {
       toast.error(describeMutationError(err, "Failed to add staff."));
     }
@@ -163,13 +170,19 @@ export default function AdminStaff() {
             <Card key={s.id} className={s.active ? "" : "opacity-60"}>
               <CardContent className="p-4 flex items-center gap-4">
                 <div
-                  className={`h-11 w-11 rounded-md flex items-center justify-center flex-shrink-0 ${
+                  className={`h-11 w-11 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 ${
                     isAdmin
                       ? "bg-primary/10 text-primary"
                       : "bg-secondary/30 text-secondary-foreground"
                   }`}
                 >
-                  {isAdmin ? (
+                  {s.avatarUrl ? (
+                    <img
+                      src={resolveImageUrl(s.avatarUrl)}
+                      alt={s.name}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : isAdmin ? (
                     <ShieldCheck className="h-5 w-5" />
                   ) : (
                     <UserCog className="h-5 w-5" />
@@ -273,6 +286,19 @@ export default function AdminStaff() {
                 value={draft.email}
                 onChange={(e) => setDraft({ ...draft, email: e.target.value })}
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="staff-password">Initial password</Label>
+              <Input
+                id="staff-password"
+                type="password"
+                autoComplete="new-password"
+                value={draft.password}
+                onChange={(e) => setDraft({ ...draft, password: e.target.value })}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                At least 8 characters. Share with the staff member; they can change it from their profile.
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label>Role</Label>

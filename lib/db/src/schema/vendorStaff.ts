@@ -1,5 +1,6 @@
 import { pgTable, uuid, text, boolean, timestamp, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
 import { vendorsTable } from "./vendors";
+import { usersTable } from "./users";
 
 export const vendorStaffTable = pgTable(
   "vendor_staff",
@@ -8,6 +9,7 @@ export const vendorStaffTable = pgTable(
     vendorId: uuid("vendor_id")
       .notNull()
       .references(() => vendorsTable.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => usersTable.id, { onDelete: "set null" }),
     name: text("name").notNull(),
     email: text("email").notNull(),
     phone: text("phone"),
