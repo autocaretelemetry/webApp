@@ -1237,6 +1237,79 @@ export const CreatePartBody = zod.object({
 
 
 /**
+ * @summary List a vendor's staff members (includes inactive)
+ */
+export const ListVendorStaffParams = zod.object({
+  "vendorId": zod.coerce.string()
+})
+
+export const ListVendorStaffResponseItem = zod.object({
+  "id": zod.string(),
+  "vendorId": zod.string(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string().nullish(),
+  "role": zod.enum(['manager', 'staff']),
+  "permissions": zod.array(zod.string()),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+export const ListVendorStaffResponse = zod.array(ListVendorStaffResponseItem)
+
+
+/**
+ * @summary Add a new staff member to a vendor
+ */
+export const CreateVendorStaffParams = zod.object({
+  "vendorId": zod.coerce.string()
+})
+
+
+
+
+export const CreateVendorStaffBody = zod.object({
+  "name": zod.string().min(1),
+  "email": zod.string().email(),
+  "phone": zod.string().nullish(),
+  "role": zod.enum(['manager', 'staff']).optional(),
+  "permissions": zod.array(zod.string()).optional()
+})
+
+
+export const UpdateVendorStaffParams = zod.object({
+  "vendorId": zod.coerce.string(),
+  "staffId": zod.coerce.string()
+})
+
+export const UpdateVendorStaffBody = zod.object({
+  "name": zod.string().optional(),
+  "email": zod.string().email().optional(),
+  "phone": zod.string().nullish(),
+  "role": zod.enum(['manager', 'staff']).optional(),
+  "permissions": zod.array(zod.string()).optional(),
+  "active": zod.boolean().optional()
+})
+
+export const UpdateVendorStaffResponse = zod.object({
+  "id": zod.string(),
+  "vendorId": zod.string(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "phone": zod.string().nullish(),
+  "role": zod.enum(['manager', 'staff']),
+  "permissions": zod.array(zod.string()),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+
+
+export const DeleteVendorStaffParams = zod.object({
+  "vendorId": zod.coerce.string(),
+  "staffId": zod.coerce.string()
+})
+
+
+/**
  * @summary Browse the marketplace catalog
  */
 export const ListPartsQueryParams = zod.object({

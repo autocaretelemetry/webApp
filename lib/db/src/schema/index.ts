@@ -8,6 +8,7 @@ export * from "./parts";
 export * from "./orders";
 export * from "./deliveryAgents";
 export * from "./platformStaff";
+export * from "./vendorStaff";
 export * from "./subscriptionPlans";
 export * from "./subscriptions";
 export * from "./rentalCars";

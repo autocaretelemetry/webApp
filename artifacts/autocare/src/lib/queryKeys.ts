@@ -29,6 +29,7 @@ export {
   getListMechanicsQueryKey,
   getGetAdminOverviewQueryKey,
   getListPlatformStaffQueryKey,
+  getListVendorStaffQueryKey,
   getListSubscriptionPlansQueryKey,
   getListSubscriptionsQueryKey,
   getGetRevenueOverviewQueryKey,

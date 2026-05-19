@@ -42,6 +42,7 @@ import type {
   CreateSubscriptionInput,
   CreateSubscriptionPlanInput,
   CreateVehicleInput,
+  CreateVendorStaffInput,
   DeleteConflict,
   DeletePushSubscriptionInput,
   DeliveryAgent,
@@ -109,12 +110,14 @@ import type {
   UpdateSubscriptionInput,
   UpdateSubscriptionPlanInput,
   UpdateVehicleInput,
+  UpdateVendorStaffInput,
   UploadUrlRequest,
   UploadUrlResponse,
   UpsertRenterProfileInput,
   Vehicle,
   Vendor,
-  VendorDashboard
+  VendorDashboard,
+  VendorStaff
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -3160,6 +3163,289 @@ export const useCreatePart = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getCreatePartMutationOptions(options));
+    }
+
+export const getListVendorStaffUrl = (vendorId: string,) => {
+
+
+
+
+  return `/api/vendors/${vendorId}/staff`
+}
+
+/**
+ * @summary List a vendor's staff members (includes inactive)
+ */
+export const listVendorStaff = async (vendorId: string, options?: RequestInit): Promise<VendorStaff[]> => {
+
+  return customFetch<VendorStaff[]>(getListVendorStaffUrl(vendorId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListVendorStaffQueryKey = (vendorId: string,) => {
+    return [
+    `/api/vendors/${vendorId}/staff`
+    ] as const;
+    }
+
+
+export const getListVendorStaffQueryOptions = <TData = Awaited<ReturnType<typeof listVendorStaff>>, TError = ErrorType<unknown>>(vendorId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVendorStaff>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListVendorStaffQueryKey(vendorId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVendorStaff>>> = ({ signal }) => listVendorStaff(vendorId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(vendorId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listVendorStaff>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListVendorStaffQueryResult = NonNullable<Awaited<ReturnType<typeof listVendorStaff>>>
+export type ListVendorStaffQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List a vendor's staff members (includes inactive)
+ */
+
+export function useListVendorStaff<TData = Awaited<ReturnType<typeof listVendorStaff>>, TError = ErrorType<unknown>>(
+ vendorId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVendorStaff>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListVendorStaffQueryOptions(vendorId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateVendorStaffUrl = (vendorId: string,) => {
+
+
+
+
+  return `/api/vendors/${vendorId}/staff`
+}
+
+/**
+ * @summary Add a new staff member to a vendor
+ */
+export const createVendorStaff = async (vendorId: string,
+    createVendorStaffInput: CreateVendorStaffInput, options?: RequestInit): Promise<VendorStaff> => {
+
+  return customFetch<VendorStaff>(getCreateVendorStaffUrl(vendorId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createVendorStaffInput,)
+  }
+);}
+
+
+
+
+export const getCreateVendorStaffMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVendorStaff>>, TError,{vendorId: string;data: BodyType<CreateVendorStaffInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createVendorStaff>>, TError,{vendorId: string;data: BodyType<CreateVendorStaffInput>}, TContext> => {
+
+const mutationKey = ['createVendorStaff'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createVendorStaff>>, {vendorId: string;data: BodyType<CreateVendorStaffInput>}> = (props) => {
+          const {vendorId,data} = props ?? {};
+
+          return  createVendorStaff(vendorId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateVendorStaffMutationResult = NonNullable<Awaited<ReturnType<typeof createVendorStaff>>>
+    export type CreateVendorStaffMutationBody = BodyType<CreateVendorStaffInput>
+    export type CreateVendorStaffMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Add a new staff member to a vendor
+ */
+export const useCreateVendorStaff = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVendorStaff>>, TError,{vendorId: string;data: BodyType<CreateVendorStaffInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createVendorStaff>>,
+        TError,
+        {vendorId: string;data: BodyType<CreateVendorStaffInput>},
+        TContext
+      > => {
+      return useMutation(getCreateVendorStaffMutationOptions(options));
+    }
+
+export const getUpdateVendorStaffUrl = (vendorId: string,
+    staffId: string,) => {
+
+
+
+
+  return `/api/vendors/${vendorId}/staff/${staffId}`
+}
+
+export const updateVendorStaff = async (vendorId: string,
+    staffId: string,
+    updateVendorStaffInput: UpdateVendorStaffInput, options?: RequestInit): Promise<VendorStaff> => {
+
+  return customFetch<VendorStaff>(getUpdateVendorStaffUrl(vendorId,staffId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateVendorStaffInput,)
+  }
+);}
+
+
+
+
+export const getUpdateVendorStaffMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateVendorStaff>>, TError,{vendorId: string;staffId: string;data: BodyType<UpdateVendorStaffInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateVendorStaff>>, TError,{vendorId: string;staffId: string;data: BodyType<UpdateVendorStaffInput>}, TContext> => {
+
+const mutationKey = ['updateVendorStaff'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateVendorStaff>>, {vendorId: string;staffId: string;data: BodyType<UpdateVendorStaffInput>}> = (props) => {
+          const {vendorId,staffId,data} = props ?? {};
+
+          return  updateVendorStaff(vendorId,staffId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateVendorStaffMutationResult = NonNullable<Awaited<ReturnType<typeof updateVendorStaff>>>
+    export type UpdateVendorStaffMutationBody = BodyType<UpdateVendorStaffInput>
+    export type UpdateVendorStaffMutationError = ErrorType<unknown>
+
+    export const useUpdateVendorStaff = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateVendorStaff>>, TError,{vendorId: string;staffId: string;data: BodyType<UpdateVendorStaffInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateVendorStaff>>,
+        TError,
+        {vendorId: string;staffId: string;data: BodyType<UpdateVendorStaffInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateVendorStaffMutationOptions(options));
+    }
+
+export const getDeleteVendorStaffUrl = (vendorId: string,
+    staffId: string,) => {
+
+
+
+
+  return `/api/vendors/${vendorId}/staff/${staffId}`
+}
+
+export const deleteVendorStaff = async (vendorId: string,
+    staffId: string, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteVendorStaffUrl(vendorId,staffId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteVendorStaffMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteVendorStaff>>, TError,{vendorId: string;staffId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteVendorStaff>>, TError,{vendorId: string;staffId: string}, TContext> => {
+
+const mutationKey = ['deleteVendorStaff'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteVendorStaff>>, {vendorId: string;staffId: string}> = (props) => {
+          const {vendorId,staffId} = props ?? {};
+
+          return  deleteVendorStaff(vendorId,staffId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteVendorStaffMutationResult = NonNullable<Awaited<ReturnType<typeof deleteVendorStaff>>>
+
+    export type DeleteVendorStaffMutationError = ErrorType<unknown>
+
+    export const useDeleteVendorStaff = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteVendorStaff>>, TError,{vendorId: string;staffId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteVendorStaff>>,
+        TError,
+        {vendorId: string;staffId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteVendorStaffMutationOptions(options));
     }
 
 export const getListPartsUrl = (params?: ListPartsParams,) => {

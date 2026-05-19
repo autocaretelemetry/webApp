@@ -674,6 +674,66 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Part" }
 
+  /vendors/{vendorId}/staff:
+    get:
+      operationId: listVendorStaff
+      tags: [vendorStaff]
+      summary: List a vendor's staff members (includes inactive)
+      parameters:
+        - { name: vendorId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VendorStaff" }
+    post:
+      operationId: createVendorStaff
+      tags: [vendorStaff]
+      summary: Add a new staff member to a vendor
+      parameters:
+        - { name: vendorId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateVendorStaffInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VendorStaff" }
+
+  /vendors/{vendorId}/staff/{staffId}:
+    patch:
+      operationId: updateVendorStaff
+      tags: [vendorStaff]
+      parameters:
+        - { name: vendorId, in: path, required: true, schema: { type: string } }
+        - { name: staffId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateVendorStaffInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VendorStaff" }
+    delete:
+      operationId: deleteVendorStaff
+      tags: [vendorStaff]
+      parameters:
+        - { name: vendorId, in: path, required: true, schema: { type: string } }
+        - { name: staffId, in: path, required: true, schema: { type: string } }
+      responses:
+        "204": { description: Deleted }
+
   /parts:
     get:
       operationId: listParts
@@ -2400,6 +2460,46 @@ components:
         name: { type: string }
         email: { type: string, format: email }
         role: { type: string, enum: [admin, staff] }
+        permissions:
+          type: array
+          items: { type: string }
+        active: { type: boolean }
+
+    VendorStaff:
+      type: object
+      required: [id, vendorId, name, email, role, permissions, active, createdAt]
+      properties:
+        id: { type: string }
+        vendorId: { type: string }
+        name: { type: string }
+        email: { type: string }
+        phone: { type: string, nullable: true }
+        role: { type: string, enum: [manager, staff] }
+        permissions:
+          type: array
+          items: { type: string }
+        active: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    CreateVendorStaffInput:
+      type: object
+      required: [name, email]
+      properties:
+        name: { type: string, minLength: 1 }
+        email: { type: string, format: email }
+        phone: { type: string, nullable: true }
+        role: { type: string, enum: [manager, staff] }
+        permissions:
+          type: array
+          items: { type: string }
+
+    UpdateVendorStaffInput:
+      type: object
+      properties:
+        name: { type: string }
+        email: { type: string, format: email }
+        phone: { type: string, nullable: true }
+        role: { type: string, enum: [manager, staff] }
         permissions:
           type: array
           items: { type: string }

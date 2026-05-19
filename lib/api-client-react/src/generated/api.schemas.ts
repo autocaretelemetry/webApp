@@ -799,6 +799,60 @@ export interface UpdatePlatformStaffInput {
   active?: boolean;
 }
 
+export type VendorStaffRole = typeof VendorStaffRole[keyof typeof VendorStaffRole];
+
+
+export const VendorStaffRole = {
+  manager: 'manager',
+  staff: 'staff',
+} as const;
+
+export interface VendorStaff {
+  id: string;
+  vendorId: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  role: VendorStaffRole;
+  permissions: string[];
+  active: boolean;
+  createdAt: string;
+}
+
+export type CreateVendorStaffInputRole = typeof CreateVendorStaffInputRole[keyof typeof CreateVendorStaffInputRole];
+
+
+export const CreateVendorStaffInputRole = {
+  manager: 'manager',
+  staff: 'staff',
+} as const;
+
+export interface CreateVendorStaffInput {
+  /** @minLength 1 */
+  name: string;
+  email: string;
+  phone?: string | null;
+  role?: CreateVendorStaffInputRole;
+  permissions?: string[];
+}
+
+export type UpdateVendorStaffInputRole = typeof UpdateVendorStaffInputRole[keyof typeof UpdateVendorStaffInputRole];
+
+
+export const UpdateVendorStaffInputRole = {
+  manager: 'manager',
+  staff: 'staff',
+} as const;
+
+export interface UpdateVendorStaffInput {
+  name?: string;
+  email?: string;
+  phone?: string | null;
+  role?: UpdateVendorStaffInputRole;
+  permissions?: string[];
+  active?: boolean;
+}
+
 export type SubscriptionPlanAudience = typeof SubscriptionPlanAudience[keyof typeof SubscriptionPlanAudience];
 
 
