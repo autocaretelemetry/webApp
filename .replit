@@ -45,3 +45,10 @@ externalPort = 3000
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+VAPID_PUBLIC_KEY = "BGFfhzeYBbTXKAxG9O5eGxtMO5eIbTRuwVGBvdLpuS2JVrmeEh-ebkAcmVfR_RPKEKx8PyLkzh6dAJy06cFtFg8"
+VAPID_PRIVATE_KEY = "Pt1nNl9FCPC6X6vLGtm6V91WwErXlNpnUGQQ1SYzFRo"
+VAPID_CONTACT_EMAIL = "support@autocare.local"
