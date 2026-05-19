@@ -22,6 +22,7 @@ import {
   Layers,
   CreditCard,
   TrendingUp,
+  KeyRound,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -30,6 +31,9 @@ const OWNER_NAV = [
   { href: "/vehicles", label: "My Vehicles", icon: Car },
   { href: "/service-centers", label: "Service Centers", icon: Store },
   { href: "/bookings", label: "Bookings", icon: CalendarDays },
+  { href: "/rentals", label: "Rent a Car", icon: KeyRound },
+  { href: "/rentals/my-listings", label: "My Listings", icon: KeyRound },
+  { href: "/rentals/my-bookings", label: "My Rentals", icon: KeyRound },
   { href: "/marketplace", label: "Marketplace", icon: ShoppingBag },
   { href: "/orders", label: "My Orders", icon: Package },
 ];
@@ -66,6 +70,7 @@ const ADMIN_NAV = [
   { href: "/admin/vendors", label: "Vendors", icon: Store },
   { href: "/admin/mechanics", label: "Mechanics", icon: Users },
   { href: "/admin/agents", label: "Delivery Agents", icon: Truck },
+  { href: "/admin/rentals", label: "Rentals", icon: KeyRound },
   { href: "/bookings", label: "All Bookings", icon: CalendarDays },
   { href: "/orders", label: "All Orders", icon: Package },
 ];

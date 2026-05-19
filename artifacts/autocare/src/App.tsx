@@ -43,6 +43,14 @@ import AdminStaff from "@/pages/admin/Staff";
 import AdminPlans from "@/pages/admin/Plans";
 import AdminSubscriptions from "@/pages/admin/Subscriptions";
 import AdminRevenue from "@/pages/admin/Revenue";
+import AdminRentals from "@/pages/admin/Rentals";
+
+// Rentals Pages
+import RentalsBrowse from "@/pages/rentals/Browse";
+import RentalDetail from "@/pages/rentals/Detail";
+import ListYourCar from "@/pages/rentals/ListYours";
+import MyListings from "@/pages/rentals/MyListings";
+import MyRentals from "@/pages/rentals/MyRentals";
 
 // Shared Pages
 import Bookings from "@/pages/shared/Bookings";
@@ -144,6 +152,14 @@ function Router() {
         <Route path="/admin/plans" component={adminOnly(AdminPlans)} />
         <Route path="/admin/subscriptions" component={adminOnly(AdminSubscriptions)} />
         <Route path="/admin/revenue" component={adminOnly(AdminRevenue)} />
+        <Route path="/admin/rentals" component={adminOnly(AdminRentals)} />
+
+        {/* Rentals Routes (owners + admins can browse; bookings open to any role using owner shell) */}
+        <Route path="/rentals" component={RentalsBrowse} />
+        <Route path="/rentals/list-yours" component={ownerOnly(ListYourCar)} />
+        <Route path="/rentals/my-listings" component={ownerOnly(MyListings)} />
+        <Route path="/rentals/my-bookings" component={ownerOnly(MyRentals)} />
+        <Route path="/rentals/:id" component={RentalDetail} />
 
         {/* Marketplace (shared) */}
         <Route path="/marketplace" component={buyersOnly(Marketplace)} />

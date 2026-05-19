@@ -14,6 +14,7 @@ import adminRouter from "./admin";
 import platformStaffRouter from "./platformStaff";
 import subscriptionsRouter from "./subscriptions";
 import revenueRouter from "./revenue";
+import rentalsRouter from "./rentals";
 
 const router: IRouter = Router();
 
@@ -32,5 +33,6 @@ router.use(adminRouter);
 router.use(platformStaffRouter);
 router.use(subscriptionsRouter);
 router.use(revenueRouter);
+router.use(rentalsRouter);
 
 export default router;

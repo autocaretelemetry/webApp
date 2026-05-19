@@ -32,4 +32,7 @@ export {
   getListSubscriptionPlansQueryKey,
   getListSubscriptionsQueryKey,
   getGetRevenueOverviewQueryKey,
+  getListRentalCarsQueryKey,
+  getGetRentalCarQueryKey,
+  getListRentalBookingsQueryKey,
 } from "@workspace/api-client-react";

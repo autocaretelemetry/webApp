@@ -21,7 +21,7 @@ import { Timeline } from "@/components/Timeline";
 import { InvoiceSummary } from "@/components/InvoiceSummary";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Car, Store, Wrench, Calendar, Info, Receipt, Package, ShoppingBag } from "lucide-react";
+import { Car, Store, Wrench, Calendar, Info, Receipt, Package, ShoppingBag, KeyRound } from "lucide-react";
 import { formatDateTime, formatCurrency } from "@/lib/format";
 
 import {
@@ -48,14 +48,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 
 function OwnerActions({ booking, onCancel }: { booking: any, onCancel: () => void }) {
-  if (booking.status === "requested") {
-    return (
-      <Button variant="destructive" onClick={onCancel} className="w-full mt-4">
-        Cancel Request
-      </Button>
-    );
-  }
-  return null;
+  const loanerEligible = ["accepted", "in_progress", "awaiting_approval"].includes(booking.status);
+  return (
+    <div className="space-y-2 mt-4">
+      {loanerEligible && (
+        <Link href={`/rentals?loaner=${booking.id}`}>
+          <Button variant="outline" className="w-full gap-2">
+            <KeyRound className="h-4 w-4" /> Need a loaner car?
+          </Button>
+        </Link>
+      )}
+      {booking.status === "requested" && (
+        <Button variant="destructive" onClick={onCancel} className="w-full">
+          Cancel Request
+        </Button>
+      )}
+    </div>
+  );
 }
 
 const invoiceSchema = z.object({

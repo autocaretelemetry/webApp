@@ -794,6 +794,224 @@ export interface RevenueOverview {
   recentPayments: RecentPayment[];
 }
 
+export type RentalCarOwnerKind = typeof RentalCarOwnerKind[keyof typeof RentalCarOwnerKind];
+
+
+export const RentalCarOwnerKind = {
+  platform: 'platform',
+  user: 'user',
+} as const;
+
+export type RentalCarTransmission = typeof RentalCarTransmission[keyof typeof RentalCarTransmission];
+
+
+export const RentalCarTransmission = {
+  automatic: 'automatic',
+  manual: 'manual',
+} as const;
+
+export type RentalCarFuelType = typeof RentalCarFuelType[keyof typeof RentalCarFuelType];
+
+
+export const RentalCarFuelType = {
+  petrol: 'petrol',
+  diesel: 'diesel',
+  hybrid: 'hybrid',
+  electric: 'electric',
+} as const;
+
+export type RentalCarStatus = typeof RentalCarStatus[keyof typeof RentalCarStatus];
+
+
+export const RentalCarStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  unavailable: 'unavailable',
+} as const;
+
+export interface RentalCar {
+  id: string;
+  ownerKind: RentalCarOwnerKind;
+  ownerName: string;
+  ownerPhone: string;
+  ownerEmail?: string | null;
+  brand: string;
+  model: string;
+  year: number;
+  color: string;
+  plateNumber: string;
+  transmission: RentalCarTransmission;
+  seats: number;
+  fuelType: RentalCarFuelType;
+  dailyRate: number;
+  city: string;
+  pickupAddress: string;
+  description?: string | null;
+  imageUrl?: string | null;
+  status: RentalCarStatus;
+  active: boolean;
+  createdAt: string;
+}
+
+export type CreateRentalCarInputOwnerKind = typeof CreateRentalCarInputOwnerKind[keyof typeof CreateRentalCarInputOwnerKind];
+
+
+export const CreateRentalCarInputOwnerKind = {
+  platform: 'platform',
+  user: 'user',
+} as const;
+
+export type CreateRentalCarInputTransmission = typeof CreateRentalCarInputTransmission[keyof typeof CreateRentalCarInputTransmission];
+
+
+export const CreateRentalCarInputTransmission = {
+  automatic: 'automatic',
+  manual: 'manual',
+} as const;
+
+export type CreateRentalCarInputFuelType = typeof CreateRentalCarInputFuelType[keyof typeof CreateRentalCarInputFuelType];
+
+
+export const CreateRentalCarInputFuelType = {
+  petrol: 'petrol',
+  diesel: 'diesel',
+  hybrid: 'hybrid',
+  electric: 'electric',
+} as const;
+
+export interface CreateRentalCarInput {
+  ownerKind: CreateRentalCarInputOwnerKind;
+  /** @minLength 1 */
+  ownerName: string;
+  /** @minLength 1 */
+  ownerPhone: string;
+  ownerEmail?: string;
+  /** @minLength 1 */
+  brand: string;
+  /** @minLength 1 */
+  model: string;
+  /** @minimum 1990 */
+  year: number;
+  /** @minLength 1 */
+  color: string;
+  /** @minLength 1 */
+  plateNumber: string;
+  transmission: CreateRentalCarInputTransmission;
+  /**
+     * @minimum 2
+     * @maximum 12
+     */
+  seats: number;
+  fuelType: CreateRentalCarInputFuelType;
+  /** @minimum 0 */
+  dailyRate: number;
+  /** @minLength 1 */
+  city: string;
+  /** @minLength 1 */
+  pickupAddress: string;
+  description?: string;
+  imageUrl?: string;
+}
+
+export type UpdateRentalCarInputStatus = typeof UpdateRentalCarInputStatus[keyof typeof UpdateRentalCarInputStatus];
+
+
+export const UpdateRentalCarInputStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  unavailable: 'unavailable',
+} as const;
+
+export interface UpdateRentalCarInput {
+  status?: UpdateRentalCarInputStatus;
+  active?: boolean;
+  /** @minimum 0 */
+  dailyRate?: number;
+  description?: string;
+  pickupAddress?: string;
+  imageUrl?: string;
+}
+
+export type RentalBookingStatus = typeof RentalBookingStatus[keyof typeof RentalBookingStatus];
+
+
+export const RentalBookingStatus = {
+  requested: 'requested',
+  confirmed: 'confirmed',
+  active: 'active',
+  completed: 'completed',
+  cancelled: 'cancelled',
+} as const;
+
+export type RentalBookingPurpose = typeof RentalBookingPurpose[keyof typeof RentalBookingPurpose];
+
+
+export const RentalBookingPurpose = {
+  general: 'general',
+  loaner: 'loaner',
+} as const;
+
+export interface RentalBooking {
+  id: string;
+  carId: string;
+  carLabel?: string;
+  renterName: string;
+  renterPhone: string;
+  renterEmail?: string | null;
+  startDate: string;
+  endDate: string;
+  days: number;
+  dailyRate: number;
+  total: number;
+  status: RentalBookingStatus;
+  purpose: RentalBookingPurpose;
+  serviceBookingId?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  confirmedAt?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  cancelledAt?: string | null;
+}
+
+export type CreateRentalBookingInputPurpose = typeof CreateRentalBookingInputPurpose[keyof typeof CreateRentalBookingInputPurpose];
+
+
+export const CreateRentalBookingInputPurpose = {
+  general: 'general',
+  loaner: 'loaner',
+} as const;
+
+export interface CreateRentalBookingInput {
+  carId: string;
+  /** @minLength 1 */
+  renterName: string;
+  /** @minLength 1 */
+  renterPhone: string;
+  renterEmail?: string;
+  startDate: string;
+  endDate: string;
+  purpose?: CreateRentalBookingInputPurpose;
+  serviceBookingId?: string;
+  notes?: string;
+}
+
+export type UpdateRentalBookingInputStatus = typeof UpdateRentalBookingInputStatus[keyof typeof UpdateRentalBookingInputStatus];
+
+
+export const UpdateRentalBookingInputStatus = {
+  requested: 'requested',
+  confirmed: 'confirmed',
+  active: 'active',
+  completed: 'completed',
+  cancelled: 'cancelled',
+} as const;
+
+export interface UpdateRentalBookingInput {
+  status?: UpdateRentalBookingInputStatus;
+  notes?: string;
+}
+
 export type ListServiceCentersParams = {
 specialty?: string;
 includeInactive?: boolean;
@@ -893,5 +1111,18 @@ includeInactive?: boolean;
 export type ListSubscriptionsParams = {
 status?: string;
 subscriberKind?: string;
+};
+
+export type ListRentalCarsParams = {
+city?: string;
+status?: string;
+ownerKind?: string;
+includeInactive?: boolean;
+};
+
+export type ListRentalBookingsParams = {
+carId?: string;
+renterPhone?: string;
+status?: string;
 };
 
