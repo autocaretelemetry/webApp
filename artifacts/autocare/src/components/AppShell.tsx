@@ -110,6 +110,7 @@ const VENDOR_NAV: NavSection[] = [
       { href: "/", label: "Dashboard", icon: LayoutDashboard },
       { href: "/vendor/parts", label: "My Catalog", icon: Package },
       { href: "/vendor/orders", label: "Fulfillment", icon: ShoppingBag },
+      { href: "/vendor/delivery-team", label: "Delivery Team", icon: Truck },
       { href: "/marketplace", label: "Browse", icon: Store },
     ],
   },

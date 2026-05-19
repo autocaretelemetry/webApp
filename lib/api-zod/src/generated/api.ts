@@ -1342,6 +1342,12 @@ export const ListOrdersResponseItem = zod.object({
   "region": zod.string(),
   "vehicleType": zod.string(),
   "bio": zod.string().nullish(),
+  "photoUrl": zod.string().nullish(),
+  "passportUrl": zod.string().nullish(),
+  "ghanaCardUrl": zod.string().nullish(),
+  "licenseUrl": zod.string().nullish(),
+  "vendorId": zod.string().nullish(),
+  "vendorCertified": zod.boolean(),
   "rating": zod.number(),
   "completedDeliveries": zod.number(),
   "active": zod.boolean(),
@@ -1454,6 +1460,12 @@ export const GetOrderResponse = zod.object({
   "region": zod.string(),
   "vehicleType": zod.string(),
   "bio": zod.string().nullish(),
+  "photoUrl": zod.string().nullish(),
+  "passportUrl": zod.string().nullish(),
+  "ghanaCardUrl": zod.string().nullish(),
+  "licenseUrl": zod.string().nullish(),
+  "vendorId": zod.string().nullish(),
+  "vendorCertified": zod.boolean(),
   "rating": zod.number(),
   "completedDeliveries": zod.number(),
   "active": zod.boolean(),
@@ -1560,6 +1572,12 @@ export const UpdateOrderStatusResponse = zod.object({
   "region": zod.string(),
   "vehicleType": zod.string(),
   "bio": zod.string().nullish(),
+  "photoUrl": zod.string().nullish(),
+  "passportUrl": zod.string().nullish(),
+  "ghanaCardUrl": zod.string().nullish(),
+  "licenseUrl": zod.string().nullish(),
+  "vendorId": zod.string().nullish(),
+  "vendorCertified": zod.boolean(),
   "rating": zod.number(),
   "completedDeliveries": zod.number(),
   "active": zod.boolean(),
@@ -1751,6 +1769,12 @@ export const GetAdminOverviewResponse = zod.object({
   "region": zod.string(),
   "vehicleType": zod.string(),
   "bio": zod.string().nullish(),
+  "photoUrl": zod.string().nullish(),
+  "passportUrl": zod.string().nullish(),
+  "ghanaCardUrl": zod.string().nullish(),
+  "licenseUrl": zod.string().nullish(),
+  "vendorId": zod.string().nullish(),
+  "vendorCertified": zod.boolean(),
   "rating": zod.number(),
   "completedDeliveries": zod.number(),
   "active": zod.boolean(),
@@ -1772,7 +1796,8 @@ export const GetAdminOverviewResponse = zod.object({
 export const ListDeliveryAgentsQueryParams = zod.object({
   "city": zod.coerce.string().optional(),
   "region": zod.coerce.string().optional(),
-  "activeOnly": zod.coerce.boolean().optional()
+  "activeOnly": zod.coerce.boolean().optional(),
+  "vendorId": zod.coerce.string().optional()
 })
 
 export const ListDeliveryAgentsResponseItem = zod.object({
@@ -1783,6 +1808,12 @@ export const ListDeliveryAgentsResponseItem = zod.object({
   "region": zod.string(),
   "vehicleType": zod.string(),
   "bio": zod.string().nullish(),
+  "photoUrl": zod.string().nullish(),
+  "passportUrl": zod.string().nullish(),
+  "ghanaCardUrl": zod.string().nullish(),
+  "licenseUrl": zod.string().nullish(),
+  "vendorId": zod.string().nullish(),
+  "vendorCertified": zod.boolean(),
   "rating": zod.number(),
   "completedDeliveries": zod.number(),
   "active": zod.boolean(),
@@ -1807,8 +1838,13 @@ export const RegisterDeliveryAgentBody = zod.object({
   "city": zod.string().min(1),
   "region": zod.string().min(1),
   "vehicleType": zod.string().min(1),
-  "bio": zod.string().nullish()
-})
+  "bio": zod.string().nullish(),
+  "photoUrl": zod.string().nullish(),
+  "passportUrl": zod.string().nullish(),
+  "ghanaCardUrl": zod.string().nullish(),
+  "licenseUrl": zod.string().nullish(),
+  "vendorId": zod.string().nullish()
+}).describe('Self-registration or vendor-created delivery agent. At least one of\npassportUrl, ghanaCardUrl, or licenseUrl must be provided as a\ngovernment-issued ID. Photo is recommended but not required by the\ncontract; the UI may enforce it. When vendorId is set the agent is\nautomatically marked vendorCertified.\n')
 
 
 /**
@@ -1826,6 +1862,12 @@ export const GetDeliveryAgentResponse = zod.object({
   "region": zod.string(),
   "vehicleType": zod.string(),
   "bio": zod.string().nullish(),
+  "photoUrl": zod.string().nullish(),
+  "passportUrl": zod.string().nullish(),
+  "ghanaCardUrl": zod.string().nullish(),
+  "licenseUrl": zod.string().nullish(),
+  "vendorId": zod.string().nullish(),
+  "vendorCertified": zod.boolean(),
   "rating": zod.number(),
   "completedDeliveries": zod.number(),
   "active": zod.boolean(),
@@ -1843,7 +1885,11 @@ export const UpdateDeliveryAgentParams = zod.object({
 export const UpdateDeliveryAgentBody = zod.object({
   "active": zod.boolean().optional(),
   "bio": zod.string().nullish(),
-  "vehicleType": zod.string().optional()
+  "vehicleType": zod.string().optional(),
+  "photoUrl": zod.string().nullish(),
+  "passportUrl": zod.string().nullish(),
+  "ghanaCardUrl": zod.string().nullish(),
+  "licenseUrl": zod.string().nullish()
 })
 
 export const UpdateDeliveryAgentResponse = zod.object({
@@ -1854,6 +1900,12 @@ export const UpdateDeliveryAgentResponse = zod.object({
   "region": zod.string(),
   "vehicleType": zod.string(),
   "bio": zod.string().nullish(),
+  "photoUrl": zod.string().nullish(),
+  "passportUrl": zod.string().nullish(),
+  "ghanaCardUrl": zod.string().nullish(),
+  "licenseUrl": zod.string().nullish(),
+  "vendorId": zod.string().nullish(),
+  "vendorCertified": zod.boolean(),
   "rating": zod.number(),
   "completedDeliveries": zod.number(),
   "active": zod.boolean(),

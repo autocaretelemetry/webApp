@@ -10,4 +10,5 @@ export type ListDeliveryAgentsParams = {
 city?: string;
 region?: string;
 activeOnly?: boolean;
+vendorId?: string;
 };

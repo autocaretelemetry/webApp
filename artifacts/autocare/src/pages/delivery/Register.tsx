@@ -12,9 +12,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { ImageUploader } from "@/components/ImageUploader";
 import { setDeliveryAgentId, useDeliveryAgentId } from "@/lib/role";
+import { resolveImageUrl } from "@/lib/format";
 import { toast } from "sonner";
-import { Loader2, UserCheck, LogOut, Truck } from "lucide-react";
+import {
+  Loader2,
+  UserCheck,
+  LogOut,
+  Truck,
+  ShieldCheck,
+  FileBadge,
+  IdCard,
+  BadgeCheck,
+} from "lucide-react";
 
 const CITY_OPTIONS = ["Lagos", "Port Harcourt", "Abuja"];
 const REGION_BY_CITY: Record<string, string> = {
@@ -36,12 +48,24 @@ export default function DeliveryRegister() {
   const [city, setCity] = useState<string>("Lagos");
   const [vehicleType, setVehicleType] = useState<string>("Motorcycle");
   const [bio, setBio] = useState("");
+  const [photoUrl, setPhotoUrl] = useState("");
+  const [passportUrl, setPassportUrl] = useState("");
+  const [ghanaCardUrl, setGhanaCardUrl] = useState("");
+  const [licenseUrl, setLicenseUrl] = useState("");
   const register = useRegisterDeliveryAgent();
   const [submitting, setSubmitting] = useState(false);
 
   const onSubmit = async () => {
     if (!name.trim() || !phone.trim()) {
       toast.error("Name and phone are required.");
+      return;
+    }
+    if (!photoUrl) {
+      toast.error("Please upload a profile photo.");
+      return;
+    }
+    if (!passportUrl && !ghanaCardUrl && !licenseUrl) {
+      toast.error("Upload at least one government ID (passport, Ghana card, or driver's license).");
       return;
     }
     setSubmitting(true);
@@ -54,6 +78,10 @@ export default function DeliveryRegister() {
           region: REGION_BY_CITY[city] ?? city,
           vehicleType,
           bio: bio.trim() || null,
+          photoUrl,
+          passportUrl: passportUrl || null,
+          ghanaCardUrl: ghanaCardUrl || null,
+          licenseUrl: licenseUrl || null,
         },
       });
       setDeliveryAgentId(created.id);
@@ -73,12 +101,27 @@ export default function DeliveryRegister() {
         <PageHeader title="Delivery profile" description="Your active delivery agent identity on this device." />
         <Card>
           <CardContent className="p-6 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-full bg-primary/10 text-primary flex items-center justify-center">
-                <Truck className="h-6 w-6" />
-              </div>
-              <div>
-                <p className="font-semibold text-lg">{agent.name}</p>
+            <div className="flex items-center gap-4">
+              {agent.photoUrl ? (
+                <img
+                  src={resolveImageUrl(agent.photoUrl)}
+                  alt={agent.name}
+                  className="h-16 w-16 rounded-full object-cover border"
+                />
+              ) : (
+                <div className="h-16 w-16 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                  <Truck className="h-7 w-7" />
+                </div>
+              )}
+              <div className="flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-semibold text-lg">{agent.name}</p>
+                  {agent.vendorCertified && (
+                    <Badge variant="secondary" className="gap-1">
+                      <BadgeCheck className="h-3.5 w-3.5" /> Vendor certified
+                    </Badge>
+                  )}
+                </div>
                 <p className="text-sm text-muted-foreground">{agent.phone}</p>
               </div>
             </div>
@@ -100,6 +143,25 @@ export default function DeliveryRegister() {
                 <p className="font-medium">{agent.rating.toFixed(1)} · {agent.completedDeliveries} runs</p>
               </div>
             </div>
+
+            <div className="pt-4 border-t">
+              <p className="text-muted-foreground text-xs uppercase tracking-wide mb-2">KYC documents on file</p>
+              <div className="flex flex-wrap gap-2">
+                {agent.passportUrl && (
+                  <Badge variant="outline" className="gap-1"><FileBadge className="h-3.5 w-3.5" /> Passport</Badge>
+                )}
+                {agent.ghanaCardUrl && (
+                  <Badge variant="outline" className="gap-1"><IdCard className="h-3.5 w-3.5" /> Ghana card</Badge>
+                )}
+                {agent.licenseUrl && (
+                  <Badge variant="outline" className="gap-1"><ShieldCheck className="h-3.5 w-3.5" /> Driver's license</Badge>
+                )}
+                {!agent.passportUrl && !agent.ghanaCardUrl && !agent.licenseUrl && (
+                  <span className="text-sm text-muted-foreground">None on file</span>
+                )}
+              </div>
+            </div>
+
             {agent.bio && (
               <div className="text-sm pt-4 border-t">
                 <p className="text-muted-foreground text-xs uppercase tracking-wide mb-1">About</p>
@@ -129,7 +191,19 @@ export default function DeliveryRegister() {
         description="Self-register to start picking up parts orders from vendors in your city."
       />
       <Card>
-        <CardContent className="p-6 space-y-4">
+        <CardContent className="p-6 space-y-5">
+          <div>
+            <Label>
+              Profile photo <span className="text-destructive">*</span>
+            </Label>
+            <div className="mt-1.5 max-w-xs">
+              <ImageUploader value={photoUrl} onChange={setPhotoUrl} label="Upload your profile photo" />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1.5">
+              Vendors and customers will see this on every delivery.
+            </p>
+          </div>
+
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="d-name">Full name</Label>
@@ -169,6 +243,38 @@ export default function DeliveryRegister() {
             <Label htmlFor="d-bio">Short bio (optional)</Label>
             <Textarea id="d-bio" rows={3} value={bio} onChange={(e) => setBio(e.target.value)} className="mt-1.5" placeholder="Years of experience, areas you cover, etc." />
           </div>
+
+          <div className="pt-2 border-t">
+            <div className="flex items-center gap-2 mb-1">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+              <h3 className="font-semibold text-sm">KYC — government ID</h3>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              Upload at least one of the documents below. A driver's license alone is
+              fine, but a passport or Ghana card on file lets us verify you faster.
+            </p>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <Label>Passport</Label>
+                <div className="mt-1.5">
+                  <ImageUploader value={passportUrl} onChange={setPassportUrl} label="Upload passport" />
+                </div>
+              </div>
+              <div>
+                <Label>Ghana card</Label>
+                <div className="mt-1.5">
+                  <ImageUploader value={ghanaCardUrl} onChange={setGhanaCardUrl} label="Upload Ghana card" />
+                </div>
+              </div>
+              <div className="sm:col-span-2">
+                <Label>Driver's license (optional)</Label>
+                <div className="mt-1.5 max-w-md">
+                  <ImageUploader value={licenseUrl} onChange={setLicenseUrl} label="Upload driver's license" />
+                </div>
+              </div>
+            </div>
+          </div>
+
           <Button onClick={onSubmit} disabled={submitting} className="gap-2">
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserCheck className="h-4 w-4" />}
             Register

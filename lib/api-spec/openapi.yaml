@@ -801,6 +801,7 @@ paths:
         - { name: city, in: query, required: false, schema: { type: string } }
         - { name: region, in: query, required: false, schema: { type: string } }
         - { name: activeOnly, in: query, required: false, schema: { type: boolean } }
+        - { name: vendorId, in: query, required: false, schema: { type: string } }
       responses:
         "200":
           description: OK
@@ -2116,7 +2117,7 @@ components:
 
     DeliveryAgent:
       type: object
-      required: [id, name, phone, city, region, vehicleType, rating, completedDeliveries, active, createdAt]
+      required: [id, name, phone, city, region, vehicleType, rating, completedDeliveries, active, vendorCertified, createdAt]
       properties:
         id: { type: string }
         name: { type: string }
@@ -2125,6 +2126,12 @@ components:
         region: { type: string }
         vehicleType: { type: string }
         bio: { type: string, nullable: true }
+        photoUrl: { type: string, nullable: true }
+        passportUrl: { type: string, nullable: true }
+        ghanaCardUrl: { type: string, nullable: true }
+        licenseUrl: { type: string, nullable: true }
+        vendorId: { type: string, nullable: true }
+        vendorCertified: { type: boolean }
         rating: { type: number }
         completedDeliveries: { type: integer }
         active: { type: boolean }
@@ -2150,6 +2157,10 @@ components:
         active: { type: boolean }
         bio: { type: string, nullable: true }
         vehicleType: { type: string }
+        photoUrl: { type: string, nullable: true }
+        passportUrl: { type: string, nullable: true }
+        ghanaCardUrl: { type: string, nullable: true }
+        licenseUrl: { type: string, nullable: true }
 
     AdminCounts:
       type: object
@@ -2193,6 +2204,12 @@ components:
     RegisterDeliveryAgentInput:
       type: object
       required: [name, phone, city, region, vehicleType]
+      description: |
+        Self-registration or vendor-created delivery agent. At least one of
+        passportUrl, ghanaCardUrl, or licenseUrl must be provided as a
+        government-issued ID. Photo is recommended but not required by the
+        contract; the UI may enforce it. When vendorId is set the agent is
+        automatically marked vendorCertified.
       properties:
         name: { type: string, minLength: 1 }
         phone: { type: string, minLength: 1 }
@@ -2200,6 +2217,11 @@ components:
         region: { type: string, minLength: 1 }
         vehicleType: { type: string, minLength: 1 }
         bio: { type: string, nullable: true }
+        photoUrl: { type: string, nullable: true }
+        passportUrl: { type: string, nullable: true }
+        ghanaCardUrl: { type: string, nullable: true }
+        licenseUrl: { type: string, nullable: true }
+        vendorId: { type: string, nullable: true }
 
     VendorDashboard:
       type: object

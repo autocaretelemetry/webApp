@@ -452,6 +452,12 @@ export interface DeliveryAgent {
   region: string;
   vehicleType: string;
   bio?: string | null;
+  photoUrl?: string | null;
+  passportUrl?: string | null;
+  ghanaCardUrl?: string | null;
+  licenseUrl?: string | null;
+  vendorId?: string | null;
+  vendorCertified: boolean;
   rating: number;
   completedDeliveries: number;
   active: boolean;
@@ -591,6 +597,10 @@ export interface UpdateDeliveryAgentInput {
   active?: boolean;
   bio?: string | null;
   vehicleType?: string;
+  photoUrl?: string | null;
+  passportUrl?: string | null;
+  ghanaCardUrl?: string | null;
+  licenseUrl?: string | null;
 }
 
 export interface AdminCounts {
@@ -620,6 +630,14 @@ export interface AdminOverview {
   recentOrders: Order[];
 }
 
+/**
+ * Self-registration or vendor-created delivery agent. At least one of
+passportUrl, ghanaCardUrl, or licenseUrl must be provided as a
+government-issued ID. Photo is recommended but not required by the
+contract; the UI may enforce it. When vendorId is set the agent is
+automatically marked vendorCertified.
+
+ */
 export interface RegisterDeliveryAgentInput {
   /** @minLength 1 */
   name: string;
@@ -632,6 +650,11 @@ export interface RegisterDeliveryAgentInput {
   /** @minLength 1 */
   vehicleType: string;
   bio?: string | null;
+  photoUrl?: string | null;
+  passportUrl?: string | null;
+  ghanaCardUrl?: string | null;
+  licenseUrl?: string | null;
+  vendorId?: string | null;
 }
 
 export interface VendorDashboard {
@@ -1512,6 +1535,7 @@ export type ListDeliveryAgentsParams = {
 city?: string;
 region?: string;
 activeOnly?: boolean;
+vendorId?: string;
 };
 
 export type ListPlatformStaffParams = {

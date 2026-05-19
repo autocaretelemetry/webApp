@@ -10,4 +10,8 @@ export interface UpdateDeliveryAgentInput {
   active?: boolean;
   bio?: string | null;
   vehicleType?: string;
+  photoUrl?: string | null;
+  passportUrl?: string | null;
+  ghanaCardUrl?: string | null;
+  licenseUrl?: string | null;
 }

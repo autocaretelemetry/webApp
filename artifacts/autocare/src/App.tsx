@@ -31,6 +31,7 @@ import VendorDashboard from "@/pages/vendor/Dashboard";
 import VendorParts from "@/pages/vendor/Parts";
 import NewPart from "@/pages/vendor/NewPart";
 import VendorOrders from "@/pages/vendor/Orders";
+import VendorDeliveryTeam from "@/pages/vendor/DeliveryTeam";
 
 // Delivery Pages
 import DeliveryDashboard from "@/pages/delivery/Dashboard";
@@ -146,6 +147,7 @@ function AppRouter() {
         <Route path="/vendor/parts/new" component={vendorOnly(NewPart)} />
         <Route path="/vendor/parts" component={vendorOnly(VendorParts)} />
         <Route path="/vendor/orders" component={vendorOnly(VendorOrders)} />
+        <Route path="/vendor/delivery-team" component={vendorOnly(VendorDeliveryTeam)} />
 
         {/* Delivery Routes */}
         <Route path="/delivery/register" component={deliveryOnly(DeliveryRegister)} />

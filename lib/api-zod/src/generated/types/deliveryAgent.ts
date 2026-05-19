@@ -14,6 +14,12 @@ export interface DeliveryAgent {
   region: string;
   vehicleType: string;
   bio?: string | null;
+  photoUrl?: string | null;
+  passportUrl?: string | null;
+  ghanaCardUrl?: string | null;
+  licenseUrl?: string | null;
+  vendorId?: string | null;
+  vendorCertified: boolean;
   rating: number;
   completedDeliveries: number;
   active: boolean;
