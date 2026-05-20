@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import request from "supertest";
-import { inArray, eq, desc } from "drizzle-orm";
+import { and, inArray, eq, desc } from "drizzle-orm";
 import { db, usersTable, notificationsTable, reminderRunsTable } from "@workspace/db";
 import app from "../app";
 import { hashPassword } from "../lib/auth";
@@ -231,6 +231,65 @@ describe("runReminderJob persists run rows", () => {
       expect(row!.finishedAt).not.toBeNull();
     } finally {
       spy.mockRestore();
+    }
+  });
+
+  it("drops an in-app notification into every admin's queue when a run fails, and dedupes by error+day", async () => {
+    // Clean any prior failure notifications for this admin so the dedupe
+    // assertion is unambiguous.
+    await db
+      .delete(notificationsTable)
+      .where(eq(notificationsTable.ownerPhone, ADMIN_PHONE));
+
+    const errMsg = "alert-task80-unique-boom";
+    const spy = vi
+      .spyOn(db, "select")
+      .mockImplementationOnce(() => {
+        throw new Error(errMsg);
+      });
+    try {
+      const r1 = await runReminderJob("scheduler");
+      spy.mockRestore();
+      expect(r1.status).toBe("error");
+
+      const after1 = await db
+        .select()
+        .from(notificationsTable)
+        .where(
+          and(
+            eq(notificationsTable.ownerPhone, ADMIN_PHONE),
+            eq(notificationsTable.kind, "reminder_job_failed"),
+          ),
+        )
+        .orderBy(desc(notificationsTable.createdAt));
+      expect(after1.length).toBe(1);
+      expect(after1[0]!.body).toContain(errMsg);
+
+      // A second failure with the same message on the same day must NOT
+      // create another row (per-error-per-day dedupe).
+      const spy2 = vi
+        .spyOn(db, "select")
+        .mockImplementationOnce(() => {
+          throw new Error(errMsg);
+        });
+      const r2 = await runReminderJob("scheduler");
+      spy2.mockRestore();
+      expect(r2.status).toBe("error");
+      const after2 = await db
+        .select()
+        .from(notificationsTable)
+        .where(
+          and(
+            eq(notificationsTable.ownerPhone, ADMIN_PHONE),
+            eq(notificationsTable.kind, "reminder_job_failed"),
+          ),
+        );
+      expect(after2.length).toBe(1);
+    } finally {
+      spy.mockRestore();
+      await db
+        .delete(notificationsTable)
+        .where(eq(notificationsTable.ownerPhone, ADMIN_PHONE));
     }
   });
 

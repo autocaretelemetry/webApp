@@ -1,4 +1,5 @@
 import { db, vehiclesTable, reminderRunsTable, usersTable, type Vehicle, type ReminderRun, type ReminderRunTrigger } from "@workspace/db";
+import { createHash } from "node:crypto";
 import { and, desc, eq, inArray, lt } from "drizzle-orm";
 import { createOwnerNotification } from "./notify";
 import { appPublicUrl } from "./whatsapp";
@@ -184,11 +185,72 @@ export async function runReminderJob(
       .set({ status: "error", errorMessage: message, finishedAt: new Date() })
       .where(eq(reminderRunsTable.id, runId));
     logger.error({ err, runId, trigger }, "Reminder run failed");
+    await notifyAdminsOfFailure(message, runId).catch((notifyErr) =>
+      logger.warn({ err: notifyErr, runId }, "Failed to create in-app reminder-failure notification"),
+    );
     await maybeAlertOnFailureStreak(message).catch((alertErr) =>
       logger.warn({ err: alertErr, runId }, "Failed to dispatch reminder-failure alert"),
     );
     return { runId, created: 0, status: "error", errorMessage: message };
   }
+}
+
+/**
+ * Stable per-day dedupe key so the same error message creates at most one
+ * in-app notification per admin per UTC day. Different messages on the same
+ * day still alert independently; the same message repeating throughout the
+ * day is silenced after the first hit.
+ */
+function failureDedupeKey(message: string, now: Date = new Date()): string {
+  const day = Math.floor(now.getTime() / DAY);
+  const hash = createHash("sha1").update(message).digest("hex").slice(0, 10);
+  return `reminder_failure:${day}:${hash}`;
+}
+
+/**
+ * Drop an in-app notification into every active admin/super_admin's queue
+ * the moment a reminder run fails. Deduped per (admin phone, error message,
+ * UTC day) so a stuck scheduler that errors every minute with the same
+ * message produces one banner per admin per day, not hundreds.
+ *
+ * This is the always-on, low-noise signal; the email in
+ * {@link maybeAlertOnFailureStreak} is the higher-severity escalation that
+ * only fires once the consecutive-failure threshold is crossed.
+ */
+async function notifyAdminsOfFailure(
+  message: string,
+  runId: string,
+): Promise<void> {
+  const admins = await db
+    .select({ phone: usersTable.phone })
+    .from(usersTable)
+    .where(
+      and(
+        eq(usersTable.active, true),
+        inArray(usersTable.role, ["admin", "super_admin"]),
+      ),
+    );
+  const phones = admins
+    .map((a) => a.phone)
+    .filter((p): p is string => Boolean(p && p.trim().length > 0));
+  if (phones.length === 0) return;
+  const dedupeKey = failureDedupeKey(message);
+  const body = (message.trim() || "(no error message recorded)").slice(0, 280);
+  const url = appPublicUrl("/admin/reminder-runs");
+  await Promise.all(
+    phones.map((phone) =>
+      createOwnerNotification({
+        ownerPhone: phone,
+        kind: "reminder_job_failed",
+        title: "Reminder job failed",
+        body,
+        dedupeKey,
+        url,
+      }).catch((err) =>
+        logger.warn({ err, phone, runId }, "admin failure notification insert failed"),
+      ),
+    ),
+  );
 }
 
 /**
