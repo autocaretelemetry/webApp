@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, uuid, text, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, boolean, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
 
 export const APPROVAL_STATUSES = ["pending", "approved", "rejected"] as const;
 export type ApprovalStatus = (typeof APPROVAL_STATUSES)[number];
@@ -73,6 +73,11 @@ export const usersTable = pgTable("users", {
     .$type<NotificationChannel[]>()
     .notNull()
     .default(sql`ARRAY['email','whatsapp']::text[]`),
+  // Tracks decision-email delivery so reviewers can see when the last
+  // approval/rejection/KYC outcome email was dispatched (initial send or
+  // resend) and how many times it has been sent in total.
+  lastDecisionEmailAt: timestamp("last_decision_email_at", { withTimezone: true }),
+  decisionEmailCount: integer("decision_email_count").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

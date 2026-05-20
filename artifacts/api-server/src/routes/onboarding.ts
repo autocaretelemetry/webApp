@@ -53,6 +53,7 @@ function fireWhatsApp(to: string | null | undefined, body: string): void {
 type DecisionKind = "approved" | "rejected" | "kyc_verified" | "kyc_rejected";
 
 type DecisionUser = {
+  id: string;
   name: string;
   email: string | null;
   phone: string | null;
@@ -75,6 +76,11 @@ function wantsChannel(
 function fireDecisionNotifications(kind: DecisionKind, user: DecisionUser): void {
   const email = wantsChannel(user, "email") ? user.email : null;
   const phone = wantsChannel(user, "whatsapp") ? user.phone : null;
+  // Only count a dispatch when we'll actually try to send an email — skip
+  // when the user opted out of the email channel or has no address on file.
+  if (email) {
+    void recordDecisionEmailDispatch(user.id);
+  }
   switch (kind) {
     case "approved":
       fireEmail(email, applicationApprovedEmail(user.name, user.approvalNote));
@@ -96,6 +102,29 @@ function fireDecisionNotifications(kind: DecisionKind, user: DecisionUser): void
 }
 
 type EventTx = Tx | typeof db;
+
+/**
+ * Bumps `lastDecisionEmailAt` / `decisionEmailCount` on the user row so
+ * reviewers can see when a decision email last went out (initial send or
+ * resend) and how many total dispatches there have been. Recorded at
+ * dispatch time — sendEmail is fire-and-forget, so this reflects "we sent
+ * it" rather than "the provider acknowledged delivery". Best-effort: a DB
+ * error here must never block the decision response, so callers ignore the
+ * promise.
+ */
+async function recordDecisionEmailDispatch(userId: string): Promise<void> {
+  try {
+    await db
+      .update(usersTable)
+      .set({
+        lastDecisionEmailAt: new Date(),
+        decisionEmailCount: sql`${usersTable.decisionEmailCount} + 1`,
+      })
+      .where(eq(usersTable.id, userId));
+  } catch (err) {
+    logger.warn({ err, userId }, "failed to record decision email dispatch");
+  }
+}
 
 async function recordEvent(
   executor: EventTx,
@@ -667,6 +696,7 @@ router.post(
       return;
     }
     lastResendAt.set(userId, now);
+    void recordDecisionEmailDispatch(userId);
     const msg =
       kind === "approved"
         ? applicationApprovedEmail(target.name, target.approvalNote)

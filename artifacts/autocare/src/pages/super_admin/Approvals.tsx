@@ -95,8 +95,25 @@ type AuthedUserRow = {
     scanCheckedAt?: string;
     scanDetails?: string;
   }> | null;
+  lastDecisionEmailAt: string | null;
+  decisionEmailCount: number;
   createdAt: string;
 };
+
+const RESEND_COOLDOWN_MS = 60_000;
+
+function formatRelative(iso: string, now: number): string {
+  const diff = now - new Date(iso).getTime();
+  if (!Number.isFinite(diff) || diff < 0) return "just now";
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+}
 
 type ApprovalsPage = {
   items: AuthedUserRow[];
@@ -183,6 +200,19 @@ function ApprovalsList({ kind }: { kind: "applications" | "kyc" | "rejected" }) 
   const [sort, setSort] = useState<SortValue>("newest");
   const [searchInput, setSearchInput] = useState("");
   const [q, setQ] = useState("");
+  // Re-render every second while any row is inside the resend cooldown so
+  // the "Last sent: Ns ago" label and the disabled button tick down live.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const inCooldown = rows?.some(
+      (r) =>
+        r.lastDecisionEmailAt &&
+        Date.now() - new Date(r.lastDecisionEmailAt).getTime() < RESEND_COOLDOWN_MS,
+    );
+    if (!inCooldown) return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [rows]);
 
   const state = useMemo(
     () =>
@@ -276,6 +306,23 @@ function ApprovalsList({ kind }: { kind: "applications" | "kyc" | "rejected" }) 
       } else {
         toast.error("Email could not be delivered. Check server logs.");
       }
+      // Optimistically mark this row as just-sent so the cooldown countdown
+      // and "Last sent" label update immediately without a full reload.
+      const sentAt = new Date().toISOString();
+      setRows((prev) =>
+        prev
+          ? prev.map((r) =>
+              r.id === row.id
+                ? {
+                    ...r,
+                    lastDecisionEmailAt: sentAt,
+                    decisionEmailCount: (r.decisionEmailCount ?? 0) + 1,
+                  }
+                : r,
+            )
+          : prev,
+      );
+      setNow(Date.now());
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to resend");
     } finally {
@@ -388,17 +435,41 @@ function ApprovalsList({ kind }: { kind: "applications" | "kyc" | "rejected" }) 
                 {(kind === "rejected" ||
                   row.approvalStatus !== "pending" ||
                   row.kycStatus === "verified" ||
-                  row.kycStatus === "rejected") && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => resend(row)}
-                    disabled={busy === row.id}
-                    title="Re-send the latest decision email to this applicant"
-                  >
-                    <Mail className="h-4 w-4 mr-1" /> Resend email
-                  </Button>
-                )}
+                  row.kycStatus === "rejected") && (() => {
+                  const lastSentMs = row.lastDecisionEmailAt
+                    ? new Date(row.lastDecisionEmailAt).getTime()
+                    : 0;
+                  const remainingMs = lastSentMs
+                    ? Math.max(0, RESEND_COOLDOWN_MS - (now - lastSentMs))
+                    : 0;
+                  const inCooldown = remainingMs > 0;
+                  const count = row.decisionEmailCount ?? 0;
+                  const lastSentLabel = row.lastDecisionEmailAt
+                    ? `Last sent: ${formatRelative(row.lastDecisionEmailAt, now)}${count > 1 ? ` · ${count} times` : ""}`
+                    : "Never sent";
+                  const buttonTitle = inCooldown
+                    ? `Please wait ${Math.ceil(remainingMs / 1000)}s before resending`
+                    : "Re-send the latest decision email to this applicant";
+                  return (
+                    <div className="flex flex-col items-end gap-0.5">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => resend(row)}
+                        disabled={busy === row.id || inCooldown}
+                        title={buttonTitle}
+                      >
+                        <Mail className="h-4 w-4 mr-1" />
+                        {inCooldown
+                          ? `Resend in ${Math.ceil(remainingMs / 1000)}s`
+                          : "Resend email"}
+                      </Button>
+                      <span className="text-[10px] text-muted-foreground">
+                        {lastSentLabel}
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
