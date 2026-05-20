@@ -167,20 +167,16 @@ function ActionRow({
   onPress?: () => void;
 }) {
   const c = useColors();
-  const Wrapper: React.ElementType = onPress ? Pressable : View;
-  return (
-    <Wrapper
-      {...(onPress ? { onPress } : {})}
-      style={({ pressed }: { pressed?: boolean } = {}) => ({
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 14,
-        paddingVertical: 14,
-        borderTopWidth: 1,
-        borderTopColor: c.border,
-        backgroundColor: pressed ? c.accent : "transparent",
-      })}
-    >
+  const baseStyle = {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderTopColor: c.border,
+  };
+  const content = (
+    <>
       <Feather name={icon} size={18} color={c.mutedForeground} />
       <View style={{ flex: 1, marginLeft: 12 }}>
         <Text style={{ color: c.foreground, fontFamily: "Inter_500Medium", fontSize: 14 }}>{label}</Text>
@@ -191,6 +187,17 @@ function ActionRow({
         ) : null}
       </View>
       {onPress ? <Feather name="chevron-right" size={18} color={c.mutedForeground} /> : null}
-    </Wrapper>
+    </>
   );
+  if (onPress) {
+    return (
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => ({ ...baseStyle, backgroundColor: pressed ? c.accent : "transparent" })}
+      >
+        {content}
+      </Pressable>
+    );
+  }
+  return <View style={baseStyle}>{content}</View>;
 }
