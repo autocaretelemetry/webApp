@@ -92,6 +92,7 @@ export type FleetPartsOrder = {
   approvedByPhone: string | null;
   approvedByName: string | null;
   approvedAt: string | null;
+  approvalNote: string | null;
   paidByPhone: string | null;
   paidByName: string | null;
   paidAt: string | null;
@@ -295,9 +296,10 @@ export function useCreateFleetPartsOrder(orgId: string | null) {
 export function usePayFleetPartsOrder(orgId: string | null) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (orderId: string) =>
+    mutationFn: ({ orderId, note }: { orderId: string; note?: string }) =>
       request<FleetPartsOrder>(`/organizations/${orgId}/parts-orders/${orderId}/pay`, {
         method: "POST",
+        body: JSON.stringify(note ? { note } : {}),
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["fleet", "parts-orders", orgId] }),
   });

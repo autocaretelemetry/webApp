@@ -44,6 +44,7 @@ export const fleetPartsOrdersTable = pgTable("fleet_parts_orders", {
   approvedByPhone: text("approved_by_phone"),
   approvedByName: text("approved_by_name"),
   approvedAt: timestamp("approved_at", { withTimezone: true }),
+  approvalNote: text("approval_note"),
   paidByPhone: text("paid_by_phone"),
   paidByName: text("paid_by_name"),
   paidAt: timestamp("paid_at", { withTimezone: true }),

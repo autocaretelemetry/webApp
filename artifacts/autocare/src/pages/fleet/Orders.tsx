@@ -79,6 +79,8 @@ export default function FleetOrdersPage() {
 
   const [rejecting, setRejecting] = useState<FleetPartsOrder | null>(null);
   const [reason, setReason] = useState("");
+  const [approving, setApproving] = useState<FleetPartsOrder | null>(null);
+  const [approvalNote, setApprovalNote] = useState("");
 
   const orders = data?.orders ?? [];
   const grouped = useMemo(() => {
@@ -90,10 +92,14 @@ export default function FleetOrdersPage() {
     };
   }, [orders]);
 
-  const onPay = async (o: FleetPartsOrder) => {
+  const onPay = async () => {
+    if (!approving) return;
     try {
-      await pay.mutateAsync(o.id);
+      const note = approvalNote.trim();
+      await pay.mutateAsync({ orderId: approving.id, note: note || undefined });
       toast.success("Order paid.");
+      setApproving(null);
+      setApprovalNote("");
     } catch (err) {
       toast.error((err as Error).message);
     }
@@ -221,8 +227,14 @@ export default function FleetOrdersPage() {
                       </div>
 
                       {status === "paid" && (
-                        <div className="text-xs text-muted-foreground border-t pt-2">
-                          Paid by {o.paidByName ?? "—"} on {fmt(o.paidAt)}
+                        <div className="text-xs text-muted-foreground border-t pt-2 space-y-1">
+                          <div>Paid by {o.paidByName ?? "—"} on {fmt(o.paidAt)}</div>
+                          {o.approvalNote && (
+                            <div>
+                              <span className="text-muted-foreground">Note: </span>
+                              <span className="text-foreground">{o.approvalNote}</span>
+                            </div>
+                          )}
                         </div>
                       )}
                       {status === "rejected" && (
@@ -236,7 +248,10 @@ export default function FleetOrdersPage() {
                         <div className="flex gap-2 pt-1 border-t">
                           <Button
                             size="sm"
-                            onClick={() => onPay(o)}
+                            onClick={() => {
+                              setApproving(o);
+                              setApprovalNote("");
+                            }}
                             disabled={pay.isPending}
                           >
                             <CheckCircle2 className="h-4 w-4 mr-1.5" /> Approve & pay
@@ -261,6 +276,32 @@ export default function FleetOrdersPage() {
           </TabsContent>
         ))}
       </Tabs>
+
+      <Dialog open={!!approving} onOpenChange={(o) => !o && setApproving(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Approve & pay parts order</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label className="text-xs">Note (optional, kept with the order)</Label>
+            <Textarea
+              value={approvalNote}
+              onChange={(e) => setApprovalNote(e.target.value)}
+              placeholder="Paid against Q3 maintenance budget..."
+              rows={3}
+              maxLength={500}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setApproving(null)}>
+              Cancel
+            </Button>
+            <Button onClick={onPay} disabled={pay.isPending}>
+              {pay.isPending ? "Paying..." : "Approve & pay"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!rejecting} onOpenChange={(o) => !o && setRejecting(null)}>
         <DialogContent>

@@ -180,6 +180,10 @@ const RejectPartsOrderBody = z.object({
   reason: z.string().min(1).max(500),
 });
 
+const PayPartsOrderBody = z.object({
+  note: z.string().trim().max(500).optional(),
+});
+
 const ReplacePreferredCentersBody = z.object({
   serviceCenterIds: z.array(z.string().uuid()),
 });
@@ -1672,6 +1676,12 @@ router.post(
       res.status(400).json({ error: "Rejected orders can't be paid." });
       return;
     }
+    const parsed = PayPartsOrderBody.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+    const note = parsed.data.note?.trim();
     const now = new Date();
     const actorPhone = m.member?.phone ?? req.user!.phone ?? "platform-admin";
     const actorName = m.member?.name ?? req.user!.name ?? "Platform admin";
@@ -1682,6 +1692,7 @@ router.post(
         approvedByPhone: order.approvedByPhone ?? actorPhone,
         approvedByName: order.approvedByName ?? actorName,
         approvedAt: order.approvedAt ?? now,
+        approvalNote: note ? note : order.approvalNote,
         paidByPhone: actorPhone,
         paidByName: actorName,
         paidAt: now,
