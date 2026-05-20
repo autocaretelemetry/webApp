@@ -13,6 +13,22 @@ import {
   type KycDocument,
 } from "@workspace/db";
 import { requireAuth, requireSuperAdmin } from "../lib/auth";
+import {
+  sendEmail,
+  applicationApprovedEmail,
+  applicationRejectedEmail,
+  kycVerifiedEmail,
+  kycRejectedEmail,
+  type EmailMessage,
+} from "../lib/email";
+import { logger } from "../lib/logger";
+
+function fireEmail(to: string | null | undefined, msg: Omit<EmailMessage, "to">): void {
+  if (!to) return;
+  sendEmail({ to, ...msg }).catch((err) =>
+    logger.warn({ err, to }, "onboarding email send threw"),
+  );
+}
 
 const router: IRouter = Router();
 
@@ -179,6 +195,10 @@ router.patch(
         .where(eq(usersTable.id, userId))
         .returning();
       const { passwordHash: _ph, ...safe } = row!;
+      fireEmail(
+        row!.email,
+        applicationRejectedEmail(row!.name, row!.approvalNote),
+      );
       res.json(safe);
       return;
     }
@@ -219,6 +239,10 @@ router.patch(
       throw err;
     }
     const { passwordHash: _ph, ...safe } = updated!;
+    fireEmail(
+      updated!.email,
+      applicationApprovedEmail(updated!.name, updated!.approvalNote),
+    );
     res.json(safe);
   },
 );
@@ -256,6 +280,12 @@ router.patch(
       .where(eq(usersTable.id, userId))
       .returning();
     const { passwordHash: _ph, ...safe } = row!;
+    fireEmail(
+      row!.email,
+      parsed.data.decision === "verify"
+        ? kycVerifiedEmail(row!.name, row!.kycNote)
+        : kycRejectedEmail(row!.name, row!.kycNote),
+    );
     res.json(safe);
   },
 );

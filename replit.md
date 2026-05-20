@@ -91,6 +91,7 @@ Connected automotive service platform that pairs vehicle owners with service cen
 - Server enforcement: `routes/onboarding.ts` exports a `requireKycVerified` middleware mounted in `routes/index.ts` AFTER auth/storage/onboarding/landing-content but BEFORE every other resource router. Anonymous traffic and admin/super_admin bypass; everyone else gets 403 `{reason}` until verified.
 - Login enforcement: `POST /auth/login` returns 403 with `{reason:"pending"}` or `{reason:"rejected", note}` for non-approved users; Login.tsx parses these into banner UX instead of the generic toast.
 - Grandfathering: existing seeded demo accounts are backfilled to `approved`+`verified` via `seedUsers.ts` so the demo experience is unchanged. New legacy `POST /auth/signup` calls (no `requestedRole` — used by the rentals quick-signup flow) still auto-approve as `owner` and issue a cookie so existing flows keep working.
+- Decision emails: `PATCH /admin/approvals/:userId` and `PATCH /admin/kyc/:userId` fire a transactional email to the applicant (approved / rejected / KYC verified / KYC rejected). Templates and the SendGrid wrapper live in `artifacts/api-server/src/lib/email.ts`; sends are fire-and-forget (failure never blocks the decision response). Set `SENDGRID_API_KEY` (and optionally `EMAIL_FROM`, default `AutoCare <no-reply@autocare.test>`) to enable delivery — without it the message is logged via pino and `sendEmail` returns `{ok:false, reason:"not_configured"}`, same pattern as `whatsapp.ts`.
 
 ## User preferences
 
