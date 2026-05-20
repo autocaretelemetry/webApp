@@ -7,7 +7,11 @@ import {
   MarkAllNotificationsReadBody,
   GenerateReminderNotificationsBody,
 } from "@workspace/api-zod";
-import { runReminderJob, listRecentReminderRuns } from "../lib/reminders";
+import {
+  runReminderJob,
+  listRecentReminderRuns,
+  getRetentionDays,
+} from "../lib/reminders";
 import { requireAuth, requireAdmin } from "../lib/auth";
 
 const router: IRouter = Router();
@@ -142,7 +146,7 @@ router.get(
   requireAdmin,
   async (_req, res): Promise<void> => {
     const runs = await listRecentReminderRuns(25);
-    res.json(runs);
+    res.json({ runs, retentionDays: getRetentionDays() });
   },
 );
 

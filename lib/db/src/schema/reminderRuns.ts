@@ -19,6 +19,11 @@ export const reminderRunsTable = pgTable(
     // indicate a crashed run and are surfaced to admins as such.
     status: text("status").notNull().default("running"),
     createdCount: integer("created_count").notNull().default(0),
+    // Number of old `reminder_runs` rows deleted at the tail of this run
+    // (see pruneOldReminderRuns). Surfaced to admins so they can confirm
+    // the silent retention cleanup is actually firing. Null on rows that
+    // pre-date the prune-count tracking or never completed.
+    prunedCount: integer("pruned_count"),
     errorMessage: text("error_message"),
   },
   (t) => [index("reminder_runs_started_idx").on(t.startedAt)],

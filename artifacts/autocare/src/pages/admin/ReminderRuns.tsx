@@ -15,7 +15,13 @@ type ReminderRun = {
   finishedAt: string | null;
   status: "running" | "success" | "error" | string;
   createdCount: number;
+  prunedCount: number | null;
   errorMessage: string | null;
+};
+
+type ReminderRunsResponse = {
+  runs: ReminderRun[];
+  retentionDays: number;
 };
 
 const REMINDER_RUNS_KEY = ["reminder-runs"] as const;
@@ -42,7 +48,7 @@ export default function AdminReminderRuns() {
   const qc = useQueryClient();
   const [isTriggering, setIsTriggering] = useState(false);
 
-  const { data, isLoading, refetch } = useQuery<ReminderRun[]>({
+  const { data, isLoading, refetch } = useQuery<ReminderRunsResponse>({
     queryKey: REMINDER_RUNS_KEY,
     queryFn: async () => {
       const res = await fetch("/api/notifications/reminder-runs", {
@@ -86,16 +92,25 @@ export default function AdminReminderRuns() {
     }
   }
 
-  const runs = data ?? [];
+  const runs = data?.runs ?? [];
+  const retentionDays = data?.retentionDays ?? null;
   const last = runs[0] ?? null;
   const lastSuccess = runs.find((r) => r.status === "success") ?? null;
   const recentFailures = runs.filter((r) => r.status === "error").length;
+  const totalPruned = runs.reduce(
+    (sum, r) => sum + (r.prunedCount ?? 0),
+    0,
+  );
 
   return (
     <div className="space-y-6 pb-12">
       <PageHeader
         title="Reminder runs"
-        description="Audit of the service-reminder generator. Runs on a recurring schedule, can be triggered manually, and is also invoked by the optional Replit Scheduled Deployment."
+        description={
+          retentionDays !== null
+            ? `Audit of the service-reminder generator. Runs on a recurring schedule, can be triggered manually, and is also invoked by the optional Replit Scheduled Deployment. Run history is retained for ${retentionDays} day${retentionDays === 1 ? "" : "s"} (configurable via REMINDER_RETENTION_DAYS); older rows are pruned at the end of every successful run.`
+            : "Audit of the service-reminder generator. Runs on a recurring schedule, can be triggered manually, and is also invoked by the optional Replit Scheduled Deployment."
+        }
         actions={
           <Button onClick={triggerNow} disabled={isTriggering}>
             {isTriggering ? (
@@ -150,6 +165,19 @@ export default function AdminReminderRuns() {
         <Card>
           <CardContent className="p-5">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              Pruned in last {runs.length || 0} runs
+            </p>
+            <p className="text-lg font-semibold mt-1">{totalPruned}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {retentionDays !== null
+                ? `Older than ${retentionDays} day${retentionDays === 1 ? "" : "s"}`
+                : "Retention window unknown"}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
               Failures in last {runs.length || 0} runs
             </p>
             <p
@@ -179,6 +207,7 @@ export default function AdminReminderRuns() {
                   <th className="px-4 py-3 font-medium">Trigger</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium">Created</th>
+                  <th className="px-4 py-3 font-medium">Pruned</th>
                   <th className="px-4 py-3 font-medium">Duration</th>
                   <th className="px-4 py-3 font-medium">Detail</th>
                 </tr>
@@ -186,13 +215,13 @@ export default function AdminReminderRuns() {
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                    <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
                       Loading reminder runs…
                     </td>
                   </tr>
                 ) : runs.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                    <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
                       No runs yet. The scheduler logs its first run shortly after the
                       server starts.
                     </td>
@@ -223,6 +252,13 @@ export default function AdminReminderRuns() {
                         )}
                       </td>
                       <td className="px-4 py-3">{r.createdCount}</td>
+                      <td className="px-4 py-3">
+                        {r.prunedCount === null ? (
+                          <span className="text-muted-foreground">—</span>
+                        ) : (
+                          r.prunedCount
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         {fmtDuration(durationMs(r.startedAt, r.finishedAt))}
                       </td>

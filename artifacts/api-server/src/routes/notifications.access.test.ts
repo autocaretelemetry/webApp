@@ -161,7 +161,9 @@ describe("Notifications access isolation", () => {
       .get(`/api/notifications/reminder-runs`)
       .set("Cookie", cookieAdmin);
     expect(res.status).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
+    expect(Array.isArray(res.body.runs)).toBe(true);
+    expect(typeof res.body.retentionDays).toBe("number");
+    expect(res.body.retentionDays).toBeGreaterThan(0);
   });
 
   it("ignores spoofed ownerPhone on mark-all-read and only touches caller's rows", async () => {
@@ -200,6 +202,7 @@ describe("runReminderJob persists run rows", () => {
     expect(row!.status).toBe("success");
     expect(row!.trigger).toBe("manual");
     expect(row!.createdCount).toBe(result.created);
+    expect(row!.prunedCount).toBe(result.pruned);
     expect(row!.errorMessage).toBeNull();
     expect(row!.finishedAt).not.toBeNull();
     expect(row!.startedAt.getTime()).toBeGreaterThanOrEqual(before.getTime() - 1000);
@@ -299,7 +302,7 @@ describe("runReminderJob persists run rows", () => {
       .get(`/api/notifications/reminder-runs`)
       .set("Cookie", cookieAdmin);
     expect(res.status).toBe(200);
-    const rows = res.body as Array<{ id: string; trigger: string }>;
+    const rows = res.body.runs as Array<{ id: string; trigger: string }>;
     const found = rows.find((r) => r.id === result.runId);
     expect(found).toBeDefined();
     expect(found!.trigger).toBe("external");

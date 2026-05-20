@@ -144,6 +144,7 @@ export async function generateServiceReminderNotifications(): Promise<number> {
 export type ReminderJobResult = {
   runId: string;
   created: number;
+  pruned: number;
   status: "success" | "error";
   errorMessage: string | null;
 };
@@ -165,19 +166,25 @@ export async function runReminderJob(
   const runId = row!.id;
   try {
     const created = await generateServiceReminderNotifications();
-    await db
-      .update(reminderRunsTable)
-      .set({ status: "success", createdCount: created, finishedAt: new Date() })
-      .where(eq(reminderRunsTable.id, runId));
-    if (created > 0) {
-      logger.info({ runId, trigger, created }, "Reminder run completed");
-    }
+    let pruned = 0;
     try {
-      await pruneOldReminderRuns();
+      pruned = await pruneOldReminderRuns();
     } catch (pruneErr) {
       logger.warn({ err: pruneErr, runId }, "Failed to prune old reminder runs");
     }
-    return { runId, created, status: "success", errorMessage: null };
+    await db
+      .update(reminderRunsTable)
+      .set({
+        status: "success",
+        createdCount: created,
+        prunedCount: pruned,
+        finishedAt: new Date(),
+      })
+      .where(eq(reminderRunsTable.id, runId));
+    if (created > 0 || pruned > 0) {
+      logger.info({ runId, trigger, created, pruned }, "Reminder run completed");
+    }
+    return { runId, created, pruned, status: "success", errorMessage: null };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await db
@@ -191,7 +198,7 @@ export async function runReminderJob(
     await maybeAlertOnFailureStreak(message).catch((alertErr) =>
       logger.warn({ err: alertErr, runId }, "Failed to dispatch reminder-failure alert"),
     );
-    return { runId, created: 0, status: "error", errorMessage: message };
+    return { runId, created: 0, pruned: 0, status: "error", errorMessage: message };
   }
 }
 
@@ -351,7 +358,7 @@ async function maybeAlertOnFailureStreak(latestError: string): Promise<void> {
  */
 export const DEFAULT_REMINDER_RETENTION_DAYS = 90;
 
-function getRetentionDays(): number {
+export function getRetentionDays(): number {
   const raw = process.env["REMINDER_RETENTION_DAYS"];
   if (!raw) return DEFAULT_REMINDER_RETENTION_DAYS;
   const n = Number.parseInt(raw, 10);
