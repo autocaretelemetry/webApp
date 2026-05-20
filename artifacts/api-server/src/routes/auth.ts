@@ -77,6 +77,16 @@ router.post("/auth/signup", async (req, res): Promise<void> => {
   const email = parsed.data.email.trim().toLowerCase();
   const requestedRole = parsed.data.requestedRole ?? null;
   const isApplication = !!requestedRole;
+  // Normalise channel preferences against the allowed list. Omitting the
+  // field (legacy callers) means "default to all channels" — handled by
+  // leaving the column null so wantsChannel() falls back to delivering on
+  // every channel.
+  const allowedChannels = ["email", "whatsapp"] as const;
+  let notificationChannels: typeof allowedChannels[number][] | null = null;
+  if (parsed.data.notificationChannels !== undefined) {
+    const set = new Set(parsed.data.notificationChannels);
+    notificationChannels = allowedChannels.filter((c) => set.has(c));
+  }
   const [dup] = await db
     .select({ id: usersTable.id })
     .from(usersTable)
@@ -108,6 +118,9 @@ router.post("/auth/signup", async (req, res): Promise<void> => {
         applicantData: (parsed.data.applicantData ?? null) as
           | Record<string, unknown>
           | null,
+        ...(notificationChannels !== null
+          ? { notificationChannels }
+          : {}),
       })
       .returning();
   } catch (err) {

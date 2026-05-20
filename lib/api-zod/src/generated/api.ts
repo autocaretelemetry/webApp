@@ -3628,7 +3628,8 @@ export const SignupBody = zod.object({
   "password": zod.string().min(signupBodyPasswordMin),
   "phone": zod.string().nullish(),
   "requestedRole": zod.enum(['owner', 'renter', 'center', 'vendor', 'delivery', 'fleet']).nullish(),
-  "applicantData": zod.record(zod.string(), zod.unknown()).nullish()
+  "applicantData": zod.record(zod.string(), zod.unknown()).nullish(),
+  "notificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional()
 })
 
 

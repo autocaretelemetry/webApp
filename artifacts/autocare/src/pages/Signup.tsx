@@ -17,8 +17,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+
+const NOTIFICATION_CHANNELS = ["email", "whatsapp"] as const;
+type NotifChannel = (typeof NOTIFICATION_CHANNELS)[number];
 
 type RoleKey = "owner" | "renter" | "center" | "vendor" | "delivery" | "fleet";
 
@@ -77,9 +81,21 @@ export default function SignupPage() {
   const [form, setForm] = useState<FormState>(EMPTY);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [channels, setChannels] = useState<NotifChannel[]>(() => [
+    ...NOTIFICATION_CHANNELS,
+  ]);
 
   const update = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
+
+  const toggleChannel = (channel: NotifChannel, on: boolean) => {
+    setChannels((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(channel);
+      else next.delete(channel);
+      return NOTIFICATION_CHANNELS.filter((c) => next.has(c));
+    });
+  };
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -94,6 +110,10 @@ export default function SignupPage() {
     }
     if (form.password !== form.confirm) {
       toast.error("Passwords don't match.");
+      return;
+    }
+    if (channels.length === 0) {
+      toast.error("Pick at least one notification channel so we can reach you.");
       return;
     }
     const applicantData: Record<string, unknown> = { notes: form.notes.trim() || undefined };
@@ -125,6 +145,7 @@ export default function SignupPage() {
         phone: form.phone.trim(),
         requestedRole: role,
         applicantData,
+        notificationChannels: channels,
       });
       setSubmitted(true);
     } catch (err) {
@@ -309,6 +330,30 @@ export default function SignupPage() {
                 placeholder="Number of vehicles, years in business, etc."
               />
             </Field>
+
+            <div className="space-y-2 rounded-md border bg-muted/30 p-4">
+              <Label>How should we reach you with the decision?</Label>
+              <p className="text-xs text-muted-foreground">
+                We'll send updates about your application and KYC review on the
+                channels you tick. You can change this later from your profile.
+              </p>
+              <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:gap-6">
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={channels.includes("email")}
+                    onCheckedChange={(v) => toggleChannel("email", v === true)}
+                  />
+                  Email
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={channels.includes("whatsapp")}
+                    onCheckedChange={(v) => toggleChannel("whatsapp", v === true)}
+                  />
+                  WhatsApp
+                </label>
+              </div>
+            </div>
 
             <Button type="submit" disabled={submitting} className="w-full">
               {submitting ? "Submitting…" : "Submit application"}

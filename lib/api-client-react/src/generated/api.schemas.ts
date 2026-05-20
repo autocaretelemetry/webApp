@@ -29,6 +29,14 @@ export const SignupInputRequestedRole = {
 
 export type SignupInputApplicantData = { [key: string]: unknown } | null;
 
+export type SignupInputNotificationChannelsItem = typeof SignupInputNotificationChannelsItem[keyof typeof SignupInputNotificationChannelsItem];
+
+
+export const SignupInputNotificationChannelsItem = {
+  email: 'email',
+  whatsapp: 'whatsapp',
+} as const;
+
 export interface SignupInput {
   /** @minLength 1 */
   name: string;
@@ -38,6 +46,7 @@ export interface SignupInput {
   phone?: string | null;
   requestedRole?: SignupInputRequestedRole;
   applicantData?: SignupInputApplicantData;
+  notificationChannels?: SignupInputNotificationChannelsItem[];
 }
 
 export type AuthedUserRole = typeof AuthedUserRole[keyof typeof AuthedUserRole];

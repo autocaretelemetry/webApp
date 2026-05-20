@@ -177,6 +177,7 @@ export * from './serviceRecord';
 export * from './serviceType';
 export * from './signupInput';
 export * from './signupInputApplicantData';
+export * from './signupInputNotificationChannelsItem';
 export * from './signupInputRequestedRole';
 export * from './statusCount';
 export * from './storageError';

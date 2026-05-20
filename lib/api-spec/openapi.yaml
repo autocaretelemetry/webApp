@@ -2163,6 +2163,9 @@ components:
           type: object
           additionalProperties: true
           nullable: true
+        notificationChannels:
+          type: array
+          items: { type: string, enum: [email, whatsapp] }
 
     AuthedUser:
       type: object

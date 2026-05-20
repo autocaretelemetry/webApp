@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { SignupInputApplicantData } from './signupInputApplicantData';
+import type { SignupInputNotificationChannelsItem } from './signupInputNotificationChannelsItem';
 import type { SignupInputRequestedRole } from './signupInputRequestedRole';
 
 export interface SignupInput {
@@ -17,4 +18,5 @@ export interface SignupInput {
   phone?: string | null;
   requestedRole?: SignupInputRequestedRole;
   applicantData?: SignupInputApplicantData;
+  notificationChannels?: SignupInputNotificationChannelsItem[];
 }
