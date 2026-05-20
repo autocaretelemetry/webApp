@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -10,10 +11,14 @@ import { ALL_ROLES, ROLE_LABEL, type Role } from "@/lib/roles";
 
 export default function ProfileScreen() {
   const c = useColors();
+  const router = useRouter();
   const { user, role, logout, setRoleOverride } = useAuth();
   const insets = useSafeAreaInsets();
   if (!user) return null;
   const canImpersonate = user.role === "super_admin";
+  const needsKyc = user.approvalStatus === "approved" && user.kycStatus !== "verified";
+  const showFleetQueue = role === "fleet";
+  const showApprovals = role === "super_admin";
 
   const kycLabel =
     user.kycStatus === "verified"
@@ -111,6 +116,33 @@ export default function ProfileScreen() {
         </Section>
       ) : null}
 
+      <Section title="Quick actions">
+        <Card padding={0}>
+          <ActionRow
+            icon="shield"
+            label={needsKyc ? "Finish identity verification" : "Identity verification"}
+            hint={needsKyc ? "Required to unlock the app" : "Re-submit documents"}
+            onPress={() => router.push("/kyc")}
+          />
+          {showFleetQueue ? (
+            <ActionRow
+              icon="package"
+              label="Fleet parts orders"
+              hint="Approve or reject pending orders"
+              onPress={() => router.push("/fleet/parts-orders")}
+            />
+          ) : null}
+          {showApprovals ? (
+            <ActionRow
+              icon="clipboard"
+              label="Approvals queue"
+              hint="Applications & KYC review"
+              onPress={() => router.push("/admin/approvals")}
+            />
+          ) : null}
+        </Card>
+      </Section>
+
       <Section title="Account">
         <Card padding={0}>
           <ActionRow icon="external-link" label="Open full web app" hint={(process.env as Record<string, string | undefined>)["EXPO_PUBLIC_DOMAIN"] ?? ""} />
@@ -127,22 +159,27 @@ function ActionRow({
   icon,
   label,
   hint,
+  onPress,
 }: {
   icon: React.ComponentProps<typeof Feather>["name"];
   label: string;
   hint?: string;
+  onPress?: () => void;
 }) {
   const c = useColors();
+  const Wrapper: React.ElementType = onPress ? Pressable : View;
   return (
-    <View
-      style={{
+    <Wrapper
+      {...(onPress ? { onPress } : {})}
+      style={({ pressed }: { pressed?: boolean } = {}) => ({
         flexDirection: "row",
         alignItems: "center",
         paddingHorizontal: 14,
         paddingVertical: 14,
         borderTopWidth: 1,
         borderTopColor: c.border,
-      }}
+        backgroundColor: pressed ? c.accent : "transparent",
+      })}
     >
       <Feather name={icon} size={18} color={c.mutedForeground} />
       <View style={{ flex: 1, marginLeft: 12 }}>
@@ -153,6 +190,7 @@ function ActionRow({
           </Text>
         ) : null}
       </View>
-    </View>
+      {onPress ? <Feather name="chevron-right" size={18} color={c.mutedForeground} /> : null}
+    </Wrapper>
   );
 }

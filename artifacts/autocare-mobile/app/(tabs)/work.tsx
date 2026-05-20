@@ -1,8 +1,9 @@
+import { useRouter } from "expo-router";
 import React from "react";
-import { ScrollView, Text, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Section } from "@/components/ui";
+import { Button, Section } from "@/components/ui";
 import { WorkList } from "@/components/dashboards";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
@@ -20,13 +21,18 @@ const TITLES: Record<string, string> = {
 
 export default function WorkScreen() {
   const c = useColors();
+  const router = useRouter();
   const { role, token } = useAuth();
   const insets = useSafeAreaInsets();
+  const canCreateBooking = role === "owner" || role === "admin" || role === "super_admin";
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: c.background }}
       contentContainerStyle={{ padding: 18, paddingBottom: insets.bottom + 96, gap: 16 }}
     >
+      {canCreateBooking ? (
+        <Button label="Book a service" onPress={() => router.push("/bookings/new")} />
+      ) : null}
       <Section title={TITLES[role] ?? "Activity"}>
         <WorkList role={role} token={token} />
       </Section>

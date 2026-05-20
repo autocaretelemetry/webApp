@@ -17,6 +17,7 @@ import { setBaseUrl, setAuthTokenGetter } from "@workspace/api-client-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider, configureAuthApiBase, useAuth } from "@/contexts/AuthContext";
 import { getStoredToken } from "@/lib/token-store";
+import { setMobileApiBase } from "@/lib/api-mobile";
 import { LoadingScreen } from "@/components/ui";
 
 SplashScreen.preventAutoHideAsync();
@@ -44,6 +45,7 @@ function resolveApiBase(): string {
 const API_BASE = resolveApiBase();
 setBaseUrl(API_BASE);
 configureAuthApiBase(API_BASE);
+setMobileApiBase(API_BASE);
 setAuthTokenGetter(async () => getStoredToken());
 
 function AuthGate() {
@@ -67,6 +69,13 @@ function AuthGate() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="signup" options={{ headerShown: false }} />
+      <Stack.Screen name="kyc" options={{ title: "Identity verification" }} />
+      <Stack.Screen name="rentals/[id]" options={{ title: "Car details" }} />
+      <Stack.Screen name="trips/[id]" options={{ title: "Trip" }} />
+      <Stack.Screen name="bookings/new" options={{ title: "Book a service" }} />
+      <Stack.Screen name="bookings/[id]" options={{ title: "Service booking" }} />
+      <Stack.Screen name="fleet/parts-orders" options={{ title: "Parts orders" }} />
+      <Stack.Screen name="admin/approvals" options={{ title: "Approvals" }} />
     </Stack>
   );
 }

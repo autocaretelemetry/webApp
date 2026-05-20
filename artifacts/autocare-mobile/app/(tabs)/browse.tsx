@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -8,7 +9,7 @@ import {
   useListParts,
 } from "@workspace/api-client-react";
 
-import { Card, EmptyState, LoadingScreen, Row, Section } from "@/components/ui";
+import { Card, EmptyState, LoadingScreen, Row } from "@/components/ui";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -150,6 +151,7 @@ function PartsList() {
 
 function CarsList({ token }: { token: string | null }) {
   const safeToken = token ?? "";
+  const router = useRouter();
   const q = useQuery({
     queryKey: ["browse-cars"],
     queryFn: async () => {
@@ -179,6 +181,7 @@ function CarsList({ token }: { token: string | null }) {
             subtitle={[car.city, car.dailyRate != null ? `GHS ${car.dailyRate.toFixed(0)} / day` : null]
               .filter(Boolean)
               .join("  ·  ")}
+            onPress={() => router.push(`/rentals/${car.id}`)}
           />
         </View>
       ))}
