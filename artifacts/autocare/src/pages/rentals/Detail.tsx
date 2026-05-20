@@ -274,9 +274,15 @@ export default function RentalDetail() {
               <p className="text-sm text-muted-foreground flex items-center gap-2">
                 <User className="h-4 w-4" /> {car.ownerName}
               </p>
-              <p className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
-                <Phone className="h-4 w-4" /> {car.ownerPhone}
-              </p>
+              {car.ownerPhone ? (
+                <p className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
+                  <Phone className="h-4 w-4" /> {car.ownerPhone}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-1 italic">
+                  Phone shared once the owner approves your booking.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>

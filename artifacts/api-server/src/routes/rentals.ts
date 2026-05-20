@@ -402,10 +402,11 @@ router.get("/rental-cars/:carId/public", async (req, res): Promise<void> => {
 
 // Bookings that count as "the owner approved this renter for this car" — at
 // these statuses the renter legitimately needs the chauffeur's phone /
-// licence to coordinate pickup, so we expose the full driver row. The
-// rental FSM is `pending_review -> contract_pending -> awaiting_payment ->
-// confirmed -> active -> completed`; owner approval flips the booking out
-// of `pending_review` into `contract_pending`, so everything from
+// licence (and the owner's phone/email) to coordinate pickup, so we expose
+// the full driver row + owner contact. The rental FSM is
+// `pending_review -> contract_pending -> awaiting_payment -> confirmed ->
+// active -> completed`; owner approval flips the booking out of
+// `pending_review` into `contract_pending`, so everything from
 // contract_pending onward (short of cancelled/rejected) counts as
 // owner-approved.
 const DRIVER_PII_BOOKING_STATUSES = [
@@ -415,6 +416,7 @@ const DRIVER_PII_BOOKING_STATUSES = [
   "active",
   "completed",
 ] as const;
+const OWNER_PII_BOOKING_STATUSES = DRIVER_PII_BOOKING_STATUSES;
 
 router.get("/rental-cars/:carId", requireAuth, async (req, res): Promise<void> => {
   const params = GetRentalCarParams.safeParse(req.params);
@@ -439,8 +441,8 @@ router.get("/rental-cars/:carId", requireAuth, async (req, res): Promise<void> =
   const role = req.user?.role;
   const isAdmin = role === "admin" || role === "super_admin";
   const callerPhone = (req.user?.phone ?? "").trim();
-  let canSeeDriverPii = isAdmin || (!!callerPhone && callerPhone === row.ownerPhone.trim());
-  if (!canSeeDriverPii && callerPhone) {
+  let canSeePii = isAdmin || (!!callerPhone && callerPhone === row.ownerPhone.trim());
+  if (!canSeePii && callerPhone) {
     const [match] = await db
       .select({ id: rentalBookingsTable.id })
       .from(rentalBookingsTable)
@@ -448,15 +450,15 @@ router.get("/rental-cars/:carId", requireAuth, async (req, res): Promise<void> =
         and(
           eq(rentalBookingsTable.carId, row.id),
           eq(rentalBookingsTable.renterPhone, callerPhone),
-          inArray(rentalBookingsTable.status, [...DRIVER_PII_BOOKING_STATUSES]),
+          inArray(rentalBookingsTable.status, [...OWNER_PII_BOOKING_STATUSES]),
         ),
       )
       .limit(1);
-    canSeeDriverPii = !!match;
+    canSeePii = !!match;
   }
 
   const driver =
-    hydrated.driver && !canSeeDriverPii
+    hydrated.driver && !canSeePii
       ? {
           id: hydrated.driver.id,
           name: hydrated.driver.name,
@@ -466,7 +468,14 @@ router.get("/rental-cars/:carId", requireAuth, async (req, res): Promise<void> =
           bio: hydrated.driver.bio,
         }
       : hydrated.driver;
-  res.json({ ...hydrated, driver });
+  // Owner PII (phone, email) is gated the same way as the chauffeur's: only
+  // admins, the owner themselves, and renters with an owner-approved booking
+  // on this car see them. Everyone else gets the same shape as the /public
+  // share view (ownerKind + ownerName only).
+  const redactedOwner = canSeePii
+    ? {}
+    : { ownerPhone: undefined, ownerEmail: undefined };
+  res.json({ ...hydrated, driver, ...redactedOwner });
 });
 
 router.post("/rental-cars", requireAuth, async (req, res): Promise<void> => {
