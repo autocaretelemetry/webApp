@@ -340,7 +340,24 @@ router.get("/rental-cars", requireAuth, async (req, res): Promise<void> => {
     .from(rentalCarsTable)
     .where(filters.length ? and(...filters) : undefined)
     .orderBy(desc(rentalCarsTable.createdAt));
-  res.json(await hydrateCarsWithDriver(rows));
+  const hydrated = await hydrateCarsWithDriver(rows);
+  // Owner PII (phone, email) is gated the same way as on the single-car
+  // route: admins and the row's own owner see contact details; everyone
+  // else (signed-in renters browsing the directory) gets a stripped row
+  // and must fetch the detail route — which performs a per-booking
+  // approval check — to obtain owner contact for a specific car. Without
+  // this, any signed-in user could scrape every owner's phone with one
+  // request to /rental-cars.
+  const role = req.user?.role;
+  const isAdmin = role === "admin" || role === "super_admin";
+  const callerPhone = (req.user?.phone ?? "").trim();
+  const redacted = hydrated.map((car) => {
+    if (isAdmin || (!!callerPhone && callerPhone === car.ownerPhone.trim())) {
+      return car;
+    }
+    return { ...car, ownerPhone: undefined, ownerEmail: undefined };
+  });
+  res.json(redacted);
 });
 
 router.get("/rental-cars/:carId/public", async (req, res): Promise<void> => {
