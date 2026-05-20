@@ -84,9 +84,7 @@ const OWNER_NAV: NavSection[] = [
   {
     label: "Rentals",
     items: [
-      { href: "/rentals", label: "Rent a Car", icon: KeyRound },
-      { href: "/rentals/my-bookings", label: "My Rentals", icon: CalendarDays },
-      { href: "/rentals/profile", label: "Renter Profile", icon: UserCircle2 },
+      { href: "/rentals", label: "Browse Cars", icon: KeyRound },
       { href: "/rentals/my-listings", label: "My Listings", icon: Layers },
       { href: "/rentals/drivers", label: "Drivers", icon: UserCircle2 },
       { href: "/rentals/listing-requests", label: "Requests on my cars", icon: ShieldCheck },

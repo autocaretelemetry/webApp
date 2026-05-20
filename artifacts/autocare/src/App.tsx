@@ -142,7 +142,6 @@ function RoleGuard({
 }
 
 const ownerOnly = (c: ComponentType) => () => <RoleGuard allow={["owner"]} component={c} />;
-const renterOrOwner = (c: ComponentType) => () => <RoleGuard allow={["owner", "renter"]} component={c} />;
 const renterOnly = (c: ComponentType) => () => <RoleGuard allow={["renter"]} component={c} />;
 const centerOnly = (c: ComponentType) => () => <RoleGuard allow={["center"]} component={c} />;
 const vendorOnly = (c: ComponentType) => () => <RoleGuard allow={["vendor"]} component={c} />;
