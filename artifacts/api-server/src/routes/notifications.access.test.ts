@@ -130,6 +130,14 @@ describe("Notifications access isolation", () => {
     expect(row?.readAt).toBeNull();
   });
 
+  it("403s when a regular user tries to generate platform-wide reminders", async () => {
+    const res = await request(app)
+      .post(`/api/notifications/generate-reminders`)
+      .set("Cookie", cookieA)
+      .send({});
+    expect(res.status).toBe(403);
+  });
+
   it("ignores spoofed ownerPhone on mark-all-read and only touches caller's rows", async () => {
     const res = await request(app)
       .post(`/api/notifications/mark-all-read`)

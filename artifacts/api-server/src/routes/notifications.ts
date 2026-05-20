@@ -8,7 +8,7 @@ import {
   GenerateReminderNotificationsBody,
 } from "@workspace/api-zod";
 import { generateServiceReminderNotifications } from "../lib/reminders";
-import { requireAuth } from "../lib/auth";
+import { requireAuth, requireAdmin } from "../lib/auth";
 
 const router: IRouter = Router();
 
@@ -113,6 +113,7 @@ router.post("/notifications/mark-all-read", async (req, res): Promise<void> => {
 
 router.post(
   "/notifications/generate-reminders",
+  requireAdmin,
   async (req, res): Promise<void> => {
     const body = GenerateReminderNotificationsBody.safeParse(req.body ?? {});
     if (!body.success) {
