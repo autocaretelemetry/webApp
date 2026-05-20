@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { eq } from "drizzle-orm";
 import {
   db,
@@ -18,10 +18,38 @@ import {
   notifyCenterInvoiceApproved,
   notifyCenterPaymentReceived,
 } from "../lib/centerAlerts";
+import { requireAuth } from "../lib/auth";
+import { authorizeServiceBooking, type BookingRelationship } from "./bookings";
 
 const router: IRouter = Router();
 
-router.post("/bookings/:bookingId/invoice", async (req, res): Promise<void> => {
+/**
+ * Loads an invoice and authorizes the signed-in caller by piggy-backing on
+ * the booking-level access helper (an invoice is always tied to exactly
+ * one booking). Returns null AFTER writing a 401/403/404 response.
+ */
+async function authorizeInvoice(
+  req: Request,
+  res: Response,
+  invoiceId: string,
+): Promise<{
+  invoice: typeof invoicesTable.$inferSelect;
+  relationship: BookingRelationship;
+} | null> {
+  const [invoice] = await db
+    .select()
+    .from(invoicesTable)
+    .where(eq(invoicesTable.id, invoiceId));
+  if (!invoice) {
+    res.status(404).json({ error: "Invoice not found" });
+    return null;
+  }
+  const access = await authorizeServiceBooking(req, res, invoice.bookingId);
+  if (!access) return null;
+  return { invoice, relationship: access.relationship };
+}
+
+router.post("/bookings/:bookingId/invoice", requireAuth, async (req, res): Promise<void> => {
   const params = CreateInvoiceParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -33,12 +61,14 @@ router.post("/bookings/:bookingId/invoice", async (req, res): Promise<void> => {
     return;
   }
 
-  const [booking] = await db
-    .select()
-    .from(bookingsTable)
-    .where(eq(bookingsTable.id, params.data.bookingId));
-  if (!booking) {
-    res.status(404).json({ error: "Booking not found" });
+  const access = await authorizeServiceBooking(req, res, params.data.bookingId);
+  if (!access) return;
+  const booking = access.booking;
+  // Issuing an invoice is a service-center action.
+  if (access.relationship === "owner") {
+    res.status(403).json({
+      error: "Only the service center handling this booking can issue an invoice.",
+    });
     return;
   }
   if (booking.status !== "in_progress") {
@@ -91,39 +121,36 @@ router.post("/bookings/:bookingId/invoice", async (req, res): Promise<void> => {
   res.status(201).json(invoice);
 });
 
-router.get("/invoices/:invoiceId", async (req, res): Promise<void> => {
+router.get("/invoices/:invoiceId", requireAuth, async (req, res): Promise<void> => {
   const params = GetInvoiceParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
     return;
   }
-  const [row] = await db
-    .select()
-    .from(invoicesTable)
-    .where(eq(invoicesTable.id, params.data.invoiceId));
-  if (!row) {
-    res.status(404).json({ error: "Invoice not found" });
-    return;
-  }
-  res.json(row);
+  const access = await authorizeInvoice(req, res, params.data.invoiceId);
+  if (!access) return;
+  res.json(access.invoice);
 });
 
 router.post(
   "/invoices/:invoiceId/approve",
+  requireAuth,
   async (req, res): Promise<void> => {
     const params = ApproveInvoiceParams.safeParse(req.params);
     if (!params.success) {
       res.status(400).json({ error: params.error.message });
       return;
     }
-    const [existing] = await db
-      .select()
-      .from(invoicesTable)
-      .where(eq(invoicesTable.id, params.data.invoiceId));
-    if (!existing) {
-      res.status(404).json({ error: "Invoice not found" });
+    const access = await authorizeInvoice(req, res, params.data.invoiceId);
+    if (!access) return;
+    // Approving an invoice is the vehicle owner's action.
+    if (access.relationship === "center") {
+      res.status(403).json({
+        error: "Only the vehicle owner can approve this invoice.",
+      });
       return;
     }
+    const existing = access.invoice;
     if (existing.status !== "pending_approval") {
       res.status(409).json({
         error: `Only pending invoices can be approved (current status: ${existing.status})`,
@@ -152,20 +179,22 @@ router.post(
   },
 );
 
-router.post("/invoices/:invoiceId/pay", async (req, res): Promise<void> => {
+router.post("/invoices/:invoiceId/pay", requireAuth, async (req, res): Promise<void> => {
   const params = PayInvoiceParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
     return;
   }
-  const [existing] = await db
-    .select()
-    .from(invoicesTable)
-    .where(eq(invoicesTable.id, params.data.invoiceId));
-  if (!existing) {
-    res.status(404).json({ error: "Invoice not found" });
+  const access = await authorizeInvoice(req, res, params.data.invoiceId);
+  if (!access) return;
+  // Paying an invoice is the vehicle owner's action.
+  if (access.relationship === "center") {
+    res.status(403).json({
+      error: "Only the vehicle owner can pay this invoice.",
+    });
     return;
   }
+  const existing = access.invoice;
   if (existing.status !== "approved") {
     res.status(409).json({
       error: `Only approved invoices can be paid (current status: ${existing.status})`,

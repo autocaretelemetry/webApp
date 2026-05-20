@@ -1,5 +1,5 @@
-import { Router, type IRouter } from "express";
-import { and, asc, count, desc, eq, gte, inArray, ne } from "drizzle-orm";
+import { Router, type IRouter, type Request, type Response } from "express";
+import { and, asc, count, desc, eq, gte, inArray, ne, or } from "drizzle-orm";
 import {
   db,
   vehiclesTable,
@@ -9,6 +9,7 @@ import {
   bookingEventsTable,
   invoicesTable,
   organizationPreferredCentersTable,
+  centerStaffTable,
 } from "@workspace/db";
 import { getEntitlements, getOwnerEntitlementsForVehicle } from "../lib/entitlements";
 import {
@@ -21,8 +22,87 @@ import {
   AssignMechanicBody,
 } from "@workspace/api-zod";
 import { notifyCenterNewBooking } from "../lib/centerAlerts";
+import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
+
+export type BookingRelationship = "admin" | "owner" | "center";
+
+/**
+ * Returns the set of service-center ids the signed-in user is staff of.
+ * Empty array for owners, renters, etc. Cached briefly on `req` to avoid
+ * re-querying within a single request.
+ */
+async function getCallerCenterIds(req: Request): Promise<string[]> {
+  const cache = (req as unknown as { _centerIds?: string[] })._centerIds;
+  if (cache) return cache;
+  const userId = req.user?.id;
+  if (!userId) return [];
+  const rows = await db
+    .select({ centerId: centerStaffTable.centerId })
+    .from(centerStaffTable)
+    .where(and(eq(centerStaffTable.userId, userId), eq(centerStaffTable.active, true)));
+  const ids = rows.map((r) => r.centerId);
+  (req as unknown as { _centerIds?: string[] })._centerIds = ids;
+  return ids;
+}
+
+/**
+ * Loads a booking and authorizes the signed-in caller. Returns null AFTER
+ * writing the appropriate 401/403/404 response — callers should `return`.
+ *
+ * Access rules:
+ *  - admin / super_admin: always allowed
+ *  - vehicle owner (matched by phone): allowed
+ *  - active center staff of the booking's service center: allowed
+ *  - everyone else: 403
+ */
+export async function authorizeServiceBooking(
+  req: Request,
+  res: Response,
+  bookingId: string,
+): Promise<{
+  booking: typeof bookingsTable.$inferSelect;
+  vehicle: typeof vehiclesTable.$inferSelect;
+  relationship: BookingRelationship;
+} | null> {
+  if (!req.user) {
+    res.status(401).json({ error: "Not authenticated" });
+    return null;
+  }
+  const [booking] = await db
+    .select()
+    .from(bookingsTable)
+    .where(eq(bookingsTable.id, bookingId));
+  if (!booking) {
+    res.status(404).json({ error: "Booking not found" });
+    return null;
+  }
+  const [vehicle] = await db
+    .select()
+    .from(vehiclesTable)
+    .where(eq(vehiclesTable.id, booking.vehicleId));
+  if (!vehicle) {
+    // Booking pointing at a deleted vehicle — treat as not found to avoid
+    // leaking internal state.
+    res.status(404).json({ error: "Booking not found" });
+    return null;
+  }
+  const role = req.user.role;
+  if (role === "admin" || role === "super_admin") {
+    return { booking, vehicle, relationship: "admin" };
+  }
+  const userPhone = (req.user.phone ?? "").trim();
+  if (userPhone && vehicle.ownerPhone && userPhone === vehicle.ownerPhone.trim()) {
+    return { booking, vehicle, relationship: "owner" };
+  }
+  const centerIds = await getCallerCenterIds(req);
+  if (centerIds.includes(booking.serviceCenterId)) {
+    return { booking, vehicle, relationship: "center" };
+  }
+  res.status(403).json({ error: "You don't have access to this booking." });
+  return null;
+}
 
 async function openJobsByCenter(centerIds: string[]): Promise<Map<string, number>> {
   if (centerIds.length === 0) return new Map();
@@ -87,7 +167,7 @@ async function hydrateBookings(
   });
 }
 
-router.get("/bookings", async (req, res): Promise<void> => {
+router.get("/bookings", requireAuth, async (req, res): Promise<void> => {
   const q = ListBookingsQueryParams.safeParse(req.query);
   if (!q.success) {
     res.status(400).json({ error: q.error.message });
@@ -95,6 +175,39 @@ router.get("/bookings", async (req, res): Promise<void> => {
   }
   const conditions = [];
   if (q.data.status) conditions.push(eq(bookingsTable.status, q.data.status));
+
+  // Scope the list to bookings the caller can actually see. Admins see
+  // everything; vehicle owners see bookings on cars they own; center staff
+  // see bookings routed to their center(s); everyone else gets an empty
+  // list rather than leaking cross-tenant data.
+  const role = req.user!.role;
+  if (role !== "admin" && role !== "super_admin") {
+    const userPhone = (req.user!.phone ?? "").trim();
+    const centerIds = await getCallerCenterIds(req);
+    const ownedVehicleIds = userPhone
+      ? (
+          await db
+            .select({ id: vehiclesTable.id })
+            .from(vehiclesTable)
+            .where(eq(vehiclesTable.ownerPhone, userPhone))
+        ).map((r) => r.id)
+      : [];
+    const scopeClauses = [] as ReturnType<typeof eq>[];
+    if (ownedVehicleIds.length > 0) {
+      scopeClauses.push(inArray(bookingsTable.vehicleId, ownedVehicleIds));
+    }
+    if (centerIds.length > 0) {
+      scopeClauses.push(inArray(bookingsTable.serviceCenterId, centerIds));
+    }
+    if (scopeClauses.length === 0) {
+      res.json([]);
+      return;
+    }
+    const scope =
+      scopeClauses.length === 1 ? scopeClauses[0] : or(...scopeClauses)!;
+    conditions.push(scope);
+  }
+
   // Priority bookings (granted by the owner's plan) always surface above
   // non-priority within the same status filter, then newest first.
   const rows =
@@ -113,7 +226,7 @@ router.get("/bookings", async (req, res): Promise<void> => {
   res.json(hydrated);
 });
 
-router.post("/bookings", async (req, res): Promise<void> => {
+router.post("/bookings", requireAuth, async (req, res): Promise<void> => {
   const parsed = CreateBookingBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -127,6 +240,20 @@ router.post("/bookings", async (req, res): Promise<void> => {
   if (!vehicle) {
     res.status(400).json({ error: "Vehicle not found" });
     return;
+  }
+
+  // Owners can only book service on their OWN vehicles. Admins can book
+  // on behalf of anyone (used for support flows + the seed scripts).
+  {
+    const user = req.user!;
+    const isPlatformAdmin = user.role === "admin" || user.role === "super_admin";
+    if (!isPlatformAdmin) {
+      const userPhone = (user.phone ?? "").trim();
+      if (!userPhone || !vehicle.ownerPhone || userPhone !== vehicle.ownerPhone.trim()) {
+        res.status(403).json({ error: "You can only book service on a vehicle you own." });
+        return;
+      }
+    }
   }
   const [center] = await db
     .select()
@@ -230,20 +357,15 @@ router.post("/bookings", async (req, res): Promise<void> => {
   res.status(201).json(hydrated);
 });
 
-router.get("/bookings/:bookingId", async (req, res): Promise<void> => {
+router.get("/bookings/:bookingId", requireAuth, async (req, res): Promise<void> => {
   const params = GetBookingParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
     return;
   }
-  const [row] = await db
-    .select()
-    .from(bookingsTable)
-    .where(eq(bookingsTable.id, params.data.bookingId));
-  if (!row) {
-    res.status(404).json({ error: "Booking not found" });
-    return;
-  }
+  const access = await authorizeServiceBooking(req, res, params.data.bookingId);
+  if (!access) return;
+  const row = access.booking;
   const [hydrated] = await hydrateBookings([row]);
 
   const events = await db
@@ -274,6 +396,7 @@ router.get("/bookings/:bookingId", async (req, res): Promise<void> => {
 
 router.patch(
   "/bookings/:bookingId/status",
+  requireAuth,
   async (req, res): Promise<void> => {
     const params = UpdateBookingStatusParams.safeParse(req.params);
     if (!params.success) {
@@ -286,12 +409,16 @@ router.patch(
       return;
     }
 
-    const [current] = await db
-      .select()
-      .from(bookingsTable)
-      .where(eq(bookingsTable.id, params.data.bookingId));
-    if (!current) {
-      res.status(404).json({ error: "Booking not found" });
+    const access = await authorizeServiceBooking(req, res, params.data.bookingId);
+    if (!access) return;
+    const current = access.booking;
+    // Status mutations are a service-center action — owners/admins drive
+    // the workflow elsewhere (invoice approve/pay). Anyone else who has
+    // read-access (the vehicle owner) must not be able to change status.
+    if (access.relationship === "owner") {
+      res.status(403).json({
+        error: "Only the service center handling this booking can update its status.",
+      });
       return;
     }
 
@@ -377,6 +504,7 @@ router.patch(
 
 router.post(
   "/bookings/:bookingId/assign-mechanic",
+  requireAuth,
   async (req, res): Promise<void> => {
     const params = AssignMechanicParams.safeParse(req.params);
     if (!params.success) {
@@ -386,6 +514,16 @@ router.post(
     const parsed = AssignMechanicBody.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+
+    const access = await authorizeServiceBooking(req, res, params.data.bookingId);
+    if (!access) return;
+    // Assigning a mechanic is purely a service-center action.
+    if (access.relationship === "owner") {
+      res.status(403).json({
+        error: "Only the service center handling this booking can assign a mechanic.",
+      });
       return;
     }
 
