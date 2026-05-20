@@ -135,8 +135,23 @@ type AuthedUserRow = {
   lastDecisionEmailAt: string | null;
   decisionEmailCount: number;
   lastResendEmailAt: string | null;
+  emailVerifiedAt: string | null;
+  phoneVerifiedAt: string | null;
   createdAt: string;
 };
+
+function unverifiedChannels(row: AuthedUserRow): Array<"email" | "whatsapp"> {
+  const pending: Array<"email" | "whatsapp"> = [];
+  if (row.email && !row.emailVerifiedAt) pending.push("email");
+  if (row.phone && !row.phoneVerifiedAt) pending.push("whatsapp");
+  return pending;
+}
+
+function hasAnyVerifiedChannel(row: AuthedUserRow): boolean {
+  return Boolean(
+    (row.email && row.emailVerifiedAt) || (row.phone && row.phoneVerifiedAt),
+  );
+}
 
 const RESEND_COOLDOWN_MS = 60_000;
 
@@ -355,6 +370,25 @@ function ApprovalsList({
   }, [state, role, q, sort]);
 
   async function decide(row: AuthedUserRow, action: "approve" | "reject" | "verify", note?: string) {
+    // Approval-time guard: if neither contact channel has been verified by
+    // the applicant, the decision email/WhatsApp will be silently skipped
+    // (see fireDecisionNotifications in routes/onboarding.ts). Warn the
+    // reviewer before letting them push through a decision the applicant
+    // will never be notified about. Rejections from the rejected tab don't
+    // need the prompt since they're not state-changing.
+    if (action !== "reject" && !hasAnyVerifiedChannel(row)) {
+      const pending = unverifiedChannels(row);
+      const channelText =
+        pending.length === 0
+          ? "no contact channel on file"
+          : pending
+              .map((c) => (c === "email" ? "email" : "WhatsApp"))
+              .join(" or ");
+      const ok = window.confirm(
+        `${row.name} has not confirmed their ${channelText} yet, so the decision notification will NOT be delivered. Continue anyway?`,
+      );
+      if (!ok) return;
+    }
     setBusy(row.id);
     try {
       const url = kind === "kyc" ? `/api/admin/kyc/${row.id}` : `/api/admin/approvals/${row.id}`;
@@ -521,6 +555,19 @@ function ApprovalsList({
                 <div className="text-xs text-muted-foreground">
                   {row.email} {row.phone ? `· ${row.phone}` : ""}
                 </div>
+                {unverifiedChannels(row).length > 0 && (
+                  <div className="flex flex-wrap gap-1 pt-0.5">
+                    {unverifiedChannels(row).map((c) => (
+                      <span
+                        key={c}
+                        title="Decision notifications won't be delivered on this channel until the applicant confirms it."
+                        className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                      >
+                        {c === "email" ? "Email not confirmed" : "WhatsApp not confirmed"}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <div className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
                   <Clock className="h-3 w-3" /> {new Date(row.createdAt).toLocaleString()}
                 </div>
