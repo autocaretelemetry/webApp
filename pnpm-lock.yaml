@@ -178,6 +178,9 @@ importers:
       '@workspace/db':
         specifier: workspace:*
         version: link:../../lib/db
+      clamscan:
+        specifier: ^2.4.0
+        version: 2.4.0
       cookie-parser:
         specifier: ^1.4.7
         version: 1.4.7
@@ -209,6 +212,9 @@ importers:
         specifier: 'catalog:'
         version: 3.25.76
     devDependencies:
+      '@types/clamscan':
+        specifier: ^2.4.1
+        version: 2.4.1
       '@types/cookie-parser':
         specifier: ^1.4.10
         version: 1.4.10(@types/express@5.0.6)
@@ -1752,6 +1758,9 @@ packages:
   '@types/caseless@0.12.5':
     resolution: {integrity: sha512-hWtVTC2q7hc7xZ/RLbxapMvDMgUnDvKvMOpKal4DrMyfGBUfB1oKaZlIRr6mJL+If3bAP6sV/QneGzF6tJjZDg==}
 
+  '@types/clamscan@2.4.1':
+    resolution: {integrity: sha512-KhBHhXsMGDoEkk87VRtHtDsjoqXD3epu+a09c1sjW7xqpvoihScxhZNdNIPegVCLDvPOp4khiIpy02XabseztQ==}
+
   '@types/connect@3.4.38':
     resolution: {integrity: sha512-K6uROf1LD88uDQqJCktA4yzL1YYAK6NgfsI0v/mTgyPKWsX1CnJ0XPSDhViejru1GcRkLWb8RlzFYJRqGUbaug==}
 
@@ -2064,6 +2073,10 @@ packages:
   chokidar@5.0.0:
     resolution: {integrity: sha512-TQMmc3w+5AxjpL8iIiwebF73dRDF4fBIieAqGn9RGCWaEVwQ6Fb2cGe31Yns0RRIzii5goJ1Y7xbMwo1TxMplw==}
     engines: {node: '>= 20.19.0'}
+
+  clamscan@2.4.0:
+    resolution: {integrity: sha512-XBOxUiGOcQGuKmCn5qaM5rIK153fGCwsvJMbjVtcnNJ+j/YHrSj2gKNjyP65yr/E8JsKTTDtKYFG++p7Lzigyw==}
+    engines: {node: '>=16.0.0'}
 
   class-variance-authority@0.7.1:
     resolution: {integrity: sha512-Ka+9Trutv7G8M6WT6SeiRWz792K5qEqIGEGzXKhAE6xOWAY6pPH8U+9IY3oCMv6kqTmLsv7Xh/2w2RigkePMsg==}
@@ -4976,6 +4989,10 @@ snapshots:
 
   '@types/caseless@0.12.5': {}
 
+  '@types/clamscan@2.4.1':
+    dependencies:
+      '@types/node': 25.6.2
+
   '@types/connect@3.4.38':
     dependencies:
       '@types/node': 25.6.2
@@ -5322,6 +5339,8 @@ snapshots:
   chokidar@5.0.0:
     dependencies:
       readdirp: 5.0.0
+
+  clamscan@2.4.0: {}
 
   class-variance-authority@0.7.1:
     dependencies:

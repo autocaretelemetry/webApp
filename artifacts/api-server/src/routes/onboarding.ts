@@ -221,13 +221,14 @@ const KycSubmissionBody = z.object({
  * strings or hostnames stored in the user row.
  *
  * VIRUS SCANNING — handled synchronously by `scanKycDocument` (see
- * `lib/kycScanner.ts`) which runs an EICAR signature check + a
- * magic-byte vs declared-MIME check on every uploaded blob. Infected
- * documents are quarantined to a `quarantine/` prefix via
- * `objectStorageService.quarantineObjectEntity` and the user row never
- * gains a reference to them. The scanner is intentionally pluggable: swap
- * the body of `scanKycDocument` for a ClamAV (`clamscan` npm bridge) or
- * hosted (VirusTotal / Cloudmersive) call without touching this route.
+ * `lib/kycScanner.ts`). When `CLAMAV_HOST`+`CLAMAV_PORT` (or
+ * `CLAMAV_SOCKET`) are set, every uploaded blob is streamed through
+ * clamd and the verdict drives the response; an unreachable clamd is
+ * fail-closed (503). Without those env vars we fall back to a local
+ * EICAR + magic-byte / declared-MIME heuristic so onboarding still
+ * works in dev. Infected documents are quarantined to a `quarantine/`
+ * prefix via `objectStorageService.quarantineObjectEntity` and the
+ * user row never gains a reference to them.
  * Defence-in-depth from the storage layer: `/storage/objects/*` sets
  * `X-Content-Type-Options: nosniff` and forces
  * `Content-Disposition: attachment` for anything non-image; the reviewer

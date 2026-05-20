@@ -105,6 +105,9 @@ async function buildAll() {
       "pdfkit",
       "fontkit",
       "brotli",
+      // clamscan shells out to clamdscan/clamscan binaries and dynamically
+      // resolves sibling .js helpers; bundling breaks `require('./lib/...')`.
+      "clamscan",
     ],
     sourcemap: "linked",
     plugins: [
