@@ -20,6 +20,7 @@ import {
   Truck,
   UserPlus,
   ShieldCheck,
+  ShieldAlert,
   Building2,
   UserCog,
   Layers,
@@ -161,6 +162,8 @@ const ADMIN_NAV: NavSection[] = [
       { href: "/admin/mechanics", label: "Mechanics", icon: Users },
       { href: "/admin/agents", label: "Delivery Agents", icon: Truck },
       { href: "/admin/rentals", label: "Rentals", icon: KeyRound },
+      { href: "/admin/renters", label: "Renters", icon: Users },
+      { href: "/admin/safety", label: "Safety & Tracking", icon: ShieldAlert },
     ],
   },
   {

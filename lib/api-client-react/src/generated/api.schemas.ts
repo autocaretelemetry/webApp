@@ -1715,6 +1715,15 @@ export interface UpsertRenterProfileInput {
   selfieUrl?: string;
 }
 
+export type UpdateRenterProfileInputKycStatus = typeof UpdateRenterProfileInputKycStatus[keyof typeof UpdateRenterProfileInputKycStatus];
+
+
+export const UpdateRenterProfileInputKycStatus = {
+  pending: 'pending',
+  verified: 'verified',
+  rejected: 'rejected',
+} as const;
+
 export interface UpdateRenterProfileInput {
   /** @minLength 1 */
   name?: string;
@@ -1726,6 +1735,187 @@ export interface UpdateRenterProfileInput {
   idDocumentType?: string;
   idDocumentUrl?: string;
   selfieUrl?: string;
+  kycStatus?: UpdateRenterProfileInputKycStatus;
+}
+
+export type RenterProfileSummaryKycStatus = typeof RenterProfileSummaryKycStatus[keyof typeof RenterProfileSummaryKycStatus];
+
+
+export const RenterProfileSummaryKycStatus = {
+  pending: 'pending',
+  verified: 'verified',
+  rejected: 'rejected',
+} as const;
+
+export interface RenterProfileSummary {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string | null;
+  kycStatus: RenterProfileSummaryKycStatus;
+  hasDriverLicense?: boolean;
+  hasIdDocument?: boolean;
+  hasSelfie?: boolean;
+  bookingCount: number;
+  activeBookings: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type TripLocationSource = typeof TripLocationSource[keyof typeof TripLocationSource];
+
+
+export const TripLocationSource = {
+  device: 'device',
+  owner: 'owner',
+  admin: 'admin',
+  sim: 'sim',
+} as const;
+
+export interface TripLocation {
+  id: string;
+  bookingId: string;
+  lat: number;
+  lng: number;
+  accuracyMeters?: number | null;
+  speedKph?: number | null;
+  source: TripLocationSource;
+  note?: string | null;
+  recordedAt: string;
+}
+
+export type CreateTripLocationInputSource = typeof CreateTripLocationInputSource[keyof typeof CreateTripLocationInputSource];
+
+
+export const CreateTripLocationInputSource = {
+  device: 'device',
+  owner: 'owner',
+  admin: 'admin',
+  sim: 'sim',
+} as const;
+
+export interface CreateTripLocationInput {
+  lat: number;
+  lng: number;
+  accuracyMeters?: number;
+  speedKph?: number;
+  source?: CreateTripLocationInputSource;
+  note?: string;
+  recordedAt?: string;
+}
+
+export interface TrackedTrip {
+  bookingId: string;
+  carLabel: string;
+  carPlate?: string | null;
+  renterName: string;
+  renterPhone: string;
+  ownerName: string;
+  ownerPhone: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+  lastLat?: number | null;
+  lastLng?: number | null;
+  lastSeenAt?: string | null;
+  pingCount?: number;
+  hasIncident: boolean;
+}
+
+export type RentalIncidentKind = typeof RentalIncidentKind[keyof typeof RentalIncidentKind];
+
+
+export const RentalIncidentKind = {
+  theft: 'theft',
+  accident: 'accident',
+  breakdown: 'breakdown',
+  sos: 'sos',
+} as const;
+
+export type RentalIncidentStatus = typeof RentalIncidentStatus[keyof typeof RentalIncidentStatus];
+
+
+export const RentalIncidentStatus = {
+  open: 'open',
+  investigating: 'investigating',
+  resolved: 'resolved',
+} as const;
+
+export type RentalIncidentReportedBy = typeof RentalIncidentReportedBy[keyof typeof RentalIncidentReportedBy];
+
+
+export const RentalIncidentReportedBy = {
+  renter: 'renter',
+  owner: 'owner',
+  admin: 'admin',
+} as const;
+
+export interface RentalIncident {
+  id: string;
+  bookingId: string;
+  kind: RentalIncidentKind;
+  status: RentalIncidentStatus;
+  reportedBy: RentalIncidentReportedBy;
+  reporterName?: string | null;
+  reporterPhone?: string | null;
+  notes?: string | null;
+  adminNotes?: string | null;
+  lastKnownLat?: number | null;
+  lastKnownLng?: number | null;
+  lastKnownAt?: string | null;
+  reportedAt: string;
+  resolvedAt?: string | null;
+  carLabel?: string | null;
+  carPlate?: string | null;
+  ownerName?: string | null;
+  ownerPhone?: string | null;
+  renterName?: string | null;
+  renterPhone?: string | null;
+}
+
+export type CreateRentalIncidentInputKind = typeof CreateRentalIncidentInputKind[keyof typeof CreateRentalIncidentInputKind];
+
+
+export const CreateRentalIncidentInputKind = {
+  theft: 'theft',
+  accident: 'accident',
+  breakdown: 'breakdown',
+  sos: 'sos',
+} as const;
+
+export type CreateRentalIncidentInputReportedBy = typeof CreateRentalIncidentInputReportedBy[keyof typeof CreateRentalIncidentInputReportedBy];
+
+
+export const CreateRentalIncidentInputReportedBy = {
+  renter: 'renter',
+  owner: 'owner',
+  admin: 'admin',
+} as const;
+
+export interface CreateRentalIncidentInput {
+  kind: CreateRentalIncidentInputKind;
+  reportedBy: CreateRentalIncidentInputReportedBy;
+  reporterName?: string;
+  reporterPhone?: string;
+  notes?: string;
+  /** Optional GPS latitude captured at report time */
+  lat?: number;
+  lng?: number;
+  accuracy?: number;
+}
+
+export type UpdateRentalIncidentInputStatus = typeof UpdateRentalIncidentInputStatus[keyof typeof UpdateRentalIncidentInputStatus];
+
+
+export const UpdateRentalIncidentInputStatus = {
+  open: 'open',
+  investigating: 'investigating',
+  resolved: 'resolved',
+} as const;
+
+export interface UpdateRentalIncidentInput {
+  status?: UpdateRentalIncidentInputStatus;
+  adminNotes?: string;
 }
 
 export interface UploadUrlRequest {
@@ -1925,6 +2115,32 @@ export const ListRetainersStatus = {
   active: 'active',
   cancelled: 'cancelled',
   expired: 'expired',
+} as const;
+
+export type ListRenterProfilesParams = {
+kycStatus?: ListRenterProfilesKycStatus;
+};
+
+export type ListRenterProfilesKycStatus = typeof ListRenterProfilesKycStatus[keyof typeof ListRenterProfilesKycStatus];
+
+
+export const ListRenterProfilesKycStatus = {
+  pending: 'pending',
+  verified: 'verified',
+  rejected: 'rejected',
+} as const;
+
+export type ListRentalIncidentsParams = {
+status?: ListRentalIncidentsStatus;
+};
+
+export type ListRentalIncidentsStatus = typeof ListRentalIncidentsStatus[keyof typeof ListRentalIncidentsStatus];
+
+
+export const ListRentalIncidentsStatus = {
+  open: 'open',
+  investigating: 'investigating',
+  resolved: 'resolved',
 } as const;
 
 export type ListRentalBookingsParams = {

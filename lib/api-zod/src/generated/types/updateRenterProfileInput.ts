@@ -5,6 +5,7 @@
  * AutoCare API — vehicle owners book services, service centers fulfill them.
  * OpenAPI spec version: 0.1.0
  */
+import type { UpdateRenterProfileInputKycStatus } from './updateRenterProfileInputKycStatus';
 
 export interface UpdateRenterProfileInput {
   /** @minLength 1 */
@@ -17,4 +18,5 @@ export interface UpdateRenterProfileInput {
   idDocumentType?: string;
   idDocumentUrl?: string;
   selfieUrl?: string;
+  kycStatus?: UpdateRenterProfileInputKycStatus;
 }

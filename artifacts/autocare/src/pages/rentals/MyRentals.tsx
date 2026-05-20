@@ -4,8 +4,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   useListRentalBookings,
   useUpdateRentalBooking,
+  useCreateRentalIncident,
   type RentalBooking,
 } from "@workspace/api-client-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getListRentalBookingsQueryKey } from "@/lib/queryKeys";
 import { describeMutationError } from "@/lib/adminErrors";
 import { useRenterProfile } from "@/lib/profile";
@@ -35,6 +38,7 @@ import {
   PenLine,
   CreditCard,
   Banknote,
+  ShieldAlert,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -162,9 +166,11 @@ function RentalRow({
   const meta = STATUS_META[b.status] ?? STATUS_META.pending_review;
   const Icon = meta.icon;
   const canCancel = ["pending_review", "contract_pending", "awaiting_payment", "confirmed"].includes(b.status);
+  const canReportIncident = ["confirmed", "active"].includes(b.status);
   const [contractOpen, setContractOpen] = useState(false);
   const [signOpen, setSignOpen] = useState(false);
   const [signName, setSignName] = useState(b.renterName);
+  const [incidentOpen, setIncidentOpen] = useState(false);
 
   return (
     <Card>
@@ -229,6 +235,16 @@ function RentalRow({
                 </Button>
               </>
             )}
+            {canReportIncident && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 text-destructive hover:text-destructive border-destructive/40"
+                onClick={() => setIncidentOpen(true)}
+              >
+                <ShieldAlert className="h-3.5 w-3.5" /> Report incident
+              </Button>
+            )}
             {canCancel && (
               <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={onCancel} disabled={pending}>
                 Cancel
@@ -265,6 +281,14 @@ function RentalRow({
         </DialogContent>
       </Dialog>
 
+      {incidentOpen && (
+        <ReportIncidentDialog
+          bookingId={b.id}
+          reportedBy="renter"
+          onClose={() => setIncidentOpen(false)}
+        />
+      )}
+
       <Dialog open={signOpen} onOpenChange={setSignOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -296,5 +320,109 @@ function RentalRow({
         </DialogContent>
       </Dialog>
     </Card>
+  );
+}
+
+const INCIDENT_KIND_OPTIONS: { value: "theft" | "accident" | "breakdown" | "sos"; label: string }[] = [
+  { value: "theft", label: "Theft or attempted theft" },
+  { value: "accident", label: "Accident or collision" },
+  { value: "breakdown", label: "Breakdown" },
+  { value: "sos", label: "SOS / personal safety" },
+];
+
+export function ReportIncidentDialog({
+  bookingId,
+  reportedBy,
+  onClose,
+}: {
+  bookingId: string;
+  reportedBy: "renter" | "owner" | "admin";
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [kind, setKind] = useState<"theft" | "accident" | "breakdown" | "sos">("theft");
+  const [notes, setNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [shareLocation, setShareLocation] = useState(true);
+  const report = useCreateRentalIncident();
+
+  const submit = async () => {
+    setSubmitting(true);
+    let coords: { lat: number; lng: number; accuracy?: number } | null = null;
+    if (shareLocation && typeof navigator !== "undefined" && navigator.geolocation) {
+      coords = await new Promise((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+          (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy ?? undefined }),
+          () => resolve(null),
+          { timeout: 4000, maximumAge: 60_000 },
+        );
+      });
+    }
+    try {
+      await report.mutateAsync({
+        rentalBookingId: bookingId,
+        data: {
+          kind,
+          reportedBy,
+          notes: notes.trim() || undefined,
+          ...(coords ? { lat: coords.lat, lng: coords.lng, accuracy: coords.accuracy } : {}),
+        },
+      });
+      toast.success("Incident reported. Our safety team is notified.");
+      await queryClient.invalidateQueries({ queryKey: getListRentalBookingsQueryKey() });
+      onClose();
+    } catch (err) {
+      toast.error(describeMutationError(err, "Failed to report incident."));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ShieldAlert className="h-5 w-5 text-destructive" /> Report an incident
+          </DialogTitle>
+          <DialogDescription>
+            For emergencies that require police or medical help, call local emergency services first. We'll alert the platform safety team and the car owner.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label>What happened?</Label>
+            <Select value={kind} onValueChange={(v) => setKind(v as typeof kind)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {INCIDENT_KIND_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="incidentNotes">Notes</Label>
+            <Textarea
+              id="incidentNotes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={4}
+              placeholder="Describe what happened, who is with you, and any vehicle damage or threats."
+            />
+          </div>
+          <label className="flex items-start gap-2 text-xs text-muted-foreground">
+            <input type="checkbox" checked={shareLocation} onChange={(e) => setShareLocation(e.target.checked)} className="mt-0.5" />
+            <span>Share my current GPS location so the safety team can trace the vehicle.</span>
+          </label>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose} disabled={submitting}>Cancel</Button>
+          <Button onClick={submit} disabled={submitting} className="gap-1.5">
+            <ShieldAlert className="h-4 w-4" /> {submitting ? "Sending…" : "Send report"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

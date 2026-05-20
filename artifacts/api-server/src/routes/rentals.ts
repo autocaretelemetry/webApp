@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { and, count, desc, eq, gt, inArray, lt, or } from "drizzle-orm";
+import { requireAuth, requireAdmin } from "../lib/auth";
 import {
   db,
   rentalCarsTable,
@@ -7,6 +8,8 @@ import {
   renterProfilesTable,
   bookingsTable,
   driversTable,
+  tripLocationsTable,
+  rentalIncidentsTable,
 } from "@workspace/db";
 import {
   ListRentalCarsQueryParams,
@@ -24,6 +27,15 @@ import {
   GetRenterProfileByPhoneParams,
   UpdateRenterProfileBody,
   UpdateRenterProfileParams,
+  ListRenterProfilesQueryParams,
+  ListTripLocationsParams,
+  CreateTripLocationBody,
+  CreateTripLocationParams,
+  CreateRentalIncidentBody,
+  CreateRentalIncidentParams,
+  ListRentalIncidentsQueryParams,
+  UpdateRentalIncidentBody,
+  UpdateRentalIncidentParams,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -130,6 +142,66 @@ terms above.`;
 
 // ---------- Renter profiles ----------
 
+router.get("/renter-profiles", requireAdmin, async (req, res): Promise<void> => {
+  const q = ListRenterProfilesQueryParams.safeParse(req.query);
+  if (!q.success) {
+    res.status(400).json({ error: q.error.message });
+    return;
+  }
+  const where = q.data.kycStatus
+    ? eq(renterProfilesTable.kycStatus, q.data.kycStatus)
+    : undefined;
+  const renters = await db
+    .select()
+    .from(renterProfilesTable)
+    .where(where as ReturnType<typeof eq>)
+    .orderBy(desc(renterProfilesTable.createdAt));
+
+  // Build booking counts per renterId in a single pass.
+  const renterIds = renters.map((r) => r.id);
+  type CountRow = { renterId: string | null; status: string; n: number };
+  const countsArr: CountRow[] = renterIds.length
+    ? ((await db
+        .select({
+          renterId: rentalBookingsTable.renterId,
+          status: rentalBookingsTable.status,
+          n: count(),
+        })
+        .from(rentalBookingsTable)
+        .where(inArray(rentalBookingsTable.renterId, renterIds))
+        .groupBy(rentalBookingsTable.renterId, rentalBookingsTable.status)) as CountRow[])
+    : [];
+  const ACTIVE = new Set<string>(ACTIVE_RENTAL_STATUSES);
+  const counts = new Map<string, { total: number; active: number }>();
+  for (const row of countsArr) {
+    if (!row.renterId) continue;
+    const c = counts.get(row.renterId) ?? { total: 0, active: 0 };
+    c.total += Number(row.n);
+    if (ACTIVE.has(row.status)) c.active += Number(row.n);
+    counts.set(row.renterId, c);
+  }
+
+  res.json(
+    renters.map((r) => {
+      const c = counts.get(r.id) ?? { total: 0, active: 0 };
+      return {
+        id: r.id,
+        name: r.name,
+        phone: r.phone,
+        email: r.email,
+        kycStatus: r.kycStatus,
+        hasDriverLicense: Boolean(r.driverLicenseNumber || r.driverLicenseUrl),
+        hasIdDocument: Boolean(r.idDocumentUrl),
+        hasSelfie: Boolean(r.selfieUrl),
+        bookingCount: c.total,
+        activeBookings: c.active,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+      };
+    }),
+  );
+});
+
 router.post("/renter-profiles", async (req, res): Promise<void> => {
   const body = UpsertRenterProfileBody.safeParse(req.body);
   if (!body.success) {
@@ -194,9 +266,18 @@ router.patch("/renter-profiles/:renterId", async (req, res): Promise<void> => {
     res.status(400).json({ error: (params.error ?? body.error)?.message });
     return;
   }
+  // Only platform admins/super-admins may set kycStatus; reject with 403 so
+  // callers can't accidentally believe their KYC update succeeded.
+  const patch: Record<string, unknown> = { ...body.data, updatedAt: new Date() };
+  const role = req.user?.role;
+  const isAdmin = role === "admin" || role === "super_admin";
+  if (patch.kycStatus !== undefined && !isAdmin) {
+    res.status(403).json({ error: "Only admins may change KYC status" });
+    return;
+  }
   const [row] = await db
     .update(renterProfilesTable)
-    .set({ ...body.data, updatedAt: new Date() })
+    .set(patch)
     .where(eq(renterProfilesTable.id, params.data.renterId))
     .returning();
   if (!row) {
@@ -837,7 +918,326 @@ router.patch("/rental-bookings/:rentalBookingId", async (req, res): Promise<void
   res.json(hydrated);
 });
 
+// ---------- Trip locations (live tracking) ----------
+
+type BookingRelationship = "admin" | "renter" | "owner";
+
+/**
+ * Authorize the caller against a specific rental booking. Returns the caller's
+ * relationship to it ("admin" | "renter" | "owner") or null if they have no
+ * legitimate connection. Renters are matched by phone, owners by the car's
+ * `ownerPhone`. Admins/super-admins bypass the relationship check.
+ *
+ * On rejection, this function writes the appropriate 401/403/404 response and
+ * the caller should simply return.
+ */
+async function authorizeBookingAccess(
+  req: import("express").Request,
+  res: import("express").Response,
+  bookingId: string,
+): Promise<{ relationship: BookingRelationship; renterPhone: string | null; ownerPhone: string | null } | null> {
+  const [b] = await db
+    .select({
+      id: rentalBookingsTable.id,
+      renterPhone: rentalBookingsTable.renterPhone,
+      ownerPhone: rentalCarsTable.ownerPhone,
+    })
+    .from(rentalBookingsTable)
+    .leftJoin(rentalCarsTable, eq(rentalBookingsTable.carId, rentalCarsTable.id))
+    .where(eq(rentalBookingsTable.id, bookingId));
+  if (!b) {
+    res.status(404).json({ error: "Rental booking not found" });
+    return null;
+  }
+  const user = req.user;
+  if (!user) {
+    res.status(401).json({ error: "Not authenticated" });
+    return null;
+  }
+  if (user.role === "admin" || user.role === "super_admin") {
+    return { relationship: "admin", renterPhone: b.renterPhone, ownerPhone: b.ownerPhone };
+  }
+  const userPhone = (user.phone ?? "").trim();
+  if (userPhone && b.renterPhone && userPhone === b.renterPhone.trim()) {
+    return { relationship: "renter", renterPhone: b.renterPhone, ownerPhone: b.ownerPhone };
+  }
+  if (userPhone && b.ownerPhone && userPhone === b.ownerPhone.trim()) {
+    return { relationship: "owner", renterPhone: b.renterPhone, ownerPhone: b.ownerPhone };
+  }
+  res.status(403).json({ error: "You don't have access to this rental booking." });
+  return null;
+}
+
+
+router.get("/rental-bookings/:rentalBookingId/locations", requireAuth, async (req, res): Promise<void> => {
+  const params = ListTripLocationsParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const access = await authorizeBookingAccess(req, res, params.data.rentalBookingId);
+  if (!access) return;
+  const rows = await db
+    .select()
+    .from(tripLocationsTable)
+    .where(eq(tripLocationsTable.bookingId, params.data.rentalBookingId))
+    .orderBy(desc(tripLocationsTable.recordedAt))
+    .limit(500);
+  // Return oldest -> newest so client can render a polyline directly.
+  res.json(rows.slice().reverse());
+});
+
+router.post("/rental-bookings/:rentalBookingId/locations", requireAuth, async (req, res): Promise<void> => {
+  const params = CreateTripLocationParams.safeParse(req.params);
+  const body = CreateTripLocationBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: (params.error ?? body.error)?.message });
+    return;
+  }
+  const access = await authorizeBookingAccess(req, res, params.data.rentalBookingId);
+  if (!access) return;
+  const [booking] = await db
+    .select({ id: rentalBookingsTable.id, status: rentalBookingsTable.status })
+    .from(rentalBookingsTable)
+    .where(eq(rentalBookingsTable.id, params.data.rentalBookingId));
+  if (!booking) {
+    res.status(404).json({ error: "Rental booking not found" });
+    return;
+  }
+  // Accept pings on confirmed/active trips; ignore on completed/cancelled to
+  // keep historical data clean.
+  if (!["confirmed", "active"].includes(booking.status)) {
+    res.status(400).json({ error: "Trip is not in a state that accepts location pings." });
+    return;
+  }
+  const [row] = await db
+    .insert(tripLocationsTable)
+    .values({
+      bookingId: booking.id,
+      lat: body.data.lat,
+      lng: body.data.lng,
+      accuracyMeters: body.data.accuracyMeters,
+      speedKph: body.data.speedKph,
+      source: body.data.source ?? "device",
+      note: body.data.note,
+      recordedAt: body.data.recordedAt ? new Date(body.data.recordedAt) : new Date(),
+    })
+    .returning();
+  res.status(201).json(row);
+});
+
+// ---------- Incidents (theft / accident / breakdown / SOS) ----------
+
+async function lastPingFor(bookingId: string) {
+  const [ping] = await db
+    .select()
+    .from(tripLocationsTable)
+    .where(eq(tripLocationsTable.bookingId, bookingId))
+    .orderBy(desc(tripLocationsTable.recordedAt))
+    .limit(1);
+  return ping ?? null;
+}
+
+router.post("/rental-bookings/:rentalBookingId/incidents", requireAuth, async (req, res): Promise<void> => {
+  const params = CreateRentalIncidentParams.safeParse(req.params);
+  const body = CreateRentalIncidentBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: (params.error ?? body.error)?.message });
+    return;
+  }
+  const access = await authorizeBookingAccess(req, res, params.data.rentalBookingId);
+  if (!access) return;
+  const booking = { id: params.data.rentalBookingId };
+  // Derive reportedBy from the verified relationship — client cannot spoof.
+  const reportedBy: "renter" | "owner" | "admin" = access.relationship;
+  // If the renter provided explicit GPS at the moment of reporting, persist it
+  // alongside the location feed and use it as the incident's last-known
+  // location; otherwise fall back to the trip's most recent recorded ping.
+  let incidentLat: number | null = null;
+  let incidentLng: number | null = null;
+  let incidentAt: Date | null = null;
+  if (typeof body.data.lat === "number" && typeof body.data.lng === "number") {
+    const [ping] = await db
+      .insert(tripLocationsTable)
+      .values({
+        bookingId: booking.id,
+        lat: body.data.lat,
+        lng: body.data.lng,
+        accuracyMeters: body.data.accuracy != null ? Math.round(body.data.accuracy) : null,
+        source: reportedBy === "renter" ? "device" : reportedBy === "owner" ? "owner" : "admin",
+        note: "Captured at incident report",
+      })
+      .returning();
+    incidentLat = ping?.lat ?? body.data.lat;
+    incidentLng = ping?.lng ?? body.data.lng;
+    incidentAt = ping?.recordedAt ?? new Date();
+  } else {
+    const ping = await lastPingFor(booking.id);
+    incidentLat = ping?.lat ?? null;
+    incidentLng = ping?.lng ?? null;
+    incidentAt = ping?.recordedAt ?? null;
+  }
+  const [row] = await db
+    .insert(rentalIncidentsTable)
+    .values({
+      bookingId: booking.id,
+      kind: body.data.kind,
+      reportedBy,
+      reporterName: body.data.reporterName ?? req.user?.name ?? null,
+      reporterPhone: body.data.reporterPhone ?? req.user?.phone ?? null,
+      notes: body.data.notes,
+      lastKnownLat: incidentLat,
+      lastKnownLng: incidentLng,
+      lastKnownAt: incidentAt,
+    })
+    .returning();
+  res.status(201).json(row);
+});
+
+router.get("/rental-incidents", requireAdmin, async (req, res): Promise<void> => {
+  const q = ListRentalIncidentsQueryParams.safeParse(req.query);
+  if (!q.success) {
+    res.status(400).json({ error: q.error.message });
+    return;
+  }
+  const where = q.data.status
+    ? eq(rentalIncidentsTable.status, q.data.status)
+    : undefined;
+  const rows = await db
+    .select({
+      i: rentalIncidentsTable,
+      car: {
+        brand: rentalCarsTable.brand,
+        model: rentalCarsTable.model,
+        year: rentalCarsTable.year,
+        plateNumber: rentalCarsTable.plateNumber,
+        ownerName: rentalCarsTable.ownerName,
+        ownerPhone: rentalCarsTable.ownerPhone,
+      },
+      renter: {
+        renterName: rentalBookingsTable.renterName,
+        renterPhone: rentalBookingsTable.renterPhone,
+      },
+    })
+    .from(rentalIncidentsTable)
+    .leftJoin(rentalBookingsTable, eq(rentalIncidentsTable.bookingId, rentalBookingsTable.id))
+    .leftJoin(rentalCarsTable, eq(rentalBookingsTable.carId, rentalCarsTable.id))
+    .where(where as ReturnType<typeof eq>)
+    .orderBy(desc(rentalIncidentsTable.reportedAt));
+
+  res.json(
+    rows.map(({ i, car, renter }) => ({
+      ...i,
+      carLabel: car ? `${car.year} ${car.brand} ${car.model}` : null,
+      carPlate: car?.plateNumber ?? null,
+      ownerName: car?.ownerName ?? null,
+      ownerPhone: car?.ownerPhone ?? null,
+      renterName: renter?.renterName ?? null,
+      renterPhone: renter?.renterPhone ?? null,
+    })),
+  );
+});
+
+router.patch("/rental-incidents/:incidentId", requireAdmin, async (req, res): Promise<void> => {
+  const params = UpdateRentalIncidentParams.safeParse(req.params);
+  const body = UpdateRentalIncidentBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: (params.error ?? body.error)?.message });
+    return;
+  }
+  const patch: Record<string, unknown> = { ...body.data };
+  if (body.data.status === "resolved") patch.resolvedAt = new Date();
+  const [row] = await db
+    .update(rentalIncidentsTable)
+    .set(patch)
+    .where(eq(rentalIncidentsTable.id, params.data.incidentId))
+    .returning();
+  if (!row) {
+    res.status(404).json({ error: "Incident not found" });
+    return;
+  }
+  res.json(row);
+});
+
+router.get("/tracked-trips", requireAdmin, async (_req, res): Promise<void> => {
+  // Live trips = bookings in confirmed/active. We enrich each with last ping
+  // and whether any open incident is attached.
+  const trips = await db
+    .select({
+      b: rentalBookingsTable,
+      car: {
+        brand: rentalCarsTable.brand,
+        model: rentalCarsTable.model,
+        year: rentalCarsTable.year,
+        plateNumber: rentalCarsTable.plateNumber,
+        ownerName: rentalCarsTable.ownerName,
+        ownerPhone: rentalCarsTable.ownerPhone,
+      },
+    })
+    .from(rentalBookingsTable)
+    .leftJoin(rentalCarsTable, eq(rentalBookingsTable.carId, rentalCarsTable.id))
+    .where(inArray(rentalBookingsTable.status, ["confirmed", "active"]))
+    .orderBy(desc(rentalBookingsTable.startDate));
+
+  const ids = trips.map((t) => t.b.id);
+  // Last ping per booking
+  const lastPings = new Map<string, { lat: number; lng: number; recordedAt: Date; n: number }>();
+  if (ids.length) {
+    const allPings = await db
+      .select()
+      .from(tripLocationsTable)
+      .where(inArray(tripLocationsTable.bookingId, ids))
+      .orderBy(desc(tripLocationsTable.recordedAt));
+    for (const p of allPings) {
+      const cur = lastPings.get(p.bookingId);
+      if (!cur) {
+        lastPings.set(p.bookingId, { lat: p.lat, lng: p.lng, recordedAt: p.recordedAt, n: 1 });
+      } else {
+        cur.n += 1;
+      }
+    }
+    // Open incidents per booking
+    const openIncidents = await db
+      .select({ bookingId: rentalIncidentsTable.bookingId })
+      .from(rentalIncidentsTable)
+      .where(
+        and(
+          inArray(rentalIncidentsTable.bookingId, ids),
+          inArray(rentalIncidentsTable.status, ["open", "investigating"]),
+        ),
+      );
+    const flagged = new Set(openIncidents.map((r) => r.bookingId));
+
+    res.json(
+      trips.map(({ b, car }) => {
+        const last = lastPings.get(b.id);
+        return {
+          bookingId: b.id,
+          carLabel: car ? `${car.year} ${car.brand} ${car.model}` : "Rental",
+          carPlate: car?.plateNumber ?? null,
+          renterName: b.renterName,
+          renterPhone: b.renterPhone,
+          ownerName: car?.ownerName ?? "Unknown",
+          ownerPhone: car?.ownerPhone ?? "",
+          status: b.status,
+          startDate: b.startDate,
+          endDate: b.endDate,
+          lastLat: last?.lat ?? null,
+          lastLng: last?.lng ?? null,
+          lastSeenAt: last?.recordedAt ?? null,
+          pingCount: last?.n ?? 0,
+          hasIncident: flagged.has(b.id),
+        };
+      }),
+    );
+    return;
+  }
+  res.json([]);
+});
+
 // Suppress unused import lint
 void or;
+void gt;
+void lt;
 
 export default router;

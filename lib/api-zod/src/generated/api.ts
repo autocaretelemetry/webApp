@@ -2916,6 +2916,30 @@ export const GetPublicRentalCarResponse = zod.object({
 
 
 /**
+ * @summary List all renters (admin only — full PII)
+ */
+export const ListRenterProfilesQueryParams = zod.object({
+  "kycStatus": zod.enum(['pending', 'verified', 'rejected']).optional()
+})
+
+export const ListRenterProfilesResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "email": zod.string().nullish(),
+  "kycStatus": zod.enum(['pending', 'verified', 'rejected']),
+  "hasDriverLicense": zod.boolean().optional(),
+  "hasIdDocument": zod.boolean().optional(),
+  "hasSelfie": zod.boolean().optional(),
+  "bookingCount": zod.number(),
+  "activeBookings": zod.number(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListRenterProfilesResponse = zod.array(ListRenterProfilesResponseItem)
+
+
+/**
  * @summary Create or update a renter profile by phone (idempotent)
  */
 
@@ -3013,7 +3037,8 @@ export const UpdateRenterProfileBody = zod.object({
   "driverLicenseUrl": zod.string().optional(),
   "idDocumentType": zod.string().optional(),
   "idDocumentUrl": zod.string().optional(),
-  "selfieUrl": zod.string().optional()
+  "selfieUrl": zod.string().optional(),
+  "kycStatus": zod.enum(['pending', 'verified', 'rejected']).optional()
 })
 
 export const UpdateRenterProfileResponse = zod.object({
@@ -3032,6 +3057,152 @@ export const UpdateRenterProfileResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
+
+
+/**
+ * @summary Return the trip's recorded GPS pings, oldest → newest (capped at 500).
+ */
+export const ListTripLocationsParams = zod.object({
+  "rentalBookingId": zod.coerce.string()
+})
+
+export const ListTripLocationsResponseItem = zod.object({
+  "id": zod.string(),
+  "bookingId": zod.string(),
+  "lat": zod.number(),
+  "lng": zod.number(),
+  "accuracyMeters": zod.number().nullish(),
+  "speedKph": zod.number().nullish(),
+  "source": zod.enum(['device', 'owner', 'admin', 'sim']),
+  "note": zod.string().nullish(),
+  "recordedAt": zod.coerce.date()
+})
+export const ListTripLocationsResponse = zod.array(ListTripLocationsResponseItem)
+
+
+/**
+ * @summary Record a single GPS ping for a rental in progress.
+ */
+export const CreateTripLocationParams = zod.object({
+  "rentalBookingId": zod.coerce.string()
+})
+
+export const CreateTripLocationBody = zod.object({
+  "lat": zod.number(),
+  "lng": zod.number(),
+  "accuracyMeters": zod.number().optional(),
+  "speedKph": zod.number().optional(),
+  "source": zod.enum(['device', 'owner', 'admin', 'sim']).optional(),
+  "note": zod.string().optional(),
+  "recordedAt": zod.coerce.date().optional()
+})
+
+
+/**
+ * @summary Flag a rental as theft/accident/breakdown/SOS.
+ */
+export const CreateRentalIncidentParams = zod.object({
+  "rentalBookingId": zod.coerce.string()
+})
+
+export const CreateRentalIncidentBody = zod.object({
+  "kind": zod.enum(['theft', 'accident', 'breakdown', 'sos']),
+  "reportedBy": zod.enum(['renter', 'owner', 'admin']),
+  "reporterName": zod.string().optional(),
+  "reporterPhone": zod.string().optional(),
+  "notes": zod.string().optional(),
+  "lat": zod.number().optional().describe('Optional GPS latitude captured at report time'),
+  "lng": zod.number().optional(),
+  "accuracy": zod.number().optional()
+})
+
+
+/**
+ * @summary List incidents across all rentals (admin triage).
+ */
+export const ListRentalIncidentsQueryParams = zod.object({
+  "status": zod.enum(['open', 'investigating', 'resolved']).optional()
+})
+
+export const ListRentalIncidentsResponseItem = zod.object({
+  "id": zod.string(),
+  "bookingId": zod.string(),
+  "kind": zod.enum(['theft', 'accident', 'breakdown', 'sos']),
+  "status": zod.enum(['open', 'investigating', 'resolved']),
+  "reportedBy": zod.enum(['renter', 'owner', 'admin']),
+  "reporterName": zod.string().nullish(),
+  "reporterPhone": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "adminNotes": zod.string().nullish(),
+  "lastKnownLat": zod.number().nullish(),
+  "lastKnownLng": zod.number().nullish(),
+  "lastKnownAt": zod.coerce.date().nullish(),
+  "reportedAt": zod.coerce.date(),
+  "resolvedAt": zod.coerce.date().nullish(),
+  "carLabel": zod.string().nullish(),
+  "carPlate": zod.string().nullish(),
+  "ownerName": zod.string().nullish(),
+  "ownerPhone": zod.string().nullish(),
+  "renterName": zod.string().nullish(),
+  "renterPhone": zod.string().nullish()
+})
+export const ListRentalIncidentsResponse = zod.array(ListRentalIncidentsResponseItem)
+
+
+export const UpdateRentalIncidentParams = zod.object({
+  "incidentId": zod.coerce.string()
+})
+
+export const UpdateRentalIncidentBody = zod.object({
+  "status": zod.enum(['open', 'investigating', 'resolved']).optional(),
+  "adminNotes": zod.string().optional()
+})
+
+export const UpdateRentalIncidentResponse = zod.object({
+  "id": zod.string(),
+  "bookingId": zod.string(),
+  "kind": zod.enum(['theft', 'accident', 'breakdown', 'sos']),
+  "status": zod.enum(['open', 'investigating', 'resolved']),
+  "reportedBy": zod.enum(['renter', 'owner', 'admin']),
+  "reporterName": zod.string().nullish(),
+  "reporterPhone": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "adminNotes": zod.string().nullish(),
+  "lastKnownLat": zod.number().nullish(),
+  "lastKnownLng": zod.number().nullish(),
+  "lastKnownAt": zod.coerce.date().nullish(),
+  "reportedAt": zod.coerce.date(),
+  "resolvedAt": zod.coerce.date().nullish(),
+  "carLabel": zod.string().nullish(),
+  "carPlate": zod.string().nullish(),
+  "ownerName": zod.string().nullish(),
+  "ownerPhone": zod.string().nullish(),
+  "renterName": zod.string().nullish(),
+  "renterPhone": zod.string().nullish()
+})
+
+
+/**
+ * @summary Active rentals enriched with last-known location (admin Safety panel).
+ */
+export const ListTrackedTripsResponseItem = zod.object({
+  "bookingId": zod.string(),
+  "carLabel": zod.string(),
+  "carPlate": zod.string().nullish(),
+  "renterName": zod.string(),
+  "renterPhone": zod.string(),
+  "ownerName": zod.string(),
+  "ownerPhone": zod.string(),
+  "status": zod.string(),
+  "startDate": zod.coerce.date(),
+  "endDate": zod.coerce.date(),
+  "lastLat": zod.number().nullish(),
+  "lastLng": zod.number().nullish(),
+  "lastSeenAt": zod.coerce.date().nullish(),
+  "pingCount": zod.number().optional(),
+  "hasIncident": zod.boolean()
+})
+export const ListTrackedTripsResponse = zod.array(ListTrackedTripsResponseItem)
 
 
 export const ListRentalBookingsQueryParams = zod.object({

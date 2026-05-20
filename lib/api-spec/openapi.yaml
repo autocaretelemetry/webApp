@@ -1502,6 +1502,20 @@ paths:
           description: Not found or not publicly shareable
 
   /renter-profiles:
+    get:
+      operationId: listRenterProfiles
+      tags: [rentals]
+      summary: List all renters (admin only — full PII)
+      parameters:
+        - { name: kycStatus, in: query, required: false, schema: { type: string, enum: [pending, verified, rejected] } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/RenterProfileSummary" }
     post:
       operationId: upsertRenterProfile
       tags: [rentals]
@@ -1561,6 +1575,106 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/RenterProfile" }
+
+  /rental-bookings/{rentalBookingId}/locations:
+    get:
+      operationId: listTripLocations
+      tags: [rentals]
+      summary: Return the trip's recorded GPS pings, oldest → newest (capped at 500).
+      parameters:
+        - { name: rentalBookingId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TripLocation" }
+    post:
+      operationId: createTripLocation
+      tags: [rentals]
+      summary: Record a single GPS ping for a rental in progress.
+      parameters:
+        - { name: rentalBookingId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateTripLocationInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TripLocation" }
+
+  /rental-bookings/{rentalBookingId}/incidents:
+    post:
+      operationId: createRentalIncident
+      tags: [rentals]
+      summary: Flag a rental as theft/accident/breakdown/SOS.
+      parameters:
+        - { name: rentalBookingId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateRentalIncidentInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RentalIncident" }
+
+  /rental-incidents:
+    get:
+      operationId: listRentalIncidents
+      tags: [rentals]
+      summary: List incidents across all rentals (admin triage).
+      parameters:
+        - { name: status, in: query, required: false, schema: { type: string, enum: [open, investigating, resolved] } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/RentalIncident" }
+
+  /rental-incidents/{incidentId}:
+    patch:
+      operationId: updateRentalIncident
+      tags: [rentals]
+      parameters:
+        - { name: incidentId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateRentalIncidentInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RentalIncident" }
+
+  /tracked-trips:
+    get:
+      operationId: listTrackedTrips
+      tags: [rentals]
+      summary: Active rentals enriched with last-known location (admin Safety panel).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TrackedTrip" }
 
   /rental-bookings:
     get:
@@ -3273,8 +3387,117 @@ components:
         idDocumentType: { type: string }
         idDocumentUrl: { type: string }
         selfieUrl: { type: string }
-        # Note: kycStatus intentionally omitted — it is set by AutoCare staff,
-        # never by the renter themselves.
+        # kycStatus may only be changed by platform admins. The server gates
+        # this — renters get a 403 if they try to set it themselves.
+        kycStatus: { type: string, enum: [pending, verified, rejected] }
+
+    RenterProfileSummary:
+      type: object
+      required: [id, name, phone, kycStatus, createdAt, updatedAt, bookingCount, activeBookings]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        phone: { type: string }
+        email: { type: string, nullable: true }
+        kycStatus: { type: string, enum: [pending, verified, rejected] }
+        hasDriverLicense: { type: boolean }
+        hasIdDocument: { type: boolean }
+        hasSelfie: { type: boolean }
+        bookingCount: { type: integer }
+        activeBookings: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    TripLocation:
+      type: object
+      required: [id, bookingId, lat, lng, source, recordedAt]
+      properties:
+        id: { type: string }
+        bookingId: { type: string }
+        lat: { type: number, format: float }
+        lng: { type: number, format: float }
+        accuracyMeters: { type: integer, nullable: true }
+        speedKph: { type: number, format: float, nullable: true }
+        source: { type: string, enum: [device, owner, admin, sim] }
+        note: { type: string, nullable: true }
+        recordedAt: { type: string, format: date-time }
+
+    CreateTripLocationInput:
+      type: object
+      required: [lat, lng]
+      properties:
+        lat: { type: number, format: float }
+        lng: { type: number, format: float }
+        accuracyMeters: { type: integer }
+        speedKph: { type: number, format: float }
+        source: { type: string, enum: [device, owner, admin, sim] }
+        note: { type: string }
+        recordedAt: { type: string, format: date-time }
+
+    TrackedTrip:
+      type: object
+      required: [bookingId, carLabel, renterName, renterPhone, ownerName, ownerPhone, status, startDate, endDate, hasIncident]
+      properties:
+        bookingId: { type: string }
+        carLabel: { type: string }
+        carPlate: { type: string, nullable: true }
+        renterName: { type: string }
+        renterPhone: { type: string }
+        ownerName: { type: string }
+        ownerPhone: { type: string }
+        status: { type: string }
+        startDate: { type: string, format: date-time }
+        endDate: { type: string, format: date-time }
+        lastLat: { type: number, format: float, nullable: true }
+        lastLng: { type: number, format: float, nullable: true }
+        lastSeenAt: { type: string, format: date-time, nullable: true }
+        pingCount: { type: integer }
+        hasIncident: { type: boolean }
+
+    RentalIncident:
+      type: object
+      required: [id, bookingId, kind, status, reportedBy, reportedAt]
+      properties:
+        id: { type: string }
+        bookingId: { type: string }
+        kind: { type: string, enum: [theft, accident, breakdown, sos] }
+        status: { type: string, enum: [open, investigating, resolved] }
+        reportedBy: { type: string, enum: [renter, owner, admin] }
+        reporterName: { type: string, nullable: true }
+        reporterPhone: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        adminNotes: { type: string, nullable: true }
+        lastKnownLat: { type: number, format: float, nullable: true }
+        lastKnownLng: { type: number, format: float, nullable: true }
+        lastKnownAt: { type: string, format: date-time, nullable: true }
+        reportedAt: { type: string, format: date-time }
+        resolvedAt: { type: string, format: date-time, nullable: true }
+        # Joined for admin convenience
+        carLabel: { type: string, nullable: true }
+        carPlate: { type: string, nullable: true }
+        ownerName: { type: string, nullable: true }
+        ownerPhone: { type: string, nullable: true }
+        renterName: { type: string, nullable: true }
+        renterPhone: { type: string, nullable: true }
+
+    CreateRentalIncidentInput:
+      type: object
+      required: [kind, reportedBy]
+      properties:
+        kind: { type: string, enum: [theft, accident, breakdown, sos] }
+        reportedBy: { type: string, enum: [renter, owner, admin] }
+        reporterName: { type: string }
+        reporterPhone: { type: string }
+        notes: { type: string }
+        lat: { type: number, description: "Optional GPS latitude captured at report time" }
+        lng: { type: number }
+        accuracy: { type: number }
+
+    UpdateRentalIncidentInput:
+      type: object
+      properties:
+        status: { type: string, enum: [open, investigating, resolved] }
+        adminNotes: { type: string }
 
     UploadUrlRequest:
       type: object

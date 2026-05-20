@@ -54,6 +54,8 @@ import AdminSubscriptions from "@/pages/admin/Subscriptions";
 import AdminRevenue from "@/pages/admin/Revenue";
 import SuperAdminLandingEditor from "@/pages/super_admin/LandingEditor";
 import AdminRentals from "@/pages/admin/Rentals";
+import AdminRenters from "@/pages/admin/Renters";
+import AdminSafety from "@/pages/admin/Safety";
 
 // Rentals Pages
 import RentalsBrowse from "@/pages/rentals/Browse";
@@ -171,6 +173,8 @@ function AppRouter() {
         <Route path="/admin/subscriptions" component={adminOnly(AdminSubscriptions)} />
         <Route path="/admin/revenue" component={adminOnly(AdminRevenue)} />
         <Route path="/admin/rentals" component={adminOnly(AdminRentals)} />
+        <Route path="/admin/renters" component={adminOnly(AdminRenters)} />
+        <Route path="/admin/safety" component={adminOnly(AdminSafety)} />
 
         {/* Super Admin Routes */}
         <Route path="/super-admin/landing" component={superAdminOnly(SuperAdminLandingEditor)} />

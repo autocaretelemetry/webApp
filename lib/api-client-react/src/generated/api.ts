@@ -41,10 +41,12 @@ import type {
   CreatePushSubscriptionInput,
   CreateRentalBookingInput,
   CreateRentalCarInput,
+  CreateRentalIncidentInput,
   CreateRetainerInput,
   CreateRetainerPlanInput,
   CreateSubscriptionInput,
   CreateSubscriptionPlanInput,
+  CreateTripLocationInput,
   CreateVehicleInput,
   CreateVendorStaffInput,
   DeleteConflict,
@@ -70,6 +72,8 @@ import type {
   ListPlatformStaffParams,
   ListRentalBookingsParams,
   ListRentalCarsParams,
+  ListRentalIncidentsParams,
+  ListRenterProfilesParams,
   ListRetainersParams,
   ListServiceCentersParams,
   ListSubscriptionPlansParams,
@@ -90,7 +94,9 @@ import type {
   RegisterDeliveryAgentInput,
   RentalBooking,
   RentalCar,
+  RentalIncident,
   RenterProfile,
+  RenterProfileSummary,
   Retainer,
   RetainerPlan,
   RevenueOverview,
@@ -101,6 +107,8 @@ import type {
   StorageError,
   Subscription,
   SubscriptionPlan,
+  TrackedTrip,
+  TripLocation,
   UpdateActiveInput,
   UpdateBookingStatusInput,
   UpdateCenterStaffInput,
@@ -113,6 +121,7 @@ import type {
   UpdateProfileInput,
   UpdateRentalBookingInput,
   UpdateRentalCarInput,
+  UpdateRentalIncidentInput,
   UpdateRenterProfileInput,
   UpdateRetainerInput,
   UpdateRetainerPlanInput,
@@ -7089,6 +7098,90 @@ export function useGetPublicRentalCar<TData = Awaited<ReturnType<typeof getPubli
 
 
 
+export const getListRenterProfilesUrl = (params?: ListRenterProfilesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/renter-profiles?${stringifiedParams}` : `/api/renter-profiles`
+}
+
+/**
+ * @summary List all renters (admin only — full PII)
+ */
+export const listRenterProfiles = async (params?: ListRenterProfilesParams, options?: RequestInit): Promise<RenterProfileSummary[]> => {
+
+  return customFetch<RenterProfileSummary[]>(getListRenterProfilesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListRenterProfilesQueryKey = (params?: ListRenterProfilesParams,) => {
+    return [
+    `/api/renter-profiles`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListRenterProfilesQueryOptions = <TData = Awaited<ReturnType<typeof listRenterProfiles>>, TError = ErrorType<unknown>>(params?: ListRenterProfilesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listRenterProfiles>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListRenterProfilesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listRenterProfiles>>> = ({ signal }) => listRenterProfiles(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listRenterProfiles>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListRenterProfilesQueryResult = NonNullable<Awaited<ReturnType<typeof listRenterProfiles>>>
+export type ListRenterProfilesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all renters (admin only — full PII)
+ */
+
+export function useListRenterProfiles<TData = Awaited<ReturnType<typeof listRenterProfiles>>, TError = ErrorType<unknown>>(
+ params?: ListRenterProfilesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listRenterProfiles>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListRenterProfilesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getUpsertRenterProfileUrl = () => {
 
 
@@ -7367,6 +7460,454 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getUpdateRenterProfileMutationOptions(options));
     }
+
+export const getListTripLocationsUrl = (rentalBookingId: string,) => {
+
+
+
+
+  return `/api/rental-bookings/${rentalBookingId}/locations`
+}
+
+/**
+ * @summary Return the trip's recorded GPS pings, oldest → newest (capped at 500).
+ */
+export const listTripLocations = async (rentalBookingId: string, options?: RequestInit): Promise<TripLocation[]> => {
+
+  return customFetch<TripLocation[]>(getListTripLocationsUrl(rentalBookingId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListTripLocationsQueryKey = (rentalBookingId: string,) => {
+    return [
+    `/api/rental-bookings/${rentalBookingId}/locations`
+    ] as const;
+    }
+
+
+export const getListTripLocationsQueryOptions = <TData = Awaited<ReturnType<typeof listTripLocations>>, TError = ErrorType<unknown>>(rentalBookingId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTripLocations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListTripLocationsQueryKey(rentalBookingId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTripLocations>>> = ({ signal }) => listTripLocations(rentalBookingId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(rentalBookingId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTripLocations>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListTripLocationsQueryResult = NonNullable<Awaited<ReturnType<typeof listTripLocations>>>
+export type ListTripLocationsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Return the trip's recorded GPS pings, oldest → newest (capped at 500).
+ */
+
+export function useListTripLocations<TData = Awaited<ReturnType<typeof listTripLocations>>, TError = ErrorType<unknown>>(
+ rentalBookingId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTripLocations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListTripLocationsQueryOptions(rentalBookingId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateTripLocationUrl = (rentalBookingId: string,) => {
+
+
+
+
+  return `/api/rental-bookings/${rentalBookingId}/locations`
+}
+
+/**
+ * @summary Record a single GPS ping for a rental in progress.
+ */
+export const createTripLocation = async (rentalBookingId: string,
+    createTripLocationInput: CreateTripLocationInput, options?: RequestInit): Promise<TripLocation> => {
+
+  return customFetch<TripLocation>(getCreateTripLocationUrl(rentalBookingId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createTripLocationInput,)
+  }
+);}
+
+
+
+
+export const getCreateTripLocationMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTripLocation>>, TError,{rentalBookingId: string;data: BodyType<CreateTripLocationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createTripLocation>>, TError,{rentalBookingId: string;data: BodyType<CreateTripLocationInput>}, TContext> => {
+
+const mutationKey = ['createTripLocation'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createTripLocation>>, {rentalBookingId: string;data: BodyType<CreateTripLocationInput>}> = (props) => {
+          const {rentalBookingId,data} = props ?? {};
+
+          return  createTripLocation(rentalBookingId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateTripLocationMutationResult = NonNullable<Awaited<ReturnType<typeof createTripLocation>>>
+    export type CreateTripLocationMutationBody = BodyType<CreateTripLocationInput>
+    export type CreateTripLocationMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Record a single GPS ping for a rental in progress.
+ */
+export const useCreateTripLocation = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTripLocation>>, TError,{rentalBookingId: string;data: BodyType<CreateTripLocationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createTripLocation>>,
+        TError,
+        {rentalBookingId: string;data: BodyType<CreateTripLocationInput>},
+        TContext
+      > => {
+      return useMutation(getCreateTripLocationMutationOptions(options));
+    }
+
+export const getCreateRentalIncidentUrl = (rentalBookingId: string,) => {
+
+
+
+
+  return `/api/rental-bookings/${rentalBookingId}/incidents`
+}
+
+/**
+ * @summary Flag a rental as theft/accident/breakdown/SOS.
+ */
+export const createRentalIncident = async (rentalBookingId: string,
+    createRentalIncidentInput: CreateRentalIncidentInput, options?: RequestInit): Promise<RentalIncident> => {
+
+  return customFetch<RentalIncident>(getCreateRentalIncidentUrl(rentalBookingId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createRentalIncidentInput,)
+  }
+);}
+
+
+
+
+export const getCreateRentalIncidentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRentalIncident>>, TError,{rentalBookingId: string;data: BodyType<CreateRentalIncidentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createRentalIncident>>, TError,{rentalBookingId: string;data: BodyType<CreateRentalIncidentInput>}, TContext> => {
+
+const mutationKey = ['createRentalIncident'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createRentalIncident>>, {rentalBookingId: string;data: BodyType<CreateRentalIncidentInput>}> = (props) => {
+          const {rentalBookingId,data} = props ?? {};
+
+          return  createRentalIncident(rentalBookingId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateRentalIncidentMutationResult = NonNullable<Awaited<ReturnType<typeof createRentalIncident>>>
+    export type CreateRentalIncidentMutationBody = BodyType<CreateRentalIncidentInput>
+    export type CreateRentalIncidentMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Flag a rental as theft/accident/breakdown/SOS.
+ */
+export const useCreateRentalIncident = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRentalIncident>>, TError,{rentalBookingId: string;data: BodyType<CreateRentalIncidentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createRentalIncident>>,
+        TError,
+        {rentalBookingId: string;data: BodyType<CreateRentalIncidentInput>},
+        TContext
+      > => {
+      return useMutation(getCreateRentalIncidentMutationOptions(options));
+    }
+
+export const getListRentalIncidentsUrl = (params?: ListRentalIncidentsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/rental-incidents?${stringifiedParams}` : `/api/rental-incidents`
+}
+
+/**
+ * @summary List incidents across all rentals (admin triage).
+ */
+export const listRentalIncidents = async (params?: ListRentalIncidentsParams, options?: RequestInit): Promise<RentalIncident[]> => {
+
+  return customFetch<RentalIncident[]>(getListRentalIncidentsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListRentalIncidentsQueryKey = (params?: ListRentalIncidentsParams,) => {
+    return [
+    `/api/rental-incidents`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListRentalIncidentsQueryOptions = <TData = Awaited<ReturnType<typeof listRentalIncidents>>, TError = ErrorType<unknown>>(params?: ListRentalIncidentsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listRentalIncidents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListRentalIncidentsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listRentalIncidents>>> = ({ signal }) => listRentalIncidents(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listRentalIncidents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListRentalIncidentsQueryResult = NonNullable<Awaited<ReturnType<typeof listRentalIncidents>>>
+export type ListRentalIncidentsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List incidents across all rentals (admin triage).
+ */
+
+export function useListRentalIncidents<TData = Awaited<ReturnType<typeof listRentalIncidents>>, TError = ErrorType<unknown>>(
+ params?: ListRentalIncidentsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listRentalIncidents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListRentalIncidentsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateRentalIncidentUrl = (incidentId: string,) => {
+
+
+
+
+  return `/api/rental-incidents/${incidentId}`
+}
+
+export const updateRentalIncident = async (incidentId: string,
+    updateRentalIncidentInput: UpdateRentalIncidentInput, options?: RequestInit): Promise<RentalIncident> => {
+
+  return customFetch<RentalIncident>(getUpdateRentalIncidentUrl(incidentId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateRentalIncidentInput,)
+  }
+);}
+
+
+
+
+export const getUpdateRentalIncidentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRentalIncident>>, TError,{incidentId: string;data: BodyType<UpdateRentalIncidentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateRentalIncident>>, TError,{incidentId: string;data: BodyType<UpdateRentalIncidentInput>}, TContext> => {
+
+const mutationKey = ['updateRentalIncident'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateRentalIncident>>, {incidentId: string;data: BodyType<UpdateRentalIncidentInput>}> = (props) => {
+          const {incidentId,data} = props ?? {};
+
+          return  updateRentalIncident(incidentId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateRentalIncidentMutationResult = NonNullable<Awaited<ReturnType<typeof updateRentalIncident>>>
+    export type UpdateRentalIncidentMutationBody = BodyType<UpdateRentalIncidentInput>
+    export type UpdateRentalIncidentMutationError = ErrorType<unknown>
+
+    export const useUpdateRentalIncident = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRentalIncident>>, TError,{incidentId: string;data: BodyType<UpdateRentalIncidentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateRentalIncident>>,
+        TError,
+        {incidentId: string;data: BodyType<UpdateRentalIncidentInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateRentalIncidentMutationOptions(options));
+    }
+
+export const getListTrackedTripsUrl = () => {
+
+
+
+
+  return `/api/tracked-trips`
+}
+
+/**
+ * @summary Active rentals enriched with last-known location (admin Safety panel).
+ */
+export const listTrackedTrips = async ( options?: RequestInit): Promise<TrackedTrip[]> => {
+
+  return customFetch<TrackedTrip[]>(getListTrackedTripsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListTrackedTripsQueryKey = () => {
+    return [
+    `/api/tracked-trips`
+    ] as const;
+    }
+
+
+export const getListTrackedTripsQueryOptions = <TData = Awaited<ReturnType<typeof listTrackedTrips>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTrackedTrips>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListTrackedTripsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTrackedTrips>>> = ({ signal }) => listTrackedTrips({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTrackedTrips>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListTrackedTripsQueryResult = NonNullable<Awaited<ReturnType<typeof listTrackedTrips>>>
+export type ListTrackedTripsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Active rentals enriched with last-known location (admin Safety panel).
+ */
+
+export function useListTrackedTrips<TData = Awaited<ReturnType<typeof listTrackedTrips>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTrackedTrips>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListTrackedTripsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getListRentalBookingsUrl = (params?: ListRentalBookingsParams,) => {
   const normalizedParams = new URLSearchParams();
