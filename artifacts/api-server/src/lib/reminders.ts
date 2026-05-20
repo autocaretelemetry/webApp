@@ -1,7 +1,8 @@
-import { db, vehiclesTable, reminderRunsTable, type Vehicle, type ReminderRun, type ReminderRunTrigger } from "@workspace/db";
-import { desc, eq } from "drizzle-orm";
+import { db, vehiclesTable, reminderRunsTable, usersTable, type Vehicle, type ReminderRun, type ReminderRunTrigger } from "@workspace/db";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { createOwnerNotification } from "./notify";
 import { appPublicUrl } from "./whatsapp";
+import { sendEmail, reminderJobFailureEmail } from "./email";
 import { logger } from "./logger";
 
 const DAY = 1000 * 60 * 60 * 24;
@@ -178,8 +179,101 @@ export async function runReminderJob(
       .set({ status: "error", errorMessage: message, finishedAt: new Date() })
       .where(eq(reminderRunsTable.id, runId));
     logger.error({ err, runId, trigger }, "Reminder run failed");
+    await maybeAlertOnFailureStreak(message).catch((alertErr) =>
+      logger.warn({ err: alertErr, runId }, "Failed to dispatch reminder-failure alert"),
+    );
     return { runId, created: 0, status: "error", errorMessage: message };
   }
+}
+
+/**
+ * Default number of consecutive failed runs that triggers an admin alert.
+ * Overridable via `REMINDER_FAILURE_ALERT_THRESHOLD`.
+ */
+const DEFAULT_FAILURE_ALERT_THRESHOLD = 3;
+
+function failureAlertThreshold(): number {
+  const raw = process.env["REMINDER_FAILURE_ALERT_THRESHOLD"];
+  if (!raw) return DEFAULT_FAILURE_ALERT_THRESHOLD;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 1) return DEFAULT_FAILURE_ALERT_THRESHOLD;
+  return Math.floor(n);
+}
+
+/**
+ * Resolve which addresses receive a reminder-job failure alert. Explicit
+ * `REMINDER_ALERT_EMAILS` (comma-separated) wins; otherwise fall back to
+ * every active platform super-admin's verified email so a fresh deployment
+ * still gets a heads-up without extra config.
+ */
+async function getFailureAlertRecipients(): Promise<string[]> {
+  const env = process.env["REMINDER_ALERT_EMAILS"];
+  if (env && env.trim()) {
+    return env
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+  }
+  const rows = await db
+    .select({ email: usersTable.email })
+    .from(usersTable)
+    .where(
+      and(
+        eq(usersTable.active, true),
+        inArray(usersTable.role, ["super_admin"]),
+      ),
+    );
+  return rows.map((r) => r.email).filter((e): e is string => Boolean(e));
+}
+
+/**
+ * Email platform admins exactly once per failure streak. A "streak" is N
+ * consecutive `status="error"` runs where N is the configured threshold.
+ * To avoid re-spamming, we only fire when the current run is the Nth error
+ * AND the run immediately preceding the streak is either absent or NOT an
+ * error — that means the Nth-failure boundary was just crossed, so any
+ * earlier failure in the same streak would already have sent its own alert
+ * one tick later (and would now skip because the (N+1)th prior run is an
+ * error). A single success in between resets the streak naturally.
+ */
+async function maybeAlertOnFailureStreak(latestError: string): Promise<void> {
+  const threshold = failureAlertThreshold();
+  const recent = await db
+    .select({ status: reminderRunsTable.status })
+    .from(reminderRunsTable)
+    .orderBy(desc(reminderRunsTable.startedAt))
+    .limit(threshold + 1);
+  if (recent.length < threshold) return;
+  const streak = recent.slice(0, threshold);
+  if (!streak.every((r) => r.status === "error")) return;
+  // If a run before the streak window also failed, we already alerted on
+  // the previous tick when the boundary was first crossed.
+  if (recent.length > threshold && recent[threshold]!.status === "error") return;
+
+  const recipients = await getFailureAlertRecipients();
+  if (recipients.length === 0) {
+    logger.warn(
+      { threshold },
+      "Reminder job failure streak detected but no alert recipients configured",
+    );
+    return;
+  }
+  const msg = reminderJobFailureEmail({
+    streakLength: threshold,
+    errorMessage: latestError,
+    runUrl: appPublicUrl("/admin/reminder-runs"),
+  });
+  logger.warn(
+    { threshold, recipients: recipients.length },
+    "Reminder job failure streak detected; emailing platform admins",
+  );
+  await Promise.all(
+    recipients.map((to) =>
+      sendEmail({ to, ...msg }).catch((err) =>
+        logger.warn({ err, to }, "reminder failure alert send threw"),
+      ),
+    ),
+  );
 }
 
 export async function listRecentReminderRuns(limit = 25): Promise<ReminderRun[]> {

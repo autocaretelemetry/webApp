@@ -128,6 +128,22 @@ export function kycVerifiedEmail(
   };
 }
 
+export function reminderJobFailureEmail(args: {
+  streakLength: number;
+  errorMessage: string | null;
+  runUrl: string;
+}): Omit<EmailMessage, "to"> {
+  const { streakLength, errorMessage, runUrl } = args;
+  const errText = errorMessage?.trim() || "(no error message recorded)";
+  return {
+    subject: `AutoCare reminder job failing (${streakLength} runs in a row)`,
+    text: `Heads up — the AutoCare service-reminder job has failed ${streakLength} times in a row. Owners may stop receiving service reminders until this is resolved.\n\nLatest error:\n${errText}\n\nReview recent runs: ${runUrl}\n\nYou will not receive another alert for this streak; a follow-up will be sent if it recovers and then fails again.\n\n— AutoCare`,
+    html: wrap(
+      `<h2 style="margin:0 0 16px;">Reminder job failing</h2><p>The AutoCare service-reminder job has failed <strong>${streakLength}</strong> times in a row. Owners may stop receiving service reminders until this is resolved.</p><p style="margin:16px 0 4px;color:#6b7280;font-size:13px;">Latest error</p><pre style="background:#f3f4f6;border-left:3px solid #d1d5db;padding:12px 16px;margin:0 0 16px;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;">${escape(errText)}</pre><p><a href="${escape(runUrl)}" style="color:#b45309;font-weight:600;">Review recent reminder runs →</a></p><p style="color:#9ca3af;font-size:12px;margin-top:24px;">You will not receive another alert for this streak; a follow-up will be sent only if the job recovers and then fails again.</p>`,
+    ),
+  };
+}
+
 export function kycRejectedEmail(
   name: string,
   note: string | null | undefined,
