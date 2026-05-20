@@ -17,6 +17,7 @@ import {
   GetVehicleHistoryParams,
   GetVehicleRemindersParams,
 } from "@workspace/api-zod";
+import PDFDocument from "pdfkit";
 import { computeReminders } from "../lib/reminders";
 import { getEntitlements } from "../lib/entitlements";
 import { requireAuth } from "../lib/auth";
@@ -171,16 +172,13 @@ router.get("/vehicles/:vehicleId/history", async (req, res): Promise<void> => {
   res.json(records);
 });
 
-// CSV export of completed-service history. Gated by the owner's plan
+// Maintenance-history export. One route, two formats negotiated via the
+// file-extension suffix (`.csv` | `.pdf`). Gated by the owner's plan
 // (`canExportHistory`) and authorized to the owner (matched on the
-// session user's phone) or an admin. Returned as a plain text/csv body
-// so the client can stream the download via a regular anchor — kept out
-// of OpenAPI/Orval because their binary handling is awkward and the
-// route is auth-only anyway.
-router.get(
-  "/vehicles/:vehicleId/maintenance-history.csv",
-  requireAuth,
-  async (req, res): Promise<void> => {
+// session user's phone) or an admin. Kept out of OpenAPI/Orval because
+// their binary/csv handling is awkward and the route is auth-only.
+const maintenanceHistoryHandler = (format: "csv" | "pdf") =>
+  async (req: import("express").Request, res: import("express").Response): Promise<void> => {
     const params = GetVehicleHistoryParams.safeParse(req.params);
     if (!params.success) {
       res.status(400).json({ error: params.error.message });
@@ -239,36 +237,108 @@ router.get(
       : [];
     const centerMap = new Map(centers.map((c) => [c.id, c]));
     const invoiceMap = new Map(invoices.map((i) => [i.id, i]));
-    // Minimal CSV escaper — wrap any field with comma/quote/newline in
-    // quotes and double internal quotes. Avoids pulling in a dependency.
-    const esc = (v: unknown): string => {
-      if (v == null) return "";
-      const s = String(v);
-      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const header = [
-      "completed_at",
-      "service_type",
-      "description",
-      "service_center",
-      "invoice_total",
-    ].join(",");
-    const lines = completed.map((b) => {
-      const center = centerMap.get(b.serviceCenterId);
-      const invoice = b.invoiceId ? invoiceMap.get(b.invoiceId) : null;
-      return [
-        b.completedAt?.toISOString() ?? "",
-        b.serviceType,
-        b.description,
-        center?.name ?? "",
-        invoice?.total ?? 0,
-      ].map(esc).join(",");
-    });
-    const filename = `${vehicle.plateNumber.replace(/[^A-Za-z0-9_-]/g, "_")}-history.csv`;
-    res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.send([header, ...lines].join("\n"));
-  },
+    const safePlate = vehicle.plateNumber.replace(/[^A-Za-z0-9_-]/g, "_");
+
+    if (format === "csv") {
+      // Minimal CSV escaper — wrap any field with comma/quote/newline in
+      // quotes and double internal quotes. Avoids pulling in a dependency.
+      const esc = (v: unknown): string => {
+        if (v == null) return "";
+        const s = String(v);
+        return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const header = [
+        "completed_at",
+        "service_type",
+        "description",
+        "service_center",
+        "invoice_total",
+      ].join(",");
+      const lines = completed.map((b) => {
+        const center = centerMap.get(b.serviceCenterId);
+        const invoice = b.invoiceId ? invoiceMap.get(b.invoiceId) : null;
+        return [
+          b.completedAt?.toISOString() ?? "",
+          b.serviceType,
+          b.description,
+          center?.name ?? "",
+          invoice?.total ?? 0,
+        ].map(esc).join(",");
+      });
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${safePlate}-history.csv"`,
+      );
+      res.send([header, ...lines].join("\n"));
+      return;
+    }
+
+    // PDF: stream pdfkit straight into the response. Uses the bundled
+    // Helvetica font (no font assets needed). Layout is intentionally
+    // simple — title, vehicle metadata, then one block per completed job.
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${safePlate}-history.pdf"`,
+    );
+    const doc = new PDFDocument({ size: "A4", margin: 50 });
+    doc.pipe(res);
+    doc.fillColor("#1a1a1a").fontSize(20).text("Maintenance History", { align: "left" });
+    doc.moveDown(0.3);
+    doc
+      .fontSize(12)
+      .fillColor("#555")
+      .text(`${vehicle.year} ${vehicle.brand} ${vehicle.model}  -  Plate ${vehicle.plateNumber}`);
+    doc.text(`Generated ${new Date().toISOString().slice(0, 10)}`);
+    doc.moveDown(0.8);
+    doc
+      .strokeColor("#cccccc")
+      .lineWidth(1)
+      .moveTo(doc.x, doc.y)
+      .lineTo(doc.page.width - doc.page.margins.right, doc.y)
+      .stroke();
+    doc.moveDown(0.5);
+
+    if (completed.length === 0) {
+      doc.fillColor("#555").fontSize(12).text("No completed services on record.");
+    } else {
+      for (const b of completed) {
+        const center = centerMap.get(b.serviceCenterId);
+        const invoice = b.invoiceId ? invoiceMap.get(b.invoiceId) : null;
+        const date = b.completedAt
+          ? b.completedAt.toISOString().slice(0, 10)
+          : "Unknown date";
+        doc
+          .fillColor("#1a1a1a")
+          .fontSize(13)
+          .text(`${b.serviceType}`, { continued: true })
+          .fillColor("#888")
+          .text(`   ${date}`);
+        doc.fontSize(10).fillColor("#555").text(center?.name ?? "Unknown center");
+        doc.fontSize(11).fillColor("#1a1a1a").text(b.description, { paragraphGap: 4 });
+        doc
+          .fontSize(11)
+          .fillColor("#1a1a1a")
+          .text(`Invoice total: ${invoice?.total ?? 0}`);
+        doc.moveDown(0.8);
+      }
+    }
+    doc.end();
+  };
+
+// Two routes share one handler. Express 5's path-to-regexp doesn't
+// allow `:format(csv|pdf)` inline regex on params, so we register the
+// extensions explicitly.
+router.get(
+  "/vehicles/:vehicleId/maintenance-history.csv",
+  requireAuth,
+  maintenanceHistoryHandler("csv"),
+);
+router.get(
+  "/vehicles/:vehicleId/maintenance-history.pdf",
+  requireAuth,
+  maintenanceHistoryHandler("pdf"),
 );
 
 router.get(

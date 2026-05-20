@@ -100,6 +100,11 @@ async function buildAll() {
       "puppeteer",
       "puppeteer-core",
       "electron",
+      // pdfkit ships CJS and pulls in fontkit/brotli which try to require
+      // sibling .cjs helpers at runtime; bundling them breaks resolution.
+      "pdfkit",
+      "fontkit",
+      "brotli",
     ],
     sourcemap: "linked",
     plugins: [

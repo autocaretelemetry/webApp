@@ -21,12 +21,12 @@ export default function VehicleDetail() {
   if (isLoadingVehicle) return <div className="p-8">Loading vehicle...</div>;
   if (!vehicle) return <div className="p-8">Vehicle not found</div>;
 
-  // CSV download via plain fetch (cookie-authenticated). The server
-  // returns 402 if the owner's plan doesn't include canExportHistory.
-  const downloadHistoryCsv = async () => {
+  // Download via plain fetch (cookie-authenticated). The server returns
+  // 402 if the owner's plan doesn't include canExportHistory.
+  const downloadHistory = async (format: "csv" | "pdf") => {
     try {
       const res = await fetch(
-        `/api/vehicles/${vehicle.id}/maintenance-history.csv`,
+        `/api/vehicles/${vehicle.id}/maintenance-history.${format}`,
         { credentials: "include" },
       );
       if (res.status === 402) {
@@ -41,7 +41,7 @@ export default function VehicleDetail() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${vehicle.plateNumber}-history.csv`;
+      a.download = `${vehicle.plateNumber}-history.${format}`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -105,8 +105,11 @@ export default function VehicleDetail() {
             
             <TabsContent value="history" className="mt-6 space-y-4">
               {history && history.length > 0 && (
-                <div className="flex justify-end">
-                  <Button size="sm" variant="outline" className="gap-2" onClick={downloadHistoryCsv}>
+                <div className="flex justify-end gap-2">
+                  <Button size="sm" variant="outline" className="gap-2" onClick={() => downloadHistory("pdf")}>
+                    <Download className="h-4 w-4" /> Export PDF
+                  </Button>
+                  <Button size="sm" variant="outline" className="gap-2" onClick={() => downloadHistory("csv")}>
                     <Download className="h-4 w-4" /> Export CSV
                   </Button>
                 </div>
