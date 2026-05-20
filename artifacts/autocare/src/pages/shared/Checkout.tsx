@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCreateOrder, useGetBooking } from "@workspace/api-client-react";
+import { useCreateOrder, useGetBooking, useListOrders, getListOrdersQueryKey as genGetListOrdersQueryKey } from "@workspace/api-client-react";
 import { getListOrdersQueryKey, getListPartsQueryKey, getGetBookingQueryKey } from "@/lib/queryKeys";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,40 @@ export default function Checkout() {
     if (user?.name) setBuyerName((prev) => (prev ? prev : user.name));
     if (user?.phone) setBuyerPhone((prev) => (prev ? prev : user.phone ?? ""));
   }, [isProposal, user?.name, user?.phone]);
+
+  // Direct-buy address prefill: pull the buyer's most recent non-proposal
+  // order (server-scoped to the signed-in user via `mine=true`) and reuse
+  // its shipping address so repeat buyers don't retype it. Skipped in
+  // proposal mode — proposals always ship to the booking's service center.
+  const { data: myOrders } = useListOrders(
+    { mine: true },
+    {
+      query: {
+        enabled: !isProposal && !!user,
+        staleTime: 60_000,
+        queryKey: genGetListOrdersQueryKey({ mine: true }),
+      },
+    },
+  );
+  useEffect(() => {
+    if (isProposal) return;
+    if (!myOrders || myOrders.length === 0) return;
+    // Direct-buy lineage only: proposal-origin orders carry a bookingId +
+    // mechanicId (their ship-to is the service center, not the buyer's),
+    // and remain identifiable even after they transition `proposed → placed`.
+    // We must skip them so the buyer doesn't get a workshop address back.
+    const lastDirect = myOrders.find(
+      (o) => !o.bookingId && !o.mechanicId && !!o.shippingAddress,
+    );
+    if (!lastDirect) return;
+    setShippingAddress((prev) => (prev ? prev : lastDirect.shippingAddress));
+    if (lastDirect.deliveryCity) {
+      setDeliveryCity((prev) => (prev ? prev : lastDirect.deliveryCity ?? ""));
+    }
+    if (lastDirect.deliveryRegion) {
+      setDeliveryRegion((prev) => (prev ? prev : lastDirect.deliveryRegion ?? ""));
+    }
+  }, [isProposal, myOrders]);
 
   // When the booking loads in proposal mode, prefill from owner + service center.
   useEffect(() => {
@@ -164,13 +198,13 @@ export default function Checkout() {
             buyerPhone: buyerPhone.trim(),
             shippingAddress: shippingAddress.trim(),
             notes: notes.trim() || null,
+            deliveryCity: deliveryCity.trim() || null,
+            deliveryRegion: deliveryRegion.trim() || null,
             items: group.lines.map((l) => ({ partId: l.partId, quantity: l.quantity })),
             ...(isProposal && scope
               ? {
                   bookingId: scope.bookingId,
                   mechanicId: scope.mechanicId,
-                  deliveryCity: deliveryCity || null,
-                  deliveryRegion: deliveryRegion || null,
                 }
               : {}),
           },
@@ -258,18 +292,16 @@ export default function Checkout() {
                 <Label htmlFor="addr">{isProposal ? "Delivery address (service center)" : "Shipping address"}</Label>
                 <Textarea id="addr" rows={2} value={shippingAddress} onChange={(e) => setShippingAddress(e.target.value)} className="mt-1.5" />
               </div>
-              {isProposal && (
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="city">City</Label>
-                    <Input id="city" value={deliveryCity ?? ""} onChange={(e) => setDeliveryCity(e.target.value)} className="mt-1.5" />
-                  </div>
-                  <div>
-                    <Label htmlFor="region">Region / State</Label>
-                    <Input id="region" value={deliveryRegion ?? ""} onChange={(e) => setDeliveryRegion(e.target.value)} className="mt-1.5" />
-                  </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="city">City</Label>
+                  <Input id="city" value={deliveryCity ?? ""} onChange={(e) => setDeliveryCity(e.target.value)} className="mt-1.5" />
                 </div>
-              )}
+                <div>
+                  <Label htmlFor="region">Region / State</Label>
+                  <Input id="region" value={deliveryRegion ?? ""} onChange={(e) => setDeliveryRegion(e.target.value)} className="mt-1.5" />
+                </div>
+              </div>
               <div>
                 <Label htmlFor="notes">Notes for the vendor (optional)</Label>
                 <Textarea id="notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-1.5" placeholder="Delivery instructions, fitment questions, etc." />
