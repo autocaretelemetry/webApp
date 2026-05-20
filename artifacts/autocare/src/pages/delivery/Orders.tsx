@@ -84,6 +84,14 @@ export default function DeliveryOrders() {
                       {o.vendor?.name ?? "Vendor"} → {o.buyerName}
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                      {o.shippingAddressLabel && (
+                        <span
+                          className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0 text-[10px] font-medium text-primary mr-1.5 align-middle"
+                          title="Picked from buyer's saved addresses"
+                        >
+                          {o.shippingAddressLabel}
+                        </span>
+                      )}
                       {o.shippingAddress}
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">

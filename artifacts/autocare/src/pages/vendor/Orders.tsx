@@ -78,8 +78,20 @@ export default function VendorOrders() {
                       <Badge variant="outline" className="text-xs capitalize">{o.buyerKind}</Badge>
                     </div>
                     <p className="font-semibold">{o.buyerName}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {o.itemsCount ?? 0} item{(o.itemsCount ?? 0) === 1 ? "" : "s"} · {o.shippingAddress.split(",")[0]} · {formatRelative(o.placedAt)}
+                    <p className="text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                      <span>{o.itemsCount ?? 0} item{(o.itemsCount ?? 0) === 1 ? "" : "s"}</span>
+                      <span aria-hidden>·</span>
+                      {o.shippingAddressLabel && (
+                        <span
+                          className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0 text-[10px] font-medium text-primary"
+                          title="Picked from buyer's saved addresses"
+                        >
+                          {o.shippingAddressLabel}
+                        </span>
+                      )}
+                      <span>{o.shippingAddress.split(",")[0]}</span>
+                      <span aria-hidden>·</span>
+                      <span>{formatRelative(o.placedAt)}</span>
                     </p>
                   </div>
                   <div className="text-right">

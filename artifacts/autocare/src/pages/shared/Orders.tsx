@@ -94,8 +94,23 @@ export default function Orders() {
                       <Badge variant="outline" className="text-xs capitalize">{o.buyerKind}</Badge>
                     </div>
                     <p className="font-medium">{o.vendor?.name ?? "Vendor"}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {o.buyerName} · {o.itemsCount ?? 0} item{(o.itemsCount ?? 0) === 1 ? "" : "s"} · placed {formatRelative(o.placedAt)}
+                    <p className="text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                      <span>{o.buyerName}</span>
+                      <span aria-hidden>·</span>
+                      <span>{o.itemsCount ?? 0} item{(o.itemsCount ?? 0) === 1 ? "" : "s"}</span>
+                      {o.shippingAddressLabel && (
+                        <>
+                          <span aria-hidden>·</span>
+                          <span
+                            className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0 text-[10px] font-medium text-primary"
+                            title="Picked from saved addresses"
+                          >
+                            {o.shippingAddressLabel}
+                          </span>
+                        </>
+                      )}
+                      <span aria-hidden>·</span>
+                      <span>placed {formatRelative(o.placedAt)}</span>
                     </p>
                   </div>
                   <div className="text-right">
