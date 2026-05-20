@@ -21,11 +21,14 @@ export default function FleetDashboard() {
   const { data: dash, isLoading: loadingDash, error } = useFleetDashboard(orgId);
 
   // Auto-pick the first org membership so a fresh session has something
-  // to show without the user having to fiddle with localStorage.
+  // to show without the user having to fiddle with localStorage. Also
+  // self-heal when localStorage holds a stale orgId (e.g. after a reseed
+  // or when the signed-in user no longer belongs to that org) — otherwise
+  // the dashboard would 404 on every reload.
   useEffect(() => {
-    if (!orgId && mine && mine.organizations.length > 0) {
-      setFleetOrgId(mine.organizations[0].id);
-    }
+    if (!mine || mine.organizations.length === 0) return;
+    const valid = mine.organizations.some((o) => o.id === orgId);
+    if (!valid) setFleetOrgId(mine.organizations[0].id);
   }, [orgId, mine]);
 
   const partsEnabled = !!dash?.limits.partsCostTransparency;
