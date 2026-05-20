@@ -78,7 +78,14 @@ type AuthedUserRow = {
   kycNote: string | null;
   requestedRole: string | null;
   applicantData?: Record<string, unknown> | null;
-  kycDocuments?: Array<{ key: string; label: string; url: string }> | null;
+  kycDocuments?: Array<{
+    key: string;
+    label: string;
+    url: string;
+    scanStatus?: "pending" | "clean" | "infected" | "error";
+    scanCheckedAt?: string;
+    scanDetails?: string;
+  }> | null;
   createdAt: string;
 };
 
@@ -244,22 +251,48 @@ function ApprovalsList({ kind }: { kind: "applications" | "kyc" | "rejected" }) 
 
             {kind === "kyc" && row.kycDocuments && row.kycDocuments.length > 0 && (
               <div className="grid sm:grid-cols-3 gap-2">
-                {row.kycDocuments.map((d) => (
-                  <a
-                    key={d.key}
-                    href={d.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block rounded-md border bg-card hover:border-primary/40 overflow-hidden"
-                  >
-                    <div className="aspect-[4/3] bg-muted flex items-center justify-center">
-                      <img src={d.url} alt={d.label} className="w-full h-full object-cover" />
-                    </div>
-                    <div className="px-2 py-1.5 text-[11px] flex items-center gap-1.5">
-                      <FileText className="h-3 w-3" /> {d.label}
-                    </div>
-                  </a>
-                ))}
+                {row.kycDocuments.map((d) => {
+                  // Reviewer-side gate: never render the actual image for a
+                  // document that isn't `clean`. Anything still pending, in
+                  // error, or quarantined as infected gets a placeholder so a
+                  // reviewer cannot accidentally download an unscanned blob.
+                  const scan = d.scanStatus ?? "pending";
+                  if (scan !== "clean") {
+                    return (
+                      <div
+                        key={d.key}
+                        className="block rounded-md border bg-card overflow-hidden"
+                      >
+                        <div className="aspect-[4/3] bg-muted flex items-center justify-center text-[11px] text-muted-foreground px-2 text-center">
+                          {scan === "infected"
+                            ? "Flagged by malware scanner — quarantined."
+                            : scan === "error"
+                              ? "Security scan errored. Ask applicant to re-upload."
+                              : "Awaiting security scan…"}
+                        </div>
+                        <div className="px-2 py-1.5 text-[11px] flex items-center gap-1.5">
+                          <FileText className="h-3 w-3" /> {d.label}
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <a
+                      key={d.key}
+                      href={d.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block rounded-md border bg-card hover:border-primary/40 overflow-hidden"
+                    >
+                      <div className="aspect-[4/3] bg-muted flex items-center justify-center">
+                        <img src={d.url} alt={d.label} className="w-full h-full object-cover" />
+                      </div>
+                      <div className="px-2 py-1.5 text-[11px] flex items-center gap-1.5">
+                        <FileText className="h-3 w-3" /> {d.label}
+                      </div>
+                    </a>
+                  );
+                })}
               </div>
             )}
 

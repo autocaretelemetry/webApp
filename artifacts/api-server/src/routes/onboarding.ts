@@ -31,6 +31,10 @@ import {
   kycRejectedWhatsApp,
 } from "../lib/whatsapp";
 import { logger } from "../lib/logger";
+import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
+import { scanKycDocument } from "../lib/kycScanner";
+import { ALLOWED_UPLOAD_MIME, MAX_UPLOAD_BYTES } from "./storage";
+import type { File } from "@google-cloud/storage";
 
 function fireEmail(to: string | null | undefined, msg: Omit<EmailMessage, "to">): void {
   if (!to) return;
@@ -96,6 +100,7 @@ async function recordEvent(
 }
 
 const router: IRouter = Router();
+const objectStorageService = new ObjectStorageService();
 
 /**
  * Global gate: signed-in users whose KYC is not verified are blocked from the
@@ -154,6 +159,91 @@ const KycSubmissionBody = z.object({
 });
 
 /**
+ * Validate that the URL the client submitted points at an object our storage
+ * layer actually issued, and that the stored blob is one of our allowed image
+ * types within the configured size cap.
+ *
+ * Why this matters: the client uploads directly to a presigned GCS URL, so an
+ * attacker who already has a session could (a) submit a URL pointing at any
+ * arbitrary site we'd happily serve back, or (b) PUT a non-image (PDF, EXE,
+ * script) to a presigned slot after telling /storage/uploads/request-url it
+ * was a PNG. Re-checking content-type + size against the real GCS metadata
+ * closes both holes. We also normalise the URL back to the canonical
+ * `/objects/...` form so reviewers never see attacker-controlled query
+ * strings or hostnames stored in the user row.
+ *
+ * VIRUS SCANNING — handled synchronously by `scanKycDocument` (see
+ * `lib/kycScanner.ts`) which runs an EICAR signature check + a
+ * magic-byte vs declared-MIME check on every uploaded blob. Infected
+ * documents are quarantined to a `quarantine/` prefix via
+ * `objectStorageService.quarantineObjectEntity` and the user row never
+ * gains a reference to them. The scanner is intentionally pluggable: swap
+ * the body of `scanKycDocument` for a ClamAV (`clamscan` npm bridge) or
+ * hosted (VirusTotal / Cloudmersive) call without touching this route.
+ * Defence-in-depth from the storage layer: `/storage/objects/*` sets
+ * `X-Content-Type-Options: nosniff` and forces
+ * `Content-Disposition: attachment` for anything non-image; the reviewer
+ * UI additionally refuses to render any document whose
+ * `scanStatus !== 'clean'`.
+ */
+async function validateKycDocumentUrl(rawUrl: string): Promise<
+  | {
+      ok: true;
+      normalizedUrl: string;
+      objectPath: string;
+      objectFile: File;
+      contentType: string;
+    }
+  | { ok: false; reason: string }
+> {
+  // Accept either the canonical `/api/storage/objects/...` form the upload
+  // hook produces, or the raw `/objects/...` form. Reject anything else —
+  // notably full http(s) URLs to attacker-controlled hosts.
+  let objectPath: string;
+  if (rawUrl.startsWith("/api/storage/objects/")) {
+    objectPath = rawUrl.slice("/api/storage".length);
+  } else if (rawUrl.startsWith("/objects/")) {
+    objectPath = rawUrl;
+  } else {
+    return { ok: false, reason: "Document URL is not from our storage layer." };
+  }
+
+  let objectFile: File;
+  try {
+    objectFile = await objectStorageService.getObjectEntityFile(objectPath);
+  } catch (err) {
+    if (err instanceof ObjectNotFoundError) {
+      return { ok: false, reason: "Uploaded document could not be found." };
+    }
+    throw err;
+  }
+
+  const [metadata] = await objectFile.getMetadata();
+  const contentType = String(metadata.contentType ?? "").toLowerCase();
+  if (!ALLOWED_UPLOAD_MIME.has(contentType)) {
+    return {
+      ok: false,
+      reason: "Document must be a JPG, PNG, or WebP image.",
+    };
+  }
+  const size = Number(metadata.size ?? 0);
+  if (!Number.isFinite(size) || size <= 0) {
+    return { ok: false, reason: "Uploaded document is empty." };
+  }
+  if (size > MAX_UPLOAD_BYTES) {
+    return { ok: false, reason: "Uploaded document exceeds the 10 MB limit." };
+  }
+
+  return {
+    ok: true,
+    normalizedUrl: `/api/storage${objectPath}`,
+    objectPath,
+    objectFile,
+    contentType,
+  };
+}
+
+/**
  * POST /me/kyc — the signed-in user uploads their role-specific KYC bundle.
  * Idempotent: re-submitting replaces the stored documents and bumps status
  * back to `submitted` (useful after a rejection).
@@ -168,10 +258,69 @@ router.post("/me/kyc", requireAuth, async (req, res): Promise<void> => {
     res.status(403).json({ error: "Account is not approved yet." });
     return;
   }
+
+  // Validate every submitted URL against the storage layer BEFORE we persist
+  // anything. This is the chokepoint that enforces mime/size on the real
+  // stored blob (not just whatever the browser advertised) and rejects
+  // arbitrary off-platform URLs. Each validated document is then scanned
+  // for malware; infected uploads are quarantined immediately and we abort
+  // the whole submission so the user row never gains a reference to a
+  // dirty file.
+  const validated: KycDocument[] = [];
+  for (const doc of parsed.data.documents) {
+    const result = await validateKycDocumentUrl(doc.url);
+    if (!result.ok) {
+      res.status(400).json({ error: `${doc.label}: ${result.reason}` });
+      return;
+    }
+    const scan = await scanKycDocument(result.objectFile, result.contentType);
+    const checkedAt = new Date().toISOString();
+    if (scan.status === "infected") {
+      try {
+        await objectStorageService.quarantineObjectEntity(result.objectPath);
+      } catch (err) {
+        req.log.error(
+          { err, objectPath: result.objectPath },
+          "Failed to quarantine infected KYC upload",
+        );
+      }
+      req.log.warn(
+        {
+          userId: req.user!.id,
+          objectPath: result.objectPath,
+          details: scan.details,
+        },
+        "KYC document failed malware scan",
+      );
+      res.status(400).json({
+        error: `${doc.label}: file flagged by malware scanner and quarantined. Please re-upload a fresh copy.`,
+      });
+      return;
+    }
+    if (scan.status === "error") {
+      req.log.error(
+        { userId: req.user!.id, objectPath: result.objectPath, details: scan.details },
+        "KYC malware scan errored",
+      );
+      res.status(503).json({
+        error: `${doc.label}: could not finish security scan. Please try again in a moment.`,
+      });
+      return;
+    }
+    validated.push({
+      key: doc.key,
+      label: doc.label,
+      url: result.normalizedUrl,
+      scanStatus: "clean",
+      scanCheckedAt: checkedAt,
+      scanDetails: scan.details,
+    });
+  }
+
   const [row] = await db
     .update(usersTable)
     .set({
-      kycDocuments: parsed.data.documents as KycDocument[],
+      kycDocuments: validated,
       kycStatus: "submitted",
       kycNote: null,
     })

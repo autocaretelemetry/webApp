@@ -189,6 +189,34 @@ export class ObjectStorageService {
     return normalizedPath;
   }
 
+  /**
+   * Move a private object to a `quarantine/` prefix inside the same bucket
+   * so an infected upload is preserved for forensic review but is no longer
+   * served from `/objects/...` (the new path is outside the entity-id space
+   * `getObjectEntityFile` will resolve). Returns the new bucket-relative
+   * path; callers should also null any persisted reference to the original
+   * URL so it stops showing up in the UI.
+   */
+  async quarantineObjectEntity(objectPath: string): Promise<string> {
+    if (!objectPath.startsWith("/objects/")) {
+      throw new ObjectNotFoundError();
+    }
+    const parts = objectPath.slice(1).split("/");
+    const entityId = parts.slice(1).join("/");
+    let entityDir = this.getPrivateObjectDir();
+    if (!entityDir.endsWith("/")) {
+      entityDir = `${entityDir}/`;
+    }
+    const sourcePath = `${entityDir}${entityId}`;
+    const { bucketName, objectName } = parseObjectPath(sourcePath);
+    const bucket = objectStorageClient.bucket(bucketName);
+    const sourceFile = bucket.file(objectName);
+    const destObjectName = objectName.replace(/^([^/]+\/)?uploads\//, "$1quarantine/");
+    const finalDest = destObjectName === objectName ? `quarantine/${objectName}` : destObjectName;
+    await sourceFile.move(bucket.file(finalDest));
+    return `${bucketName}/${finalDest}`;
+  }
+
   async canAccessObjectEntity({
     userId,
     objectFile,

@@ -11,7 +11,25 @@ export const KYC_STATUSES = [
 ] as const;
 export type KycStatus = (typeof KYC_STATUSES)[number];
 
-export type KycDocument = { key: string; url: string; label: string };
+export const KYC_DOC_SCAN_STATUSES = [
+  "pending",
+  "clean",
+  "infected",
+  "error",
+] as const;
+export type KycDocScanStatus = (typeof KYC_DOC_SCAN_STATUSES)[number];
+
+export type KycDocument = {
+  key: string;
+  url: string;
+  label: string;
+  // Malware-scan state for the underlying GCS object. Reviewers must only
+  // ever see documents in `clean` state — anything else is either still
+  // queued, quarantined, or had a transient scan error.
+  scanStatus?: KycDocScanStatus;
+  scanCheckedAt?: string;
+  scanDetails?: string;
+};
 
 export const usersTable = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
