@@ -52,8 +52,45 @@ type ApprovalEvent = {
     | "note";
   note: string | null;
   internal: boolean;
+  channels: EventChannel[] | null;
   createdAt: string;
 };
+
+type EventChannel = {
+  channel: "email" | "whatsapp";
+  status: "sent" | "skipped" | "failed";
+  reason?: string | null;
+};
+
+const CHANNEL_LABEL: Record<EventChannel["channel"], string> = {
+  email: "Email",
+  whatsapp: "WhatsApp",
+};
+
+function summarizeChannels(channels: EventChannel[] | null | undefined): string | null {
+  if (!channels || channels.length === 0) return null;
+  const sent = channels.filter((c) => c.status === "sent").map((c) => CHANNEL_LABEL[c.channel]);
+  const skipped = channels.filter((c) => c.status === "skipped");
+  const parts: string[] = [];
+  if (sent.length > 0) parts.push(`Sent via ${sent.join(" · ")}`);
+  if (skipped.length > 0) {
+    const detail = skipped
+      .map((c) => {
+        const reason =
+          c.reason === "opted_out"
+            ? "opted out"
+            : c.reason === "no_address"
+              ? "no email on file"
+              : c.reason === "no_phone"
+                ? "no phone on file"
+                : "skipped";
+        return `${CHANNEL_LABEL[c.channel]} (${reason})`;
+      })
+      .join(" · ");
+    parts.push(`Skipped: ${detail}`);
+  }
+  return parts.join(" — ") || null;
+}
 
 const ACTION_LABEL: Record<ApprovalEvent["action"], string> = {
   applied: "Applied",
@@ -753,6 +790,11 @@ function HistoryDialog({
                   {ev.note && (
                     <div className="text-sm whitespace-pre-wrap break-words">
                       {ev.note}
+                    </div>
+                  )}
+                  {summarizeChannels(ev.channels) && (
+                    <div className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
+                      <Mail className="h-3 w-3" /> {summarizeChannels(ev.channels)}
                     </div>
                   )}
                   <div className="text-[11px] text-muted-foreground">

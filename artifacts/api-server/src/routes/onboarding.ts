@@ -12,6 +12,7 @@ import {
   renterProfilesTable,
   approvalEventsTable,
   type ApprovalEventAction,
+  type EventChannelEntry,
   type KycDocument,
 } from "@workspace/db";
 import { requireAuth, requireSuperAdmin } from "../lib/auth";
@@ -50,6 +51,37 @@ function fireWhatsApp(to: string | null | undefined, body: string): void {
   );
 }
 
+/**
+ * Build the per-channel record that gets persisted onto the approval event so
+ * the applicant timeline can show which channels were actually attempted.
+ * "skipped" covers both user opt-outs (notificationChannels excludes the
+ * channel) and missing contact info (no email / no phone on file). We do not
+ * track delivery success/failure here because the underlying sends are
+ * fire-and-forget; this is a recording of intent at decision time.
+ */
+function buildChannelEntries(user: DecisionUser): EventChannelEntry[] {
+  const entries: EventChannelEntry[] = [];
+  if (wantsChannel(user, "email")) {
+    entries.push(
+      user.email
+        ? { channel: "email", status: "sent" }
+        : { channel: "email", status: "skipped", reason: "no_address" },
+    );
+  } else {
+    entries.push({ channel: "email", status: "skipped", reason: "opted_out" });
+  }
+  if (wantsChannel(user, "whatsapp")) {
+    entries.push(
+      user.phone
+        ? { channel: "whatsapp", status: "sent" }
+        : { channel: "whatsapp", status: "skipped", reason: "no_phone" },
+    );
+  } else {
+    entries.push({ channel: "whatsapp", status: "skipped", reason: "opted_out" });
+  }
+  return entries;
+}
+
 type DecisionKind = "approved" | "rejected" | "kyc_verified" | "kyc_rejected";
 
 type DecisionUser = {
@@ -73,7 +105,10 @@ function wantsChannel(
   return list.includes(channel);
 }
 
-function fireDecisionNotifications(kind: DecisionKind, user: DecisionUser): void {
+function fireDecisionNotifications(
+  kind: DecisionKind,
+  user: DecisionUser,
+): EventChannelEntry[] {
   const email = wantsChannel(user, "email") ? user.email : null;
   const phone = wantsChannel(user, "whatsapp") ? user.phone : null;
   // Only count a dispatch when we'll actually try to send an email — skip
@@ -81,24 +116,26 @@ function fireDecisionNotifications(kind: DecisionKind, user: DecisionUser): void
   if (email) {
     void recordDecisionEmailDispatch(user.id);
   }
+  const channels = buildChannelEntries(user);
   switch (kind) {
     case "approved":
       fireEmail(email, applicationApprovedEmail(user.name, user.approvalNote));
       fireWhatsApp(phone, applicationApprovedWhatsApp(user.name, user.approvalNote));
-      return;
+      break;
     case "rejected":
       fireEmail(email, applicationRejectedEmail(user.name, user.approvalNote));
       fireWhatsApp(phone, applicationRejectedWhatsApp(user.name, user.approvalNote));
-      return;
+      break;
     case "kyc_verified":
       fireEmail(email, kycVerifiedEmail(user.name, user.kycNote));
       fireWhatsApp(phone, kycVerifiedWhatsApp(user.name, user.kycNote));
-      return;
+      break;
     case "kyc_rejected":
       fireEmail(email, kycRejectedEmail(user.name, user.kycNote));
       fireWhatsApp(phone, kycRejectedWhatsApp(user.name, user.kycNote));
-      return;
+      break;
   }
+  return channels;
 }
 
 type EventTx = Tx | typeof db;
@@ -135,6 +172,7 @@ async function recordEvent(
     actorName?: string | null;
     note?: string | null;
     internal?: boolean;
+    channels?: EventChannelEntry[] | null;
   },
 ): Promise<void> {
   await executor.insert(approvalEventsTable).values({
@@ -144,6 +182,7 @@ async function recordEvent(
     actorName: args.actorName ?? null,
     note: args.note?.trim() || null,
     internal: args.internal ?? false,
+    channels: args.channels ?? null,
   });
 }
 
@@ -618,12 +657,14 @@ router.patch(
         })
         .where(eq(usersTable.id, userId))
         .returning();
+      const rejectedChannels = buildChannelEntries(row!);
       await recordEvent(db, {
         userId,
         action: "rejected",
         actorUserId: req.user!.id,
         actorName: req.user!.name,
         note: parsed.data.note ?? null,
+        channels: rejectedChannels,
       });
       const { passwordHash: _ph, ...safe } = row!;
       fireDecisionNotifications("rejected", row!);
@@ -664,6 +705,7 @@ router.patch(
           actorUserId: req.user!.id,
           actorName: req.user!.name,
           note: parsed.data.note ?? null,
+          channels: buildChannelEntries(row),
         });
       });
     } catch (err) {
@@ -823,6 +865,7 @@ router.patch(
       actorUserId: req.user!.id,
       actorName: req.user!.name,
       note: parsed.data.note ?? null,
+      channels: buildChannelEntries(row!),
     });
     const { passwordHash: _ph, ...safe } = row!;
     fireDecisionNotifications(

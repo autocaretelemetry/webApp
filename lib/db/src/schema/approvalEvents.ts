@@ -1,4 +1,11 @@
-import { pgTable, uuid, text, boolean, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, boolean, timestamp, index, jsonb } from "drizzle-orm/pg-core";
+import type { NotificationChannel } from "./users";
+
+export type EventChannelEntry = {
+  channel: NotificationChannel;
+  status: "sent" | "skipped" | "failed";
+  reason?: string | null;
+};
 
 export const APPROVAL_EVENT_ACTIONS = [
   "applied",
@@ -21,6 +28,7 @@ export const approvalEventsTable = pgTable(
     action: text("action").notNull(),
     note: text("note"),
     internal: boolean("internal").notNull().default(false),
+    channels: jsonb("channels").$type<EventChannelEntry[]>(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

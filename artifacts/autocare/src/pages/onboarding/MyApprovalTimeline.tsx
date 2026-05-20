@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Clock, Loader2 } from "lucide-react";
+import { Clock, Loader2, Send } from "lucide-react";
 
 type PublicAction =
   | "applied"
@@ -9,14 +9,41 @@ type PublicAction =
   | "kyc_verified"
   | "kyc_rejected";
 
+type EventChannel = {
+  channel: "email" | "whatsapp";
+  status: "sent" | "skipped" | "failed";
+  reason?: string | null;
+};
+
 type ApprovalEvent = {
   id: string;
   action: PublicAction | "note";
   note: string | null;
   actorName: string | null;
   internal: boolean;
+  channels: EventChannel[] | null;
   createdAt: string;
 };
+
+const CHANNEL_LABEL: Record<EventChannel["channel"], string> = {
+  email: "email",
+  whatsapp: "WhatsApp",
+};
+
+function channelSummary(channels: EventChannel[] | null | undefined): string | null {
+  if (!channels || channels.length === 0) return null;
+  const sent = channels
+    .filter((c) => c.status === "sent")
+    .map((c) => CHANNEL_LABEL[c.channel]);
+  if (sent.length > 0) return `Sent via ${sent.join(" · ")}`;
+  const optedOut = channels.filter(
+    (c) => c.status === "skipped" && c.reason === "opted_out",
+  );
+  if (optedOut.length === channels.length) {
+    return "No notification sent — you've opted out of all channels.";
+  }
+  return "No notification was delivered for this update.";
+}
 
 const ACTION_LABEL: Record<PublicAction, string> = {
   applied: "Application received",
@@ -93,6 +120,11 @@ export function MyApprovalTimeline({ title = "Your decision history" }: { title?
                 {ev.note && (
                   <div className="text-sm whitespace-pre-wrap break-words">
                     {ev.note}
+                  </div>
+                )}
+                {channelSummary(ev.channels) && (
+                  <div className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
+                    <Send className="h-3 w-3" /> {channelSummary(ev.channels)}
                   </div>
                 )}
               </div>
