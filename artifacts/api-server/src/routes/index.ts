@@ -26,6 +26,7 @@ import authRouter from "./auth";
 import landingContentRouter from "./landingContent";
 import organizationsRouter from "./organizations";
 import onboardingRouter, { requireKycVerified } from "./onboarding";
+import addressesRouter from "./addresses";
 
 const router: IRouter = Router();
 
@@ -63,5 +64,6 @@ router.use(retainersRouter);
 router.use(notificationsRouter);
 router.use(pushRouter);
 router.use(organizationsRouter);
+router.use(addressesRouter);
 
 export default router;

@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ImageUploader } from "@/components/ImageUploader";
 import { ContactChannelVerifier, channelLabel } from "@/components/ContactVerification";
+import { AddressBook } from "@/components/AddressBook";
 import { resolveImageUrl } from "@/lib/format";
 import { Bell, Loader2, ShieldCheck, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
@@ -332,6 +333,8 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
       )}
+
+      <AddressBook />
 
       <Card>
         <CardHeader>

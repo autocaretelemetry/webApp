@@ -13,6 +13,20 @@ import { useCart, clearCart, setCartScope } from "@/lib/cart";
 import { useRole, useFleetOrgId } from "@/lib/role";
 import { useAuth } from "@/lib/auth";
 import { useCreateFleetPartsOrder, useMyFleetOrgs } from "@/lib/fleet-api";
+import {
+  useMyAddresses,
+  useCreateAddress,
+  useTouchAddress,
+  type SavedAddress,
+} from "@/lib/addresses-api";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { formatCurrency } from "@/lib/format";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2, ShieldCheck, Wrench } from "lucide-react";
@@ -44,6 +58,19 @@ export default function Checkout() {
   const [deliveryCity, setDeliveryCity] = useState("");
   const [deliveryRegion, setDeliveryRegion] = useState("");
 
+  // Saved address book: signed-in direct buyers get a dropdown of their
+  // saved entries (default preselected) plus an "Add new address" option
+  // that opens the inline form. Skipped in proposal mode — proposals
+  // always ship to the booking's service center.
+  const { data: savedAddresses } = useMyAddresses(!isProposal && !!user);
+  const createAddress = useCreateAddress();
+  const touchAddress = useTouchAddress();
+  // "" = use a new address (inline form), otherwise the saved address id.
+  const [selectedAddressId, setSelectedAddressId] = useState<string>("");
+  const [didPickSaved, setDidPickSaved] = useState(false);
+  const [saveNewAddress, setSaveNewAddress] = useState(false);
+  const [newAddressLabel, setNewAddressLabel] = useState("");
+
   // Auth resolves asynchronously — once the user lands, backfill any
   // contact field the operator hasn't started editing yet.
   useEffect(() => {
@@ -56,6 +83,8 @@ export default function Checkout() {
   // order (server-scoped to the signed-in user via `mine=true`) and reuse
   // its shipping address so repeat buyers don't retype it. Skipped in
   // proposal mode — proposals always ship to the booking's service center.
+  // Also skipped once the user has any saved address book entries — the
+  // dropdown below takes over so we don't fight its preselection.
   const { data: myOrders } = useListOrders(
     { mine: true },
     {
@@ -68,6 +97,7 @@ export default function Checkout() {
   );
   useEffect(() => {
     if (isProposal) return;
+    if (savedAddresses && savedAddresses.length > 0) return;
     if (!myOrders || myOrders.length === 0) return;
     // Direct-buy lineage only: proposal-origin orders carry a bookingId +
     // mechanicId (their ship-to is the service center, not the buyer's),
@@ -84,7 +114,31 @@ export default function Checkout() {
     if (lastDirect.deliveryRegion) {
       setDeliveryRegion((prev) => (prev ? prev : lastDirect.deliveryRegion ?? ""));
     }
-  }, [isProposal, myOrders]);
+  }, [isProposal, myOrders, savedAddresses]);
+
+  // Apply a saved address into the form fields. Memo-free — called from
+  // the dropdown onValueChange and from the auto-preselect effect below.
+  const applySavedAddress = (a: SavedAddress) => {
+    setBuyerName(a.recipientName);
+    setBuyerPhone(a.recipientPhone);
+    setShippingAddress(a.addressLine);
+    setDeliveryCity(a.city ?? "");
+    setDeliveryRegion(a.region ?? "");
+  };
+
+  // Auto-preselect the default (or most-recently-used) saved address once
+  // the list arrives. We only run this once per session so a buyer who
+  // explicitly picks "Add new address" keeps the blank form.
+  useEffect(() => {
+    if (isProposal) return;
+    if (didPickSaved) return;
+    if (!savedAddresses || savedAddresses.length === 0) return;
+    // Server returns them already sorted (default → most-recently-used).
+    const preferred = savedAddresses[0];
+    setSelectedAddressId(preferred.id);
+    applySavedAddress(preferred);
+    setDidPickSaved(true);
+  }, [isProposal, savedAddresses, didPickSaved]);
 
   // When the booking loads in proposal mode, prefill from owner + service center.
   useEffect(() => {
@@ -188,6 +242,28 @@ export default function Checkout() {
         navigate("/fleet/orders");
         return;
       }
+      // If the buyer is filling in a brand-new address and ticked
+      // "Save to address book", persist it BEFORE creating the orders so
+      // a subsequent crash doesn't leave them without the entry. The new
+      // address is automatically marked default (book may be empty too).
+      let touchTargetId: string | null = selectedAddressId || null;
+      if (!isProposal && user && !selectedAddressId && saveNewAddress) {
+        try {
+          const created = await createAddress.mutateAsync({
+            label: newAddressLabel.trim() || "Shipping address",
+            recipientName: buyerName.trim(),
+            recipientPhone: buyerPhone.trim(),
+            addressLine: shippingAddress.trim(),
+            city: deliveryCity.trim(),
+            region: deliveryRegion.trim(),
+            isDefault: true,
+          });
+          touchTargetId = created.id;
+        } catch {
+          // Don't block the order if save fails — surface a soft toast.
+          toast.error("Could not save address to your book; order will still go through.");
+        }
+      }
       const results = [];
       for (const group of linesByVendor) {
         const order = await createOrder.mutateAsync({
@@ -213,6 +289,15 @@ export default function Checkout() {
       }
       clearCart();
       if (isProposal) setCartScope(null);
+      // Bump the saved address's lastUsedAt so the next checkout
+      // preselects it again. Best-effort — failure shouldn't block.
+      if (touchTargetId) {
+        try {
+          await touchAddress.mutateAsync(touchTargetId);
+        } catch {
+          /* non-fatal */
+        }
+      }
       await queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
       await queryClient.invalidateQueries({ queryKey: getListPartsQueryKey() });
       if (isProposal && scope) {
@@ -278,6 +363,48 @@ export default function Checkout() {
           <Card>
             <CardContent className="p-5 space-y-4">
               <h2 className="font-semibold">{isProposal ? "Owner & delivery" : "Contact & shipping"}</h2>
+              {!isProposal && user && savedAddresses && savedAddresses.length > 0 && (
+                <div>
+                  <Label htmlFor="saved-addr">Ship to</Label>
+                  <Select
+                    value={selectedAddressId || "__new__"}
+                    onValueChange={(value) => {
+                      setDidPickSaved(true);
+                      if (value === "__new__") {
+                        setSelectedAddressId("");
+                        setShippingAddress("");
+                        setDeliveryCity("");
+                        setDeliveryRegion("");
+                        // Keep name/phone — they default from the user
+                        // and the buyer most likely wants them unchanged.
+                        return;
+                      }
+                      setSelectedAddressId(value);
+                      const picked = savedAddresses.find((a) => a.id === value);
+                      if (picked) applySavedAddress(picked);
+                      setSaveNewAddress(false);
+                      setNewAddressLabel("");
+                    }}
+                  >
+                    <SelectTrigger id="saved-addr" className="mt-1.5">
+                      <SelectValue placeholder="Pick a saved address" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {savedAddresses.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.label}
+                          {a.isDefault ? " · Default" : ""} — {a.addressLine}
+                          {a.city ? `, ${a.city}` : ""}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="__new__">+ Add new address</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-muted-foreground mt-1.5">
+                    Manage your address book from your <Link href="/profile" className="underline">profile</Link>.
+                  </p>
+                </div>
+              )}
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="name">{buyerKind === "center" ? "Shop name" : "Owner name"}</Label>
@@ -319,6 +446,29 @@ export default function Checkout() {
                   <Input id="region" value={deliveryRegion ?? ""} onChange={(e) => setDeliveryRegion(e.target.value)} className="mt-1.5" />
                 </div>
               </div>
+              {!isProposal && user && !selectedAddressId && (
+                <div className="border rounded-md p-3 bg-muted/30 space-y-2">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Checkbox
+                      checked={saveNewAddress}
+                      onCheckedChange={(v) => setSaveNewAddress(v === true)}
+                    />
+                    Save this to my address book for next time
+                  </label>
+                  {saveNewAddress && (
+                    <div>
+                      <Label htmlFor="new-addr-label" className="text-xs">Label</Label>
+                      <Input
+                        id="new-addr-label"
+                        placeholder="Home, Garage, Workshop…"
+                        value={newAddressLabel}
+                        onChange={(e) => setNewAddressLabel(e.target.value)}
+                        className="mt-1"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
               <div>
                 <Label htmlFor="notes">Notes for the vendor (optional)</Label>
                 <Textarea id="notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-1.5" placeholder="Delivery instructions, fitment questions, etc." />

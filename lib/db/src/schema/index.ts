@@ -22,6 +22,7 @@ export * from "./retainers";
 export * from "./notifications";
 export * from "./pushSubscriptions";
 export * from "./users";
+export * from "./userAddresses";
 export * from "./landingContent";
 export * from "./organizations";
 export * from "./fleetTracking";
