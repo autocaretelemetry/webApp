@@ -1,5 +1,5 @@
 import { db, vehiclesTable, reminderRunsTable, usersTable, type Vehicle, type ReminderRun, type ReminderRunTrigger } from "@workspace/db";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, lt } from "drizzle-orm";
 import { createOwnerNotification } from "./notify";
 import { appPublicUrl } from "./whatsapp";
 import { sendEmail, reminderJobFailureEmail } from "./email";
@@ -171,6 +171,11 @@ export async function runReminderJob(
     if (created > 0) {
       logger.info({ runId, trigger, created }, "Reminder run completed");
     }
+    try {
+      await pruneOldReminderRuns();
+    } catch (pruneErr) {
+      logger.warn({ err: pruneErr, runId }, "Failed to prune old reminder runs");
+    }
     return { runId, created, status: "success", errorMessage: null };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -274,6 +279,44 @@ async function maybeAlertOnFailureStreak(latestError: string): Promise<void> {
       ),
     ),
   );
+}
+
+/**
+ * Default retention window for `reminder_runs` rows. Anything older than this
+ * is deleted by {@link pruneOldReminderRuns} so the table doesn't grow without
+ * bound (one row per scheduler tick + every manual/external invocation).
+ * Overridable via `REMINDER_RETENTION_DAYS` env var.
+ */
+export const DEFAULT_REMINDER_RETENTION_DAYS = 90;
+
+function getRetentionDays(): number {
+  const raw = process.env["REMINDER_RETENTION_DAYS"];
+  if (!raw) return DEFAULT_REMINDER_RETENTION_DAYS;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n <= 0) return DEFAULT_REMINDER_RETENTION_DAYS;
+  return n;
+}
+
+/**
+ * Delete reminder_runs rows older than the retention window. Returns the
+ * number of rows removed. Safe to call repeatedly; called automatically at
+ * the end of every successful {@link runReminderJob}.
+ */
+export async function pruneOldReminderRuns(
+  retentionDays: number = getRetentionDays(),
+): Promise<number> {
+  const cutoff = new Date(Date.now() - retentionDays * DAY);
+  const deleted = await db
+    .delete(reminderRunsTable)
+    .where(lt(reminderRunsTable.startedAt, cutoff))
+    .returning({ id: reminderRunsTable.id });
+  if (deleted.length > 0) {
+    logger.info(
+      { deleted: deleted.length, retentionDays, cutoff: cutoff.toISOString() },
+      "Pruned old reminder runs",
+    );
+  }
+  return deleted.length;
 }
 
 export async function listRecentReminderRuns(limit = 25): Promise<ReminderRun[]> {
