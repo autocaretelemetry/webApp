@@ -481,36 +481,140 @@ router.patch("/auth/me", requireAuth, async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  // Load the current row so we can detect contact-channel changes and
+  // trigger re-verification when email or phone actually move.
+  const [current] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.id, req.user!.id));
+  if (!current) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
   // Only forward keys the caller actually set so we don't overwrite stored
   // values with `undefined` (Drizzle would set them to NULL).
   const patch: Record<string, unknown> = {};
   if (parsed.data.name !== undefined) patch["name"] = parsed.data.name.trim();
+  let nextEmail: string | null = null;
+  let emailChanged = false;
+  if (parsed.data.email !== undefined) {
+    nextEmail = parsed.data.email.trim().toLowerCase();
+    if (nextEmail && nextEmail !== current.email) {
+      emailChanged = true;
+      patch["email"] = nextEmail;
+      // New email hasn't been confirmed yet — drop the verified stamp so
+      // the gate that skips decision emails to unverified inboxes kicks
+      // in until the user enters the new code.
+      patch["emailVerifiedAt"] = null;
+    }
+  }
+  let nextPhone: string | null = current.phone;
+  let phoneChanged = false;
   if (parsed.data.phone !== undefined) {
     const p = parsed.data.phone?.trim();
-    patch["phone"] = p ? p : null;
+    nextPhone = p ? p : null;
+    if (nextPhone !== current.phone) {
+      phoneChanged = true;
+      patch["phone"] = nextPhone;
+      // Phone is the WhatsApp address. Treat any change (including
+      // clearing it) as a re-verification trigger; a null number stays
+      // null below because there's nothing to send a code to.
+      patch["phoneVerifiedAt"] = null;
+    }
   }
   if (parsed.data.avatarUrl !== undefined) {
     const a = parsed.data.avatarUrl?.trim();
     patch["avatarUrl"] = a ? a : null;
   }
+  const selectedChannels = (current.notificationChannels ?? ["email", "whatsapp"]) as
+    | NotificationChannel[]
+    | readonly NotificationChannel[];
+  let nextChannels: NotificationChannel[] = [...(selectedChannels as NotificationChannel[])];
   if (parsed.data.notificationChannels !== undefined) {
     // De-dupe and preserve canonical order so storage stays normalised.
     const allowed = ["email", "whatsapp"] as const;
     const set = new Set(parsed.data.notificationChannels);
-    patch["notificationChannels"] = allowed.filter((c) => set.has(c));
+    nextChannels = allowed.filter((c) => set.has(c));
+    patch["notificationChannels"] = nextChannels;
   }
   if (Object.keys(patch).length === 0) {
     res.json(req.user);
     return;
   }
-  const [row] = await db
-    .update(usersTable)
-    .set(patch)
-    .where(eq(usersTable.id, req.user!.id))
-    .returning();
+  // Pre-flight email-uniqueness check so we can return a clean 409 before
+  // the unique-constraint fires. The catch below handles the race where
+  // another request takes the same email between this check and the
+  // UPDATE.
+  if (emailChanged && nextEmail) {
+    const [dup] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.email, nextEmail));
+    if (dup && dup.id !== current.id) {
+      res.status(409).json({ error: "An account with that email already exists." });
+      return;
+    }
+  }
+  // Mint fresh verification entries for whichever channel actually
+  // changed AND is still selected for notifications. The plaintext code
+  // is only ever in the email/WhatsApp body — we store a hash.
+  const newPending: PendingVerifications = {
+    ...((current.pendingVerifications ?? {}) as PendingVerifications),
+  };
+  const codesToSend: Array<{
+    channel: NotificationChannel;
+    recipient: string;
+    code: string;
+  }> = [];
+  const userName = (parsed.data.name?.trim() || current.name);
+  if (emailChanged && nextEmail && nextChannels.includes("email")) {
+    const code = generateCode();
+    newPending["email"] = buildPendingEntry(code);
+    codesToSend.push({ channel: "email", recipient: nextEmail, code });
+  } else if (emailChanged) {
+    // Email changed but the user isn't using email for notifications, or
+    // the new email is empty — drop any stale pending entry.
+    delete newPending["email"];
+  }
+  if (phoneChanged && nextPhone && nextChannels.includes("whatsapp")) {
+    const code = generateCode();
+    newPending["whatsapp"] = buildPendingEntry(code);
+    codesToSend.push({ channel: "whatsapp", recipient: nextPhone, code });
+  } else if (phoneChanged) {
+    delete newPending["whatsapp"];
+  }
+  if (emailChanged || phoneChanged) {
+    patch["pendingVerifications"] =
+      Object.keys(newPending).length === 0 ? null : newPending;
+  }
+  let row;
+  try {
+    [row] = await db
+      .update(usersTable)
+      .set(patch)
+      .where(eq(usersTable.id, req.user!.id))
+      .returning();
+  } catch (err) {
+    const code =
+      (err as { code?: string }).code ??
+      (err as { cause?: { code?: string } }).cause?.code;
+    if (code === "23505") {
+      res.status(409).json({ error: "An account with that email already exists." });
+      return;
+    }
+    throw err;
+  }
   if (!row) {
     res.status(404).json({ error: "User not found" });
     return;
+  }
+  // Fire codes after the commit so a transient send failure can't leave
+  // us with a row whose pending entry references a recipient we never
+  // actually messaged. Failures are logged; the client can hit the
+  // existing /auth/signup/resend-verification endpoint to get a fresh
+  // copy.
+  for (const c of codesToSend) {
+    sendVerificationCode(c.channel, c.recipient, userName, c.code);
   }
   // Best-effort sync to any staff records linked to this user so the staff
   // list shows the same name/phone the user just set.

@@ -3702,6 +3702,7 @@ export const GetCurrentUserResponse = zod.object({
 
 export const UpdateMyProfileBody = zod.object({
   "name": zod.string().min(1).optional(),
+  "email": zod.string().email().optional(),
   "phone": zod.string().nullish(),
   "avatarUrl": zod.string().nullish(),
   "notificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional()

@@ -3,6 +3,7 @@ import {
   useUpdateMyProfile,
   useChangePassword,
 } from "@workspace/api-client-react";
+import type { VerifySignupCodeInputChannel } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,8 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ImageUploader } from "@/components/ImageUploader";
+import { ContactChannelVerifier, channelLabel } from "@/components/ContactVerification";
 import { resolveImageUrl } from "@/lib/format";
-import { Bell, Loader2, ShieldCheck } from "lucide-react";
+import { Bell, Loader2, ShieldCheck, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 
 type NotifChannel = "email" | "whatsapp";
@@ -44,6 +46,7 @@ export default function ProfilePage() {
   const changePassword = useChangePassword();
 
   const [name, setName] = useState(user?.name ?? "");
+  const [email, setEmail] = useState(user?.email ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl ?? "");
   const [channels, setChannels] = useState<NotifChannel[]>(() =>
@@ -53,6 +56,7 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!user) return;
     setName(user.name);
+    setEmail(user.email);
     setPhone(user.phone ?? "");
     setAvatarUrl(user.avatarUrl ?? "");
     setChannels(normalizeChannels(user.notificationChannels));
@@ -76,32 +80,59 @@ export default function ProfilePage() {
   }
 
   const savedChannels = normalizeChannels(user.notificationChannels);
+  const normalizedEmail = email.trim().toLowerCase();
   const dirty =
     name.trim() !== user.name ||
+    normalizedEmail !== user.email.toLowerCase() ||
     (phone.trim() || null) !== (user.phone ?? null) ||
     (avatarUrl.trim() || null) !== (user.avatarUrl ?? null) ||
     !sameChannels(channels, savedChannels);
+
+  // List of contact channels that still need re-verification. Derived
+  // from the server-returned `pendingVerificationChannels` on the auth
+  // user — populated by signup AND by any subsequent contact-change
+  // through PATCH /auth/me. We surface a code-entry row per channel
+  // until they're all confirmed.
+  const pendingChannels = (user.pendingVerificationChannels ?? []) as
+    VerifySignupCodeInputChannel[];
 
   const saveProfile = async () => {
     if (!name.trim()) {
       toast.error("Name can't be empty.");
       return;
     }
+    if (!normalizedEmail) {
+      toast.error("Email can't be empty.");
+      return;
+    }
     if (channels.length === 0) {
       toast.error("Pick at least one notification channel so we can reach you.");
       return;
     }
+    const emailChanged = normalizedEmail !== user.email.toLowerCase();
+    const phoneChanged = (phone.trim() || null) !== (user.phone ?? null);
     try {
       await updateProfile.mutateAsync({
         data: {
           name: name.trim(),
+          email: normalizedEmail,
           phone: phone.trim() || null,
           avatarUrl: avatarUrl.trim() || null,
           notificationChannels: channels,
         },
       });
       await refresh();
-      toast.success("Profile updated.");
+      if (emailChanged || phoneChanged) {
+        const changedLabels = [
+          emailChanged ? "email" : null,
+          phoneChanged ? "phone" : null,
+        ].filter(Boolean) as string[];
+        toast.success(
+          `Profile updated. Enter the code we sent to your new ${changedLabels.join(" and ")} to confirm the change.`,
+        );
+      } else {
+        toast.success("Profile updated.");
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not save profile.");
     }
@@ -181,9 +212,14 @@ export default function ProfilePage() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="profile-email">Email</Label>
-              <Input id="profile-email" value={user.email} disabled />
+              <Input
+                id="profile-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
               <p className="text-[11px] text-muted-foreground">
-                Email is your sign-in identifier and can't be changed here.
+                Email is your sign-in identifier. Changing it requires a one-time code to confirm the new address.
               </p>
             </div>
             <div className="space-y-1.5">
@@ -194,6 +230,9 @@ export default function ProfilePage() {
                 placeholder="+233 ..."
                 onChange={(e) => setPhone(e.target.value)}
               />
+              <p className="text-[11px] text-muted-foreground">
+                Changing your phone requires a WhatsApp code to confirm the new number.
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label>Role</Label>
@@ -259,6 +298,40 @@ export default function ProfilePage() {
           </div>
         </CardContent>
       </Card>
+
+      {pendingChannels.length > 0 && (
+        <Card className="border-amber-300/60 bg-amber-50/40">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShieldAlert className="h-4 w-4 text-amber-600" /> Confirm your contact details
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            <p className="text-muted-foreground">
+              We sent a 6-digit code to each contact channel that hasn't been
+              confirmed yet. Notifications will only land on channels you
+              verify — meanwhile we'll keep sending to any channel that is
+              still confirmed.
+            </p>
+            {pendingChannels.map((channel) => (
+              <ContactChannelVerifier
+                key={channel}
+                userId={user.id}
+                channel={channel}
+                recipient={
+                  channel === "email" ? user.email : user.phone ?? ""
+                }
+                onVerified={() => {
+                  refresh();
+                  toast.success(
+                    `${channelLabel(channel)} confirmed. Notifications will now go through.`,
+                  );
+                }}
+              />
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
