@@ -3600,11 +3600,16 @@ export const LoginResponse = zod.object({
   "id": zod.string(),
   "email": zod.string(),
   "name": zod.string(),
-  "role": zod.enum(['owner', 'center', 'vendor', 'delivery', 'admin', 'super_admin']),
+  "role": zod.enum(['owner', 'center', 'vendor', 'delivery', 'fleet', 'admin', 'super_admin']),
   "phone": zod.string().nullish(),
   "avatarUrl": zod.string().nullish(),
   "active": zod.boolean(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "approvalStatus": zod.enum(['pending', 'approved', 'rejected']).nullish(),
+  "approvalNote": zod.string().nullish(),
+  "kycStatus": zod.enum(['not_submitted', 'submitted', 'verified', 'rejected']).nullish(),
+  "kycNote": zod.string().nullish(),
+  "requestedRole": zod.string().nullish()
 })
 
 
@@ -3620,7 +3625,9 @@ export const SignupBody = zod.object({
   "name": zod.string().min(1),
   "email": zod.string().email(),
   "password": zod.string().min(signupBodyPasswordMin),
-  "phone": zod.string().nullish()
+  "phone": zod.string().nullish(),
+  "requestedRole": zod.enum(['owner', 'renter', 'center', 'vendor', 'delivery', 'fleet']).nullish(),
+  "applicantData": zod.record(zod.string(), zod.unknown()).nullish()
 })
 
 
@@ -3628,11 +3635,16 @@ export const GetCurrentUserResponse = zod.object({
   "id": zod.string(),
   "email": zod.string(),
   "name": zod.string(),
-  "role": zod.enum(['owner', 'center', 'vendor', 'delivery', 'admin', 'super_admin']),
+  "role": zod.enum(['owner', 'center', 'vendor', 'delivery', 'fleet', 'admin', 'super_admin']),
   "phone": zod.string().nullish(),
   "avatarUrl": zod.string().nullish(),
   "active": zod.boolean(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "approvalStatus": zod.enum(['pending', 'approved', 'rejected']).nullish(),
+  "approvalNote": zod.string().nullish(),
+  "kycStatus": zod.enum(['not_submitted', 'submitted', 'verified', 'rejected']).nullish(),
+  "kycNote": zod.string().nullish(),
+  "requestedRole": zod.string().nullish()
 })
 
 
@@ -3649,11 +3661,16 @@ export const UpdateMyProfileResponse = zod.object({
   "id": zod.string(),
   "email": zod.string(),
   "name": zod.string(),
-  "role": zod.enum(['owner', 'center', 'vendor', 'delivery', 'admin', 'super_admin']),
+  "role": zod.enum(['owner', 'center', 'vendor', 'delivery', 'fleet', 'admin', 'super_admin']),
   "phone": zod.string().nullish(),
   "avatarUrl": zod.string().nullish(),
   "active": zod.boolean(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "approvalStatus": zod.enum(['pending', 'approved', 'rejected']).nullish(),
+  "approvalNote": zod.string().nullish(),
+  "kycStatus": zod.enum(['not_submitted', 'submitted', 'verified', 'rejected']).nullish(),
+  "kycNote": zod.string().nullish(),
+  "requestedRole": zod.string().nullish()
 })
 
 

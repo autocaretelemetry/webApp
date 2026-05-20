@@ -1999,6 +1999,14 @@ components:
         email: { type: string, format: email }
         password: { type: string, minLength: 8 }
         phone: { type: string, nullable: true }
+        requestedRole:
+          type: string
+          nullable: true
+          enum: [owner, renter, center, vendor, delivery, fleet]
+        applicantData:
+          type: object
+          additionalProperties: true
+          nullable: true
 
     AuthedUser:
       type: object
@@ -2009,11 +2017,22 @@ components:
         name: { type: string }
         role:
           type: string
-          enum: [owner, center, vendor, delivery, admin, super_admin]
+          enum: [owner, center, vendor, delivery, fleet, admin, super_admin]
         phone: { type: string, nullable: true }
         avatarUrl: { type: string, nullable: true }
         active: { type: boolean }
         createdAt: { type: string, format: date-time }
+        approvalStatus:
+          type: string
+          nullable: true
+          enum: [pending, approved, rejected]
+        approvalNote: { type: string, nullable: true }
+        kycStatus:
+          type: string
+          nullable: true
+          enum: [not_submitted, submitted, verified, rejected]
+        kycNote: { type: string, nullable: true }
+        requestedRole: { type: string, nullable: true }
 
     UpdateProfileInput:
       type: object

@@ -15,6 +15,20 @@ export interface LoginInput {
   password: string;
 }
 
+export type SignupInputRequestedRole = typeof SignupInputRequestedRole[keyof typeof SignupInputRequestedRole] | null;
+
+
+export const SignupInputRequestedRole = {
+  owner: 'owner',
+  renter: 'renter',
+  center: 'center',
+  vendor: 'vendor',
+  delivery: 'delivery',
+  fleet: 'fleet',
+} as const;
+
+export type SignupInputApplicantData = { [key: string]: unknown } | null;
+
 export interface SignupInput {
   /** @minLength 1 */
   name: string;
@@ -22,6 +36,8 @@ export interface SignupInput {
   /** @minLength 8 */
   password: string;
   phone?: string | null;
+  requestedRole?: SignupInputRequestedRole;
+  applicantData?: SignupInputApplicantData;
 }
 
 export type AuthedUserRole = typeof AuthedUserRole[keyof typeof AuthedUserRole];
@@ -32,8 +48,28 @@ export const AuthedUserRole = {
   center: 'center',
   vendor: 'vendor',
   delivery: 'delivery',
+  fleet: 'fleet',
   admin: 'admin',
   super_admin: 'super_admin',
+} as const;
+
+export type AuthedUserApprovalStatus = typeof AuthedUserApprovalStatus[keyof typeof AuthedUserApprovalStatus] | null;
+
+
+export const AuthedUserApprovalStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+export type AuthedUserKycStatus = typeof AuthedUserKycStatus[keyof typeof AuthedUserKycStatus] | null;
+
+
+export const AuthedUserKycStatus = {
+  not_submitted: 'not_submitted',
+  submitted: 'submitted',
+  verified: 'verified',
+  rejected: 'rejected',
 } as const;
 
 export interface AuthedUser {
@@ -45,6 +81,11 @@ export interface AuthedUser {
   avatarUrl?: string | null;
   active: boolean;
   createdAt: string;
+  approvalStatus?: AuthedUserApprovalStatus;
+  approvalNote?: string | null;
+  kycStatus?: AuthedUserKycStatus;
+  kycNote?: string | null;
+  requestedRole?: string | null;
 }
 
 export interface UpdateProfileInput {

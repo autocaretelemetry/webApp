@@ -103,10 +103,22 @@ async function main() {
         role: s.role,
         phone: s.phone ?? null,
         active: true,
+        // Grandfather every seeded demo account — they bypass the new
+        // self-signup / KYC funnel entirely.
+        approvalStatus: "approved",
+        kycStatus: "verified",
       })
       .onConflictDoUpdate({
         target: usersTable.email,
-        set: { passwordHash, name: s.name, role: s.role, phone: s.phone ?? null, active: true },
+        set: {
+          passwordHash,
+          name: s.name,
+          role: s.role,
+          phone: s.phone ?? null,
+          active: true,
+          approvalStatus: "approved",
+          kycStatus: "verified",
+        },
       });
     console.log(`Seeded ${s.role} -> ${s.email}`);
   }

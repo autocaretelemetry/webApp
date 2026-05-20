@@ -6,15 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type AuthedUserRole = typeof AuthedUserRole[keyof typeof AuthedUserRole];
+export type SignupInputRequestedRole = typeof SignupInputRequestedRole[keyof typeof SignupInputRequestedRole] | null;
 
 
-export const AuthedUserRole = {
+export const SignupInputRequestedRole = {
   owner: 'owner',
+  renter: 'renter',
   center: 'center',
   vendor: 'vendor',
   delivery: 'delivery',
   fleet: 'fleet',
-  admin: 'admin',
-  super_admin: 'super_admin',
 } as const;

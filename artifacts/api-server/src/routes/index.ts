@@ -25,10 +25,22 @@ import pushRouter from "./push";
 import authRouter from "./auth";
 import landingContentRouter from "./landingContent";
 import organizationsRouter from "./organizations";
+import onboardingRouter, { requireKycVerified } from "./onboarding";
 
 const router: IRouter = Router();
 
+// Public + onboarding-friendly routes mount FIRST so unverified users can
+// still sign in, hit storage uploads, and finish KYC.
 router.use(healthRouter);
+router.use(authRouter);
+router.use(storageRouter);
+router.use(landingContentRouter);
+router.use(onboardingRouter);
+
+// Global KYC gate: signed-in users whose KYC isn't verified get 403 on
+// anything below. Anonymous traffic and admins pass through.
+router.use(requireKycVerified);
+
 router.use(vehiclesRouter);
 router.use(serviceCentersRouter);
 router.use(bookingsRouter);
@@ -47,12 +59,9 @@ router.use(subscriptionsRouter);
 router.use(revenueRouter);
 router.use(rentalsRouter);
 router.use(driversRouter);
-router.use(storageRouter);
 router.use(retainersRouter);
 router.use(notificationsRouter);
 router.use(pushRouter);
-router.use(authRouter);
-router.use(landingContentRouter);
 router.use(organizationsRouter);
 
 export default router;

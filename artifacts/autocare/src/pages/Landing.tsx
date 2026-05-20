@@ -203,9 +203,14 @@ export default function Landing() {
                   </div>
                 ))}
               </div>
-              <Link href="/login">
-                <Button className="w-full">Open sign in</Button>
-              </Link>
+              <div className="grid grid-cols-2 gap-2">
+                <Link href="/login">
+                  <Button className="w-full">Open sign in</Button>
+                </Link>
+                <Link href="/signup">
+                  <Button variant="outline" className="w-full">Apply for access</Button>
+                </Link>
+              </div>
             </CardContent>
           </Card>
         </div>

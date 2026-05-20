@@ -9,8 +9,11 @@ import { useRole, type Role } from "@/lib/role";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import Landing from "@/pages/Landing";
 import LoginPage from "@/pages/Login";
+import SignupPage from "@/pages/Signup";
 import RentalsSignup from "@/pages/rentals/Signup";
 import RegisterFleet from "@/pages/RegisterFleet";
+import OnboardingKyc from "@/pages/onboarding/Kyc";
+import OnboardingRejected from "@/pages/onboarding/Rejected";
 import NotFound from "@/pages/not-found";
 
 // Fleet Pages
@@ -63,6 +66,7 @@ import AdminPlans from "@/pages/admin/Plans";
 import AdminSubscriptions from "@/pages/admin/Subscriptions";
 import AdminRevenue from "@/pages/admin/Revenue";
 import SuperAdminLandingEditor from "@/pages/super_admin/LandingEditor";
+import SuperAdminApprovals from "@/pages/super_admin/Approvals";
 import AdminRentals from "@/pages/admin/Rentals";
 import AdminRenters from "@/pages/admin/Renters";
 import AdminSafety from "@/pages/admin/Safety";
@@ -199,6 +203,7 @@ function AppRouter() {
 
         {/* Super Admin Routes */}
         <Route path="/super-admin/landing" component={superAdminOnly(SuperAdminLandingEditor)} />
+        <Route path="/super-admin/approvals" component={superAdminOnly(SuperAdminApprovals)} />
 
         {/* Rentals Routes (owners + admins can browse; bookings open to any role using owner shell) */}
         <Route path="/rentals" component={RentalsBrowse} />
@@ -232,6 +237,33 @@ function AppRouter() {
   );
 }
 
+function AuthedShell() {
+  const { user } = useAuth();
+  // Admins/super-admins and grandfathered users (kycStatus === "verified")
+  // see the full app. Pending/rejected applicants can't sign in at all, so by
+  // the time we get here we only need to gate the post-approval KYC step.
+  const needsKyc =
+    !!user &&
+    user.role !== "admin" &&
+    user.role !== "super_admin" &&
+    user.kycStatus !== "verified";
+  return (
+    <Switch>
+      <Route path="/onboarding/kyc" component={OnboardingKyc} />
+      <Route path="/onboarding/rejected">
+        <OnboardingRejected />
+      </Route>
+      {needsKyc ? (
+        <Route>
+          <Redirect to="/onboarding/kyc" />
+        </Route>
+      ) : (
+        <Route component={AppRouter} />
+      )}
+    </Switch>
+  );
+}
+
 function Router() {
   const { user, loading } = useAuth();
   return (
@@ -242,6 +274,7 @@ function Router() {
       <Route path="/share/cars/:id" component={SharedCar} />
 
       <Route path="/login" component={LoginPage} />
+      <Route path="/signup" component={SignupPage} />
       <Route path="/rentals/signup" component={RentalsSignup} />
       <Route path="/register-fleet" component={RegisterFleet} />
 
@@ -252,7 +285,7 @@ function Router() {
           </div>
         </Route>
       ) : user ? (
-        <Route component={AppRouter} />
+        <Route component={AuthedShell} />
       ) : (
         <Switch>
           <Route path="/" component={Landing} />

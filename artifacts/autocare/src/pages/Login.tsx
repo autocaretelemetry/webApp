@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Wrench, LogIn, KeyRound } from "lucide-react";
+import { Wrench, LogIn, KeyRound, Clock, XCircle, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,6 +26,11 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [statusBanner, setStatusBanner] = useState<
+    | { kind: "pending" }
+    | { kind: "rejected"; note: string | null }
+    | null
+  >(null);
 
   useEffect(() => {
     if (!loading && user) navigate("/", { replace: true });
@@ -38,12 +43,30 @@ export default function Login() {
       return;
     }
     setSubmitting(true);
+    setStatusBanner(null);
     try {
       await login(email.trim(), password);
       toast.success("Welcome back");
       navigate("/", { replace: true });
-    } catch {
-      toast.error("Invalid email or password");
+    } catch (err) {
+      // The generated client serializes the JSON body into the error message.
+      // Try to parse a structured `{ reason, note }` payload before falling
+      // back to the generic toast.
+      const raw = err instanceof Error ? err.message : String(err);
+      let parsed: { reason?: string; note?: string | null; error?: string } | null = null;
+      try {
+        const match = raw.match(/\{[\s\S]*\}/);
+        if (match) parsed = JSON.parse(match[0]);
+      } catch {
+        /* not JSON */
+      }
+      if (parsed?.reason === "pending") {
+        setStatusBanner({ kind: "pending" });
+      } else if (parsed?.reason === "rejected") {
+        setStatusBanner({ kind: "rejected", note: parsed.note ?? null });
+      } else {
+        toast.error("Invalid email or password");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -81,6 +104,29 @@ export default function Login() {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {statusBanner?.kind === "pending" && (
+              <div className="mb-4 rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 p-3 text-sm flex items-start gap-2">
+                <Clock className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <div>
+                  <div className="font-semibold">Application under review</div>
+                  <div className="text-xs">
+                    Your account is waiting for super-admin approval. We'll
+                    unlock sign-in as soon as it's reviewed.
+                  </div>
+                </div>
+              </div>
+            )}
+            {statusBanner?.kind === "rejected" && (
+              <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 text-destructive p-3 text-sm flex items-start gap-2">
+                <XCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <div>
+                  <div className="font-semibold">Application not approved</div>
+                  {statusBanner.note && (
+                    <div className="text-xs mt-1">{statusBanner.note}</div>
+                  )}
+                </div>
+              </div>
+            )}
             <form onSubmit={onSubmit} className="space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="email">Email</Label>
@@ -107,12 +153,20 @@ export default function Login() {
               <Button type="submit" disabled={submitting} className="w-full">
                 {submitting ? "Signing in..." : "Sign in"}
               </Button>
-              <p className="text-xs text-muted-foreground text-center">
-                New here and want to rent a car?{" "}
-                <Link href="/rentals/signup" className="text-primary font-medium hover:underline">
-                  Create an account
-                </Link>
-              </p>
+              <div className="text-xs text-muted-foreground text-center space-y-1">
+                <p>
+                  New to AutoCare?{" "}
+                  <Link href="/signup" className="text-primary font-medium hover:underline inline-flex items-center gap-1">
+                    <UserPlus className="h-3 w-3" /> Apply for access
+                  </Link>
+                </p>
+                <p>
+                  Just want to rent a car?{" "}
+                  <Link href="/rentals/signup" className="text-primary font-medium hover:underline">
+                    Quick renter signup
+                  </Link>
+                </p>
+              </div>
             </form>
           </CardContent>
         </Card>

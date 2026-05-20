@@ -223,6 +223,7 @@ const SUPER_ADMIN_NAV: NavSection[] = [
   {
     label: "Site",
     items: [
+      { href: "/super-admin/approvals", label: "Approvals", icon: ShieldCheck },
       { href: "/super-admin/landing", label: "Landing Page", icon: Paintbrush },
     ],
   },

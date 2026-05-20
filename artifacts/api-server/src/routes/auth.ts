@@ -36,15 +36,37 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     res.status(401).json({ error: "Invalid email or password" });
     return;
   }
+  if (row.approvalStatus === "pending") {
+    res.status(403).json({
+      error: "Your application is still under review.",
+      reason: "pending",
+    });
+    return;
+  }
+  if (row.approvalStatus === "rejected") {
+    res.status(403).json({
+      error: "Your application was not approved.",
+      reason: "rejected",
+      note: row.approvalNote ?? null,
+    });
+    return;
+  }
   issueSessionCookie(res, row.id);
   const { passwordHash: _ph, ...safe } = row;
   res.json(safe);
 });
 
 /**
- * Public signup — currently only used by the "Sign up to rent" flow, so we
- * pin every new account to the `owner` role. Renting a car uses an owner
- * account plus a phone-keyed renter profile created on the next step.
+ * Public signup. Two flavors share this endpoint:
+ *
+ *  1. Legacy "Sign up to rent" — body has no `requestedRole`. We provision an
+ *     `owner` account and sign them in immediately so the rentals flow keeps
+ *     working without rewiring (renter-profile KYC stays the booking gate).
+ *  2. New multi-role apply flow (`/signup` page) — body carries
+ *     `requestedRole` + `applicantData`. We park the user in
+ *     `approvalStatus=pending`, do NOT issue a session cookie, and the super
+ *     admin must approve before they can sign in. Once approved they land on
+ *     `/onboarding/kyc` until verified.
  */
 router.post("/auth/signup", async (req, res): Promise<void> => {
   const parsed = SignupBody.safeParse(req.body);
@@ -53,9 +75,8 @@ router.post("/auth/signup", async (req, res): Promise<void> => {
     return;
   }
   const email = parsed.data.email.trim().toLowerCase();
-  // Pre-check is a UX optimization only — the DB unique index on users.email
-  // is the source of truth. We still try/catch the insert so two concurrent
-  // signups for the same email both get a deterministic 409.
+  const requestedRole = parsed.data.requestedRole ?? null;
+  const isApplication = !!requestedRole;
   const [dup] = await db
     .select({ id: usersTable.id })
     .from(usersTable)
@@ -64,6 +85,13 @@ router.post("/auth/signup", async (req, res): Promise<void> => {
     res.status(409).json({ error: "An account with that email already exists." });
     return;
   }
+  // For an application, the user has no usable role yet — store a neutral
+  // placeholder until approval (we never let `pending` users sign in anyway).
+  const insertRole = isApplication
+    ? requestedRole === "renter"
+      ? "owner"
+      : requestedRole
+    : "owner";
   let row;
   try {
     [row] = await db
@@ -72,13 +100,17 @@ router.post("/auth/signup", async (req, res): Promise<void> => {
         email,
         passwordHash: hashPassword(parsed.data.password),
         name: parsed.data.name.trim(),
-        role: "owner",
+        role: insertRole,
         phone: parsed.data.phone?.trim() || null,
+        approvalStatus: isApplication ? "pending" : "approved",
+        kycStatus: isApplication ? "not_submitted" : "verified",
+        requestedRole,
+        applicantData: (parsed.data.applicantData ?? null) as
+          | Record<string, unknown>
+          | null,
       })
       .returning();
   } catch (err) {
-    // Postgres unique_violation. node-postgres surfaces the SQLSTATE on
-    // `code`; drizzle wraps it but preserves the underlying error.
     const code =
       (err as { code?: string }).code ??
       (err as { cause?: { code?: string } }).cause?.code;
@@ -92,9 +124,13 @@ router.post("/auth/signup", async (req, res): Promise<void> => {
     res.status(500).json({ error: "Could not create account" });
     return;
   }
-  issueSessionCookie(res, row.id);
+  // Only the legacy auto-approved path issues a cookie. Applications get
+  // returned without a session so the client can show "pending" UX.
+  if (!isApplication) {
+    issueSessionCookie(res, row.id);
+  }
   const { passwordHash: _ph, ...safe } = row;
-  res.status(201).json(safe);
+  res.status(isApplication ? 202 : 201).json(safe);
 });
 
 router.post("/auth/logout", (_req, res): void => {

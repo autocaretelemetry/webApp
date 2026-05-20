@@ -27,6 +27,11 @@ Connected automotive service platform that pairs vehicle owners with service cen
 - `lib/api-client-react/src/generated/` — generated hooks (`useGetBooking`, `getGetBookingQueryKey`, etc.) and Zod schemas
 - `lib/db/src/schema.ts` — Drizzle schema for vehicles, service_centers, mechanics, bookings, booking_events, invoices
 - `lib/db/src/schema/subscriptionPlans.ts` — `PlanLimits` type + `DEFAULT_PLAN_LIMITS`; `subscription_plans.limits` jsonb is the source of truth for enforced entitlements
+- `lib/db/src/schema/users.ts` — adds `approvalStatus`, `approvalNote`, `kycStatus`, `kycNote`, `kycDocuments` (jsonb), `requestedRole`, `applicantData` (jsonb) for self-signup + KYC onboarding
+- `artifacts/api-server/src/routes/onboarding.ts` — `POST /me/kyc`, `GET /admin/approvals?state=`, `PATCH /admin/approvals/:userId`, `PATCH /admin/kyc/:userId`, and the `requireKycVerified` middleware
+- `artifacts/autocare/src/pages/Signup.tsx` — public role-picker signup form
+- `artifacts/autocare/src/pages/onboarding/{Kyc,Rejected}.tsx` — KYC upload + rejection screens
+- `artifacts/autocare/src/pages/super_admin/Approvals.tsx` — super-admin applications / KYC / rejected tabs
 - `artifacts/api-server/src/lib/entitlements.ts` — `getEntitlements(kind,id)`, `getOwnerEntitlementsForVehicle(vehicleId)`, `featuredSubscriberIds(kind, ids)`; every plan-gated server action goes through here
 - `lib/db/src/schema/drivers.ts` — chauffeur profiles attached to with-driver listings (scoped by ownerPhone)
 - `lib/db/src/schema/tripLocations.ts` — append-only GPS pings for live rental tracking (source: device/owner/admin/sim)
@@ -76,6 +81,16 @@ Connected automotive service platform that pairs vehicle owners with service cen
 - **Admin rentals safety**: Renters page (KYC queue + history) and Safety & Tracking page (live trip list with freshness badges, SVG trip trail viewer, incident triage with one-tap "Open in Google Maps" deep links — no Leaflet dependency).
 - **Renter incident reporting**: MyRentals exposes "Report incident" on confirmed/active bookings; dialog captures browser geolocation (opt-in) and posts it alongside the report so admins see a fresh `lastKnown` ping.
 - **Fleet experience** (`role = "fleet"`): org admins manage their fleet from a dedicated dashboard (KPIs + reminders + parts-spend chart when on Fleet Pro), Vehicles page (add/assign drivers), Team & Drivers page (invite by phone with one of 4 roles + per-member direct-checkout toggle), Preferred Centers (multi-select from the global directory), Safety & Tracking (live last-known positions + incident triage with Google Maps deep links), Settings (org profile + **Require finance approval** toggle), and a Parts Orders queue with pending/paid/rejected tabs. Fleet users also access the shared Parts Marketplace (via `buyersOnly` which now allows `fleet`); checkout there routes through the org's approval workflow. Public signup at `/register-fleet`. Demo seed: "MTN Ghana" with 4 vehicles, admin (Akosua, fleet@autocare.test/fleet1234), finance (Ama, finance@autocare.test/finance1234), 2 drivers (Kwame canCheckoutDirectly=false, Yaa=true), 2 preferred centers, subscribed to Fleet Pro, `requireFinanceApproval=true`.
+
+## Onboarding & approvals
+
+- Self-signup at `/signup` lets anyone apply as one of: car owner, renter, service center, parts vendor, delivery agent, or fleet/institution. The form is two-step (role picker → role-specific details) and posts to `POST /auth/signup` with `requestedRole` + `applicantData`.
+- Applicants are inserted with `approvalStatus=pending` + `kycStatus=not_submitted` and DO NOT receive a session cookie. They cannot sign in until a super admin approves them.
+- Super admin reviews queues at `/super-admin/approvals` with tabs for Applications, KYC submissions, and Rejected. Approve provisions the matching directory row (service-center / vendor / delivery-agent / organisation with the applicant as `admin` member / renter-profile shell) keyed by phone; reject stores `approvalNote` shown back to the applicant on next login attempt.
+- After approval, the user lands on `/onboarding/kyc` with a role-specific checklist (gov ID + selfie for everyone; driver's licence for renters & delivery; business registration for centers/vendors; org reg + sample vehicle reg for fleet). Uploads reuse `@workspace/object-storage-web` `useUpload` and store as `/api/storage{objectPath}`. Resubmitting flips `kycStatus` back to `submitted` for re-review.
+- Server enforcement: `routes/onboarding.ts` exports a `requireKycVerified` middleware mounted in `routes/index.ts` AFTER auth/storage/onboarding/landing-content but BEFORE every other resource router. Anonymous traffic and admin/super_admin bypass; everyone else gets 403 `{reason}` until verified.
+- Login enforcement: `POST /auth/login` returns 403 with `{reason:"pending"}` or `{reason:"rejected", note}` for non-approved users; Login.tsx parses these into banner UX instead of the generic toast.
+- Grandfathering: existing seeded demo accounts are backfilled to `approved`+`verified` via `seedUsers.ts` so the demo experience is unchanged. New legacy `POST /auth/signup` calls (no `requestedRole` — used by the rentals quick-signup flow) still auto-approve as `owner` and issue a cookie so existing flows keep working.
 
 ## User preferences
 

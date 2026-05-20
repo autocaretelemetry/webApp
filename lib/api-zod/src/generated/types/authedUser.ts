@@ -5,6 +5,8 @@
  * AutoCare API — vehicle owners book services, service centers fulfill them.
  * OpenAPI spec version: 0.1.0
  */
+import type { AuthedUserApprovalStatus } from './authedUserApprovalStatus';
+import type { AuthedUserKycStatus } from './authedUserKycStatus';
 import type { AuthedUserRole } from './authedUserRole';
 
 export interface AuthedUser {
@@ -16,4 +18,9 @@ export interface AuthedUser {
   avatarUrl?: string | null;
   active: boolean;
   createdAt: Date;
+  approvalStatus?: AuthedUserApprovalStatus;
+  approvalNote?: string | null;
+  kycStatus?: AuthedUserKycStatus;
+  kycNote?: string | null;
+  requestedRole?: string | null;
 }

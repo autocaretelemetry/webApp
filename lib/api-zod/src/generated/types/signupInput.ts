@@ -5,6 +5,8 @@
  * AutoCare API — vehicle owners book services, service centers fulfill them.
  * OpenAPI spec version: 0.1.0
  */
+import type { SignupInputApplicantData } from './signupInputApplicantData';
+import type { SignupInputRequestedRole } from './signupInputRequestedRole';
 
 export interface SignupInput {
   /** @minLength 1 */
@@ -13,4 +15,6 @@ export interface SignupInput {
   /** @minLength 8 */
   password: string;
   phone?: string | null;
+  requestedRole?: SignupInputRequestedRole;
+  applicantData?: SignupInputApplicantData;
 }
