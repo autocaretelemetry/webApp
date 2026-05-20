@@ -143,6 +143,7 @@ function RoleGuard({
 
 const ownerOnly = (c: ComponentType) => () => <RoleGuard allow={["owner"]} component={c} />;
 const renterOrOwner = (c: ComponentType) => () => <RoleGuard allow={["owner", "renter"]} component={c} />;
+const renterOnly = (c: ComponentType) => () => <RoleGuard allow={["renter"]} component={c} />;
 const centerOnly = (c: ComponentType) => () => <RoleGuard allow={["center"]} component={c} />;
 const vendorOnly = (c: ComponentType) => () => <RoleGuard allow={["vendor"]} component={c} />;
 const buyersOnly = (c: ComponentType) => () => <RoleGuard allow={["owner", "center", "fleet"]} component={c} />;
@@ -215,16 +216,14 @@ function AppRouter() {
         <Route path="/rentals/list-yours" component={ownerOnly(ListYourCar)} />
         <Route path="/rentals/my-listings" component={ownerOnly(MyListings)} />
         {/*
-          /rentals/my-bookings and /rentals/profile are intentionally
-          renterOrOwner: car owners can also rent cars on the platform
-          (their renter identity is keyed by phone, not role), so we
-          deliberately keep these pages reachable by both personas.
-          Server-side authorization in routes/rentals.ts is the source
-          of truth for which rows each caller may see — see follow-up
-          task #32 for the planned hardening.
+          /rentals/my-bookings and /rentals/profile are renter-only:
+          a vehicle owner who also wants to rent must switch role to
+          "renter" via the role tabs. This keeps the renter experience
+          first-class and avoids accidentally serving owner accounts
+          renter-specific UI they never asked for.
         */}
-        <Route path="/rentals/my-bookings" component={renterOrOwner(MyRentals)} />
-        <Route path="/rentals/profile" component={renterOrOwner(RenterProfilePage)} />
+        <Route path="/rentals/my-bookings" component={renterOnly(MyRentals)} />
+        <Route path="/rentals/profile" component={renterOnly(RenterProfilePage)} />
         <Route path="/rentals/drivers" component={ownerOnly(DriversPage)} />
         <Route path="/rentals/listing-requests" component={ownerOnly(ListingRequests)} />
         <Route path="/rentals/:id" component={RentalDetail} />

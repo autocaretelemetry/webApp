@@ -210,7 +210,7 @@ export default function RenterDashboard() {
             ) : (
               <div className="space-y-3">
                 {upcoming.map((b) => (
-                  <Link key={b.id} href={`/rentals/${b.id}`}>
+                  <Link key={b.id} href="/rentals/my-bookings">
                     <div className="flex items-center gap-4 border rounded-lg p-3 hover:bg-accent/30 transition cursor-pointer">
                       <div className="h-14 w-14 rounded-md bg-muted overflow-hidden shrink-0 flex items-center justify-center">
                         {b.carImageUrl ? (
