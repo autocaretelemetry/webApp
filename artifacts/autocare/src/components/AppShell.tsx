@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { useRole, useFleetOrgId, type Role } from "@/lib/role";
 import { useMyFleetOrgs } from "@/lib/fleet-api";
@@ -51,6 +51,7 @@ type NavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
+  badge?: number;
 };
 
 type NavSection = {
@@ -343,6 +344,44 @@ const ROLE_LABEL: Record<Role, string> = {
   super_admin: "Super admin",
 };
 
+/**
+ * Polls the lightweight approvals-count endpoint so the super-admin sidebar
+ * can show a backlog badge next to the Approvals link. Returns null until
+ * the first successful fetch (so we don't render a stale 0), and silently
+ * keeps the last value if a refresh errors.
+ */
+function useApprovalsPendingCount(enabled: boolean): number | null {
+  const [count, setCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (!enabled) {
+      setCount(null);
+      return;
+    }
+    let cancelled = false;
+    async function load(): Promise<void> {
+      try {
+        const res = await fetch("/api/admin/approvals/counts", {
+          credentials: "include",
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as { pending?: number };
+        if (!cancelled && typeof data.pending === "number") {
+          setCount(data.pending);
+        }
+      } catch {
+        // soft-fail — badge just won't refresh this tick
+      }
+    }
+    void load();
+    const id = window.setInterval(load, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [enabled]);
+  return count;
+}
+
 function SidebarItem({
   item,
   active,
@@ -372,7 +411,24 @@ function SidebarItem({
         )}
         <Icon className={cn("h-4 w-4 shrink-0 transition-transform", active && "scale-110")} />
         {!collapsed && <span className="truncate">{item.label}</span>}
-        {!collapsed && active && (
+        {!collapsed && item.badge !== undefined && item.badge > 0 && (
+          <span
+            className={cn(
+              "ml-auto inline-flex items-center justify-center rounded-full text-[10px] font-semibold h-4 min-w-4 px-1",
+              active
+                ? "bg-primary-foreground/20 text-primary-foreground"
+                : "bg-primary text-primary-foreground",
+            )}
+          >
+            {item.badge}
+          </span>
+        )}
+        {collapsed && item.badge !== undefined && item.badge > 0 && (
+          <span className="absolute -top-1 -right-1 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-semibold h-4 min-w-4 px-1">
+            {item.badge}
+          </span>
+        )}
+        {!collapsed && active && (item.badge === undefined || item.badge === 0) && (
           <ChevronRight className="ml-auto h-3.5 w-3.5 opacity-70" />
         )}
       </span>
@@ -413,7 +469,19 @@ function SidebarBody({
   location: string;
   onNavigate?: () => void;
 }) {
-  const sections = navFor(role, user?.role === "super_admin", fleetRole);
+  const rawSections = navFor(role, user?.role === "super_admin", fleetRole);
+  const pendingApprovals = useApprovalsPendingCount(user?.role === "super_admin");
+  const sections = useMemo(() => {
+    if (pendingApprovals === null) return rawSections;
+    return rawSections.map((section) => ({
+      ...section,
+      items: section.items.map((item) =>
+        item.href === "/super-admin/approvals"
+          ? { ...item, badge: pendingApprovals }
+          : item,
+      ),
+    }));
+  }, [rawSections, pendingApprovals]);
   const showCart = role === "owner" || role === "center";
   const showBell = role === "owner";
   const FLEET_ROLE_LABEL: Record<FleetMemberRoleNav, string> = {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -120,6 +120,12 @@ type ApprovalsPage = {
   nextCursor: string | null;
 };
 
+type ApprovalCounts = {
+  pending: number;
+  kycPending: number;
+  rejected: number;
+};
+
 const ROLE_OPTIONS = [
   { value: "all", label: "All roles" },
   { value: "owner", label: "Car owner" },
@@ -160,34 +166,84 @@ async function fetchApprovals(params: {
   return res.json();
 }
 
+function CountBadge({ count, active }: { count: number | null; active: boolean }) {
+  if (count === null) return null;
+  return (
+    <span
+      className={`ml-1.5 inline-flex items-center justify-center rounded-full text-[10px] font-semibold h-4 min-w-4 px-1 ${
+        active
+          ? "bg-background text-foreground"
+          : "bg-muted text-muted-foreground"
+      }`}
+    >
+      {count}
+    </span>
+  );
+}
+
 export default function ApprovalsPage() {
+  const [counts, setCounts] = useState<ApprovalCounts | null>(null);
+  const [tab, setTab] = useState("applications");
+
+  const refreshCounts = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/approvals/counts", {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed");
+      const data = (await res.json()) as ApprovalCounts;
+      setCounts(data);
+    } catch {
+      // Soft-fail: badges just hide if the count endpoint isn't reachable.
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshCounts();
+  }, [refreshCounts]);
+
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-500">
       <PageHeader
         title="Account approvals"
         description="Review self-signup applications and KYC submissions."
       />
-      <Tabs defaultValue="applications">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="applications">Applications</TabsTrigger>
-          <TabsTrigger value="kyc">KYC submissions</TabsTrigger>
-          <TabsTrigger value="rejected">Rejected</TabsTrigger>
+          <TabsTrigger value="applications">
+            Applications
+            <CountBadge count={counts?.pending ?? null} active={tab === "applications"} />
+          </TabsTrigger>
+          <TabsTrigger value="kyc">
+            KYC submissions
+            <CountBadge count={counts?.kycPending ?? null} active={tab === "kyc"} />
+          </TabsTrigger>
+          <TabsTrigger value="rejected">
+            Rejected
+            <CountBadge count={counts?.rejected ?? null} active={tab === "rejected"} />
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="applications" className="mt-4">
-          <ApprovalsList kind="applications" />
+          <ApprovalsList kind="applications" onChanged={refreshCounts} />
         </TabsContent>
         <TabsContent value="kyc" className="mt-4">
-          <ApprovalsList kind="kyc" />
+          <ApprovalsList kind="kyc" onChanged={refreshCounts} />
         </TabsContent>
         <TabsContent value="rejected" className="mt-4">
-          <ApprovalsList kind="rejected" />
+          <ApprovalsList kind="rejected" onChanged={refreshCounts} />
         </TabsContent>
       </Tabs>
     </div>
   );
 }
 
-function ApprovalsList({ kind }: { kind: "applications" | "kyc" | "rejected" }) {
+function ApprovalsList({
+  kind,
+  onChanged,
+}: {
+  kind: "applications" | "kyc" | "rejected";
+  onChanged?: () => void;
+}) {
   const [rows, setRows] = useState<AuthedUserRow[] | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -277,6 +333,7 @@ function ApprovalsList({ kind }: { kind: "applications" | "kyc" | "rejected" }) 
       }
       toast.success(action === "approve" || action === "verify" ? "Approved." : "Rejected.");
       await reload();
+      onChanged?.();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed");
     } finally {

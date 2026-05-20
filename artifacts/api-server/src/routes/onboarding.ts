@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { and, asc, desc, eq, gt, ilike, inArray, lt, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, ilike, inArray, lt, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import {
   db,
@@ -402,6 +402,44 @@ const APPROVAL_ROLES = [
   "fleet",
   "renter",
 ] as const;
+
+/**
+ * GET /admin/approvals/counts — lightweight queue sizes for the three
+ * super-admin approval tabs. Powers the count badges on the Approvals page
+ * and the sidebar "Approvals" link so reviewers see backlog at a glance
+ * without loading every list.
+ */
+router.get(
+  "/admin/approvals/counts",
+  requireSuperAdmin,
+  async (_req, res): Promise<void> => {
+    const rejectedWhere = or(
+      eq(usersTable.approvalStatus, "rejected"),
+      eq(usersTable.kycStatus, "rejected"),
+    );
+    const [[pendingRow], [kycRow], [rejectedRow]] = await Promise.all([
+      db
+        .select({ c: count() })
+        .from(usersTable)
+        .where(eq(usersTable.approvalStatus, "pending")),
+      db
+        .select({ c: count() })
+        .from(usersTable)
+        .where(
+          and(
+            eq(usersTable.approvalStatus, "approved"),
+            eq(usersTable.kycStatus, "submitted"),
+          ),
+        ),
+      db.select({ c: count() }).from(usersTable).where(rejectedWhere),
+    ]);
+    res.json({
+      pending: Number(pendingRow?.c ?? 0),
+      kycPending: Number(kycRow?.c ?? 0),
+      rejected: Number(rejectedRow?.c ?? 0),
+    });
+  },
+);
 
 router.get("/admin/approvals", requireSuperAdmin, async (req, res): Promise<void> => {
   const state = String(req.query["state"] ?? "pending");
