@@ -23,6 +23,13 @@ import {
   kycRejectedEmail,
   type EmailMessage,
 } from "../lib/email";
+import {
+  sendWhatsAppText,
+  applicationApprovedWhatsApp,
+  applicationRejectedWhatsApp,
+  kycVerifiedWhatsApp,
+  kycRejectedWhatsApp,
+} from "../lib/whatsapp";
 import { logger } from "../lib/logger";
 
 function fireEmail(to: string | null | undefined, msg: Omit<EmailMessage, "to">): void {
@@ -30,6 +37,39 @@ function fireEmail(to: string | null | undefined, msg: Omit<EmailMessage, "to">)
   sendEmail({ to, ...msg }).catch((err) =>
     logger.warn({ err, to }, "onboarding email send threw"),
   );
+}
+
+function fireWhatsApp(to: string | null | undefined, body: string): void {
+  if (!to) return;
+  sendWhatsAppText(to, body).catch((err) =>
+    logger.warn({ err, to }, "onboarding whatsapp send threw"),
+  );
+}
+
+type DecisionKind = "approved" | "rejected" | "kyc_verified" | "kyc_rejected";
+
+function fireDecisionNotifications(
+  kind: DecisionKind,
+  user: { name: string; email: string | null; phone: string | null; approvalNote: string | null; kycNote: string | null },
+): void {
+  switch (kind) {
+    case "approved":
+      fireEmail(user.email, applicationApprovedEmail(user.name, user.approvalNote));
+      fireWhatsApp(user.phone, applicationApprovedWhatsApp(user.name, user.approvalNote));
+      return;
+    case "rejected":
+      fireEmail(user.email, applicationRejectedEmail(user.name, user.approvalNote));
+      fireWhatsApp(user.phone, applicationRejectedWhatsApp(user.name, user.approvalNote));
+      return;
+    case "kyc_verified":
+      fireEmail(user.email, kycVerifiedEmail(user.name, user.kycNote));
+      fireWhatsApp(user.phone, kycVerifiedWhatsApp(user.name, user.kycNote));
+      return;
+    case "kyc_rejected":
+      fireEmail(user.email, kycRejectedEmail(user.name, user.kycNote));
+      fireWhatsApp(user.phone, kycRejectedWhatsApp(user.name, user.kycNote));
+      return;
+  }
 }
 
 type EventTx = Tx | typeof db;
@@ -233,10 +273,7 @@ router.patch(
         note: parsed.data.note ?? null,
       });
       const { passwordHash: _ph, ...safe } = row!;
-      fireEmail(
-        row!.email,
-        applicationRejectedEmail(row!.name, row!.approvalNote),
-      );
+      fireDecisionNotifications("rejected", row!);
       res.json(safe);
       return;
     }
@@ -284,10 +321,7 @@ router.patch(
       throw err;
     }
     const { passwordHash: _ph, ...safe } = updated!;
-    fireEmail(
-      updated!.email,
-      applicationApprovedEmail(updated!.name, updated!.approvalNote),
-    );
+    fireDecisionNotifications("approved", updated!);
     res.json(safe);
   },
 );
@@ -332,11 +366,9 @@ router.patch(
       note: parsed.data.note ?? null,
     });
     const { passwordHash: _ph, ...safe } = row!;
-    fireEmail(
-      row!.email,
-      parsed.data.decision === "verify"
-        ? kycVerifiedEmail(row!.name, row!.kycNote)
-        : kycRejectedEmail(row!.name, row!.kycNote),
+    fireDecisionNotifications(
+      parsed.data.decision === "verify" ? "kyc_verified" : "kyc_rejected",
+      row!,
     );
     res.json(safe);
   },

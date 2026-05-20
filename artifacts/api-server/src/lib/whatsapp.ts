@@ -58,6 +58,39 @@ export async function sendWhatsAppText(
   }
 }
 
+function noteLine(note: string | null | undefined): string {
+  if (!note || !note.trim()) return "";
+  return `\n\nReviewer note: ${note.trim()}`;
+}
+
+export function applicationApprovedWhatsApp(
+  name: string,
+  note: string | null | undefined,
+): string {
+  return `Hi ${name}, good news — your AutoCare application has been approved. Sign in to submit your KYC documents and unlock the platform.${noteLine(note)}\n\n— AutoCare`;
+}
+
+export function applicationRejectedWhatsApp(
+  name: string,
+  note: string | null | undefined,
+): string {
+  return `Hi ${name}, thank you for applying to AutoCare. After review we are unable to approve your application at this time.${noteLine(note)}\n\nYou are welcome to reach out or apply again with updated information.\n\n— AutoCare`;
+}
+
+export function kycVerifiedWhatsApp(
+  name: string,
+  note: string | null | undefined,
+): string {
+  return `Hi ${name}, your AutoCare KYC documents have been verified. You now have full access — sign in to get started.${noteLine(note)}\n\n— AutoCare`;
+}
+
+export function kycRejectedWhatsApp(
+  name: string,
+  note: string | null | undefined,
+): string {
+  return `Hi ${name}, we reviewed your AutoCare KYC submission and need you to resubmit. Sign in and visit the KYC page to upload corrected documents.${noteLine(note)}\n\n— AutoCare`;
+}
+
 export function appPublicUrl(path: string): string {
   const domains = process.env["REPLIT_DOMAINS"];
   const host = domains ? domains.split(",")[0] : "localhost:5000";
