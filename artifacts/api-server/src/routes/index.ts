@@ -27,6 +27,7 @@ import landingContentRouter from "./landingContent";
 import organizationsRouter from "./organizations";
 import onboardingRouter, { requireKycVerified } from "./onboarding";
 import addressesRouter from "./addresses";
+import publicCatalogRouter from "./publicCatalog";
 
 const router: IRouter = Router();
 
@@ -37,6 +38,11 @@ router.use(authRouter);
 router.use(storageRouter);
 router.use(landingContentRouter);
 router.use(onboardingRouter);
+// Public catalog facets + VAPID key. Must be mounted before any router
+// that calls `router.use(requireAuth)` internally, because sub-router
+// middleware fires for every request entering the sub-router (not just
+// for routes that match inside it).
+router.use(publicCatalogRouter);
 
 // Global KYC gate: signed-in users whose KYC isn't verified get 403 on
 // anything below. Anonymous traffic and admins pass through.

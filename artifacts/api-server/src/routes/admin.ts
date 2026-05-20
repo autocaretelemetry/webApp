@@ -12,8 +12,16 @@ import {
   ordersTable,
   invoicesTable,
 } from "@workspace/db";
+import { requireAdmin } from "../lib/auth";
 
 const router: IRouter = Router();
+
+// Platform-wide counts, revenue, and recent activity. Admin/super-admin
+// only — was previously reachable anonymously and leaked aggregate
+// business metrics + recent booking/order rows.
+// Scope the gate to `/admin/*` so this sub-router doesn't 403 unrelated
+// traffic that happens to pass through it on its way to a later router.
+router.use("/admin", requireAdmin);
 
 // One-shot snapshot of the whole platform — what a super admin / platform
 // owner needs to see at a glance: counts of every entity, revenue, status

@@ -5,8 +5,13 @@ import {
   CreateMechanicBody,
   CreateMechanicParams,
 } from "@workspace/api-zod";
+import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
+
+// Mechanic listings expose names, certifications, and per-center rosters.
+// Used only by signed-in centers/admins — never anonymously.
+router.use(requireAuth);
 
 // Cross-center mechanic listing used by the admin directory.
 router.get("/mechanics", async (_req, res): Promise<void> => {

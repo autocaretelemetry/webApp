@@ -21,8 +21,14 @@ import {
   UpdateMechanicParams,
   DeleteMechanicParams,
 } from "@workspace/api-zod";
+import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
+
+// Service-center directory + mechanic roster routes are only consumed by
+// signed-in roles (owners browsing, centers managing themselves, admin).
+// No anonymous public surface; gate at the router level.
+router.use(requireAuth);
 
 async function openJobsByCenter(centerIds: string[]): Promise<Map<string, number>> {
   if (centerIds.length === 0) return new Map();

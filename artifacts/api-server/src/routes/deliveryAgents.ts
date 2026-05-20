@@ -13,9 +13,16 @@ import {
   UpdateDeliveryAgentParams,
   DeleteDeliveryAgentParams,
 } from "@workspace/api-zod";
+import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
 
+// `POST /delivery-agents` is the legacy self-signup endpoint still wired
+// up by `/delivery/Register` and the vendor onboarding flow. It is kept
+// anonymous (matching `POST /organizations` / `POST /auth/signup`) so a
+// new rider can register before they have a session; KYC + super-admin
+// approval still gate the account from doing anything else. Everything
+// else on this router (read / update / delete) is signed-in only.
 router.get("/delivery-agents", async (req, res): Promise<void> => {
   const q = ListDeliveryAgentsQueryParams.safeParse(req.query);
   if (!q.success) {

@@ -11,8 +11,14 @@ import {
   UpdatePartBody,
   ListPartsQueryParams,
 } from "@workspace/api-zod";
+import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
+
+// Every parts handler requires a signed-in session. The previously-public
+// `/catalog/part-categories` endpoint was moved to `publicCatalog.ts` so
+// it can be mounted ahead of the auth gate without leaking parts data.
+router.use(requireAuth);
 
 async function hydrate(parts: (typeof partsTable.$inferSelect)[]) {
   if (parts.length === 0) return [];
@@ -158,17 +164,6 @@ router.post("/vendors/:vendorId/parts", async (req, res): Promise<void> => {
     .returning();
   const [hydrated] = await hydrate([row]);
   res.status(201).json(hydrated);
-});
-
-router.get("/catalog/part-categories", async (_req, res): Promise<void> => {
-  const rows = await db.select().from(partsTable).where(eq(partsTable.active, true));
-  const map = new Map<string, number>();
-  for (const r of rows) map.set(r.category, (map.get(r.category) ?? 0) + 1);
-  res.json(
-    [...map.entries()]
-      .map(([category, count]) => ({ category, count }))
-      .sort((a, b) => b.count - a.count),
-  );
 });
 
 export default router;

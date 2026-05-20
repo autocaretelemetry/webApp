@@ -9,8 +9,13 @@ import {
   UpdateDriverParams,
   DeleteDriverParams,
 } from "@workspace/api-zod";
+import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
+
+// Chauffeur profiles are owner-scoped data; every route here mutates or
+// reads PII keyed by ownerPhone, so block anonymous traffic up front.
+router.use(requireAuth);
 
 router.get("/drivers", async (req, res): Promise<void> => {
   const q = ListDriversQueryParams.safeParse(req.query);

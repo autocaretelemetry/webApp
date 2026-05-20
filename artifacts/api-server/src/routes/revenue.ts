@@ -8,8 +8,15 @@ import {
   invoicesTable,
   ordersTable,
 } from "@workspace/db";
+import { requireAdmin } from "../lib/auth";
 
 const router: IRouter = Router();
+
+// Revenue overview reveals platform-wide MRR + commission earnings.
+// Admin-only by intent — was reachable anonymously prior to task #48.
+// Scope the gate to `/revenue/*` so this sub-router doesn't 403 unrelated
+// traffic that happens to pass through it on its way to a later router.
+router.use("/revenue", requireAdmin);
 
 const COMMISSION_RATE = 0.05;
 

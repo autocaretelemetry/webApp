@@ -5,18 +5,14 @@ import {
   CreatePushSubscriptionBody,
   DeletePushSubscriptionBody,
 } from "@workspace/api-zod";
-import { vapidPublicKey } from "../lib/push";
+import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
 
-router.get("/push/vapid-public-key", (_req, res): void => {
-  const key = vapidPublicKey();
-  if (!key) {
-    res.status(503).json({ error: "Web push not configured" });
-    return;
-  }
-  res.json({ publicKey: key });
-});
+// Push-subscription create/delete writes per-owner endpoints to our DB.
+// Require sign-in so anonymous callers can't enumerate or churn rows.
+// The public VAPID-key endpoint lives in `publicCatalog.ts`.
+router.use(requireAuth);
 
 router.post("/push/subscriptions", async (req, res): Promise<void> => {
   const parsed = CreatePushSubscriptionBody.safeParse(req.body);

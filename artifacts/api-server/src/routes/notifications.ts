@@ -8,8 +8,15 @@ import {
   GenerateReminderNotificationsBody,
 } from "@workspace/api-zod";
 import { generateServiceReminderNotifications } from "../lib/reminders";
+import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
+
+// Notifications are scoped by ownerPhone in the query/body, but those
+// strings come from the client and would otherwise be enumerable by an
+// anonymous caller. Sign-in is required; per-owner authorization (matching
+// the session phone) can be tightened in a follow-up.
+router.use(requireAuth);
 
 router.get("/notifications", async (req, res): Promise<void> => {
   const q = ListNotificationsQueryParams.safeParse(req.query);

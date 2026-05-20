@@ -21,8 +21,15 @@ import {
   UpdateOrderStatusParams,
   UpdateOrderStatusBody,
 } from "@workspace/api-zod";
+import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
+
+// Orders carry buyer PII and stock-mutation power. The legacy per-handler
+// 401 checks (see POST /orders for proposals vs direct buys) were
+// inconsistent — gate the entire router so a forgotten check can't open
+// up a new endpoint. Per-handler role/relationship checks remain.
+router.use(requireAuth);
 
 class HttpError extends Error {
   constructor(public status: number, message: string) {

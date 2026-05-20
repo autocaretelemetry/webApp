@@ -18,8 +18,15 @@ import {
   UpdateSubscriptionBody,
   DeleteSubscriptionParams,
 } from "@workspace/api-zod";
+import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
+
+// Subscription plans + active subscriptions are signed-in concerns
+// (owners/centers/vendors managing their own plan, admins managing the
+// catalog). Plan pricing on the public landing page is hand-curated copy
+// and does not hit this router.
+router.use(requireAuth);
 
 // ───── Plans ─────
 

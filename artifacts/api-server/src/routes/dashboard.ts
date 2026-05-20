@@ -9,10 +9,16 @@ import {
   mechanicsTable,
 } from "@workspace/db";
 import { computeReminders } from "../lib/reminders";
-import { SERVICE_TYPES } from "../lib/catalog";
 import { ListActivityQueryParams } from "@workspace/api-zod";
+import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
+
+// All dashboard endpoints expose per-org operational data — gate the
+// whole router. The public `/catalog/service-types` endpoint that used
+// to live here was moved to `publicCatalog.ts` so it can be mounted
+// ahead of the gated resource routers.
+router.use(requireAuth);
 
 router.get("/dashboard/owner", async (_req, res): Promise<void> => {
   const [vehicles, statusRows, lifetimeRow] = await Promise.all([
@@ -148,10 +154,6 @@ router.get("/activity", async (req, res): Promise<void> => {
       vehicleId: e.vehicleId,
     })),
   );
-});
-
-router.get("/catalog/service-types", async (_req, res): Promise<void> => {
-  res.json(SERVICE_TYPES);
 });
 
 export default router;

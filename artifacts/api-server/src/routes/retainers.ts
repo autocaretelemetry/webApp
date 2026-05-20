@@ -18,8 +18,13 @@ import {
   UpdateRetainerParams,
   UpdateRetainerBody,
 } from "@workspace/api-zod";
+import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
+
+// Retainer plans + retainer agreements are signed-in surfaces (center
+// admins manage plans, owners subscribe). No anonymous access.
+router.use(requireAuth);
 
 const CADENCE_ORDER: Record<string, number> = { monthly: 0, quarterly: 1, annual: 2 };
 

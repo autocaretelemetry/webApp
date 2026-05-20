@@ -9,8 +9,13 @@ import {
   UpdateVendorParams,
   DeleteVendorParams,
 } from "@workspace/api-zod";
+import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
+
+// Vendor directory + admin mutations all require a signed-in session.
+// The public landing page does not call any of these endpoints.
+router.use(requireAuth);
 
 async function hydrate(vendors: (typeof vendorsTable.$inferSelect)[]) {
   if (vendors.length === 0) return [];

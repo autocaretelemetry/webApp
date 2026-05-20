@@ -24,6 +24,11 @@ import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
 
+// All vehicle routes carry owner PII (name, phone, plate) and per-vehicle
+// service history. Nothing here is meant to be reachable anonymously, so
+// gate the whole router up front rather than per-handler.
+router.use(requireAuth);
+
 router.get("/vehicles", async (_req, res): Promise<void> => {
   const rows = await db
     .select()
