@@ -1,101 +1,119 @@
 # AutoCare
 
-Connected automotive service platform that pairs vehicle owners with service centers — owners track their vehicles, book services, and approve invoices; centers triage incoming requests, assign mechanics, and bill customers.
+Connected automotive service platform pairing vehicle owners, renters, service centers, parts vendors, delivery agents, and fleet operators.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm --filter @workspace/autocare run dev` — run the AutoCare web app
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- `pnpm --filter @workspace/api-server run dev` — API server (port 5000)
+- `pnpm --filter @workspace/autocare run dev` — web app
+- `pnpm run typecheck` — full typecheck
+- `pnpm run build` — typecheck + build
+- `pnpm run test` — run all workspace test suites
+- `pnpm --filter @workspace/api-spec run codegen` — regen hooks + Zod schemas from OpenAPI
+- `pnpm --filter @workspace/db run push` — push DB schema (dev only)
+- Required env: `DATABASE_URL`
 
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5, Zod validation, contract-first via OpenAPI
+- API: Express 5 + Zod, contract-first OpenAPI
 - DB: PostgreSQL + Drizzle ORM
 - Web: React 19 + Vite, wouter, TanStack Query, shadcn/ui, Tailwind v4, framer-motion, recharts, sonner
-- API codegen: Orval (React Query hooks + Zod schemas from OpenAPI)
+- Codegen: Orval (React Query hooks + Zod schemas)
 - Build: esbuild (CJS bundle)
 
 ## Where things live
 
+### Contracts & shared libs
 - `lib/api-spec/openapi.yaml` — single source of truth for the API contract
-- `lib/api-client-react/src/generated/` — generated hooks (`useGetBooking`, `getGetBookingQueryKey`, etc.) and Zod schemas
-- `lib/db/src/schema.ts` — Drizzle schema for vehicles, service_centers, mechanics, bookings, booking_events, invoices
-- `lib/db/src/schema/subscriptionPlans.ts` — `PlanLimits` type + `DEFAULT_PLAN_LIMITS`; `subscription_plans.limits` jsonb is the source of truth for enforced entitlements
-- `lib/db/src/schema/users.ts` — adds `approvalStatus`, `approvalNote`, `kycStatus`, `kycNote`, `kycDocuments` (jsonb), `requestedRole`, `applicantData` (jsonb) for self-signup + KYC onboarding
-- `artifacts/api-server/src/routes/onboarding.ts` — `POST /me/kyc`, `GET /admin/approvals?state=`, `PATCH /admin/approvals/:userId`, `PATCH /admin/kyc/:userId`, and the `requireKycVerified` middleware
-- `artifacts/autocare/src/pages/Signup.tsx` — public role-picker signup form
-- `artifacts/autocare/src/pages/renter/Dashboard.tsx` — renter home (active/upcoming trips, KYC status, lifetime spend); rendered by `HomeRoute` when `role === "renter"`
-- `artifacts/autocare/src/pages/onboarding/{Kyc,Rejected}.tsx` — KYC upload + rejection screens
-- `artifacts/autocare/src/pages/super_admin/Approvals.tsx` — super-admin applications / KYC / rejected tabs
-- `artifacts/api-server/src/lib/entitlements.ts` — `getEntitlements(kind,id)`, `getOwnerEntitlementsForVehicle(vehicleId)`, `featuredSubscriberIds(kind, ids)`; every plan-gated server action goes through here
-- `lib/db/src/schema/drivers.ts` — chauffeur profiles attached to with-driver listings (scoped by ownerPhone)
-- `lib/db/src/schema/tripLocations.ts` — append-only GPS pings for live rental tracking (source: device/owner/admin/sim)
-- `lib/db/src/schema/rentalIncidents.ts` — theft/accident/breakdown/SOS reports tied to a rental booking
-- `lib/db/src/schema/organizations.ts` — fleet `organizations`, `organization_members` (admin|driver), `organization_preferred_centers` (M2M); `vehicles.organizationId` + `vehicles.assignedDriverPhone` attach a vehicle to a fleet
-- `artifacts/api-server/src/routes/organizations.ts` — fleet endpoints (signup, CRUD, members, preferred-centers PUT, fleet vehicles, dashboard, parts-spend); guarded by `requireOrgMember`; intentionally outside OpenAPI (single client, plain Express + Zod)
+- `lib/api-client-react/src/generated/` — generated hooks (`useGetBooking`, `getGetBookingQueryKey`, …) and Zod schemas (do NOT hand-edit)
+- `lib/db/src/schema.ts` — core Drizzle schema (vehicles, service_centers, mechanics, bookings, booking_events, invoices)
+- `lib/db/src/schema/users.ts` — auth + onboarding (`approvalStatus`, `kycStatus`, `kycDocuments`, `requestedRole`, `applicantData`)
+- `lib/db/src/schema/subscriptionPlans.ts` — `PlanLimits` type + `DEFAULT_PLAN_LIMITS`; the jsonb `limits` column is the source of truth for enforced entitlements
+- `lib/db/src/schema/drivers.ts` — chauffeur profiles (scoped by ownerPhone)
+- `lib/db/src/schema/{tripLocations,rentalIncidents}.ts` — rental-booking-scoped GPS pings + safety reports
+- `lib/db/src/schema/organizations.ts` — `organizations`, `organization_members`, `organization_preferred_centers`; `vehicles.organizationId` + `vehicles.assignedDriverPhone`
+- `lib/db/src/schema/fleetTracking.ts` — vehicle-scoped fleet GPS + incidents (distinct from rental-booking-scoped tables)
+- `lib/db/src/schema/fleetPartsOrders.ts` — org-scoped parts orders with approval workflow
+- `lib/db/src/seed.ts` — demo data
+
+### Server
+- `artifacts/api-server/src/routes/` — Express handlers per resource
+- `artifacts/api-server/src/lib/entitlements.ts` — `getEntitlements(kind,id)`, `getOwnerEntitlementsForVehicle`, `featuredSubscriberIds`; every plan-gated action goes through here
+- `artifacts/api-server/src/routes/onboarding.ts` — KYC submit, super-admin approval queues, `requireKycVerified` middleware
+- `artifacts/api-server/src/routes/organizations.ts` — fleet endpoints (intentionally outside OpenAPI; plain Express + Zod)
+- `artifacts/api-server/src/lib/email.ts` — SendGrid wrapper for approval/KYC decision emails
+- `artifacts/api-server/src/lib/kycScanner.ts` — ClamAV + heuristic upload scanner
+- `artifacts/api-server/src/routes/rentals.access.test.ts` + `bookings.access.test.ts` — vitest IDOR/access-isolation coverage
+
+### Web
+- `artifacts/autocare/src/index.css` — warm-industrial theme tokens
+- `artifacts/autocare/src/lib/role.ts` — role switch (owner/center/renter/fleet/vendor/delivery) persisted to localStorage
 - `artifacts/autocare/src/lib/fleet-api.ts` — React Query hooks for fleet endpoints (plain fetch, not codegen)
-- `artifacts/autocare/src/pages/fleet/{Dashboard,Vehicles,Drivers,Centers,Settings,Safety,Orders}.tsx` — fleet-role UI (Orders = parts-order approval queue)
-- `lib/db/src/schema/fleetPartsOrders.ts` — org-scoped parts orders (`pending_finance|approved|paid|rejected`) with item snapshot, requester, approver, payer, rejection reason
-- `organizations.requireFinanceApproval` (bool) + `organization_members.canCheckoutDirectly` (bool) — org-level approval toggle and per-member bypass override
-- `lib/db/src/schema/fleetTracking.ts` — `fleet_trip_locations` (vehicle-scoped GPS pings) and `fleet_incidents` (vehicle-scoped safety events); both distinct from the rental-booking-scoped `tripLocations`/`rentalIncidents` tables
-- `artifacts/autocare/src/pages/RegisterFleet.tsx` — public "Register your fleet" signup
-- `artifacts/autocare/src/pages/rentals/Drivers.tsx` — owner-facing driver CRUD
-- `artifacts/autocare/src/pages/admin/Renters.tsx` — admin renter directory + KYC approve/reject
-- `artifacts/autocare/src/pages/admin/Safety.tsx` — admin live-trip + incident triage (Google Maps deep links + inline SVG trail)
-- `artifacts/autocare/src/pages/rentals/MyRentals.tsx` — renter "Report incident" dialog (geolocation-capable)
-- `lib/db/src/seed.ts` — demo data (3 centers, 5 mechanics, 2 vehicles, 5 bookings, 3 invoices)
-- `artifacts/api-server/src/routes/` — Express route handlers per resource
-- `artifacts/autocare/src/index.css` — warm-industrial theme tokens (orange primary, teal secondary, concrete-beige background)
-- `artifacts/autocare/src/lib/role.ts` — owner/center role switch persisted to localStorage
-- `artifacts/autocare/src/components/AppShell.tsx` — top bar + role-adaptive sidebar
-- `artifacts/autocare/src/pages/{owner,center,shared}/` — role-scoped and shared pages
+- `artifacts/autocare/src/components/AppShell.tsx` — top bar + role-adaptive sidebar; `fleetNavFor()` trims by org role
+- `artifacts/autocare/src/pages/{owner,center,shared,renter,fleet,onboarding,admin,super_admin,rentals}/` — role-scoped UI
+- `artifacts/autocare/src/pages/Signup.tsx` — public role-picker signup; honours `?role=`
+- `artifacts/autocare/src/pages/Login.tsx` — honours `?next=` (sanitised; must start with `/`, not `//`)
+- `artifacts/autocare/src/pages/RegisterFleet.tsx` — public fleet signup
 
 ## Architecture decisions
 
-- Single app, two roles: a localStorage-backed role switch (`owner` | `center`) drives navigation and what actions are available on shared pages like booking detail — no separate logins for the MVP.
-- Contract-first: every API change goes OpenAPI → codegen → server route + client hook. Server handlers consume the same generated Zod schemas, so request/response types cannot drift from the contract.
-- Booking lifecycle is one finite-state machine guarded server-side (`requested → accepted → in_progress → awaiting_approval → approved → completed`, with `cancelled`/`rejected` terminal branches); UI surfaces only the actions legal for the current state and role.
-- Generated React Query hooks require an explicit `queryKey` when `enabled` is conditional — always pair `{ enabled, queryKey: getXQueryKey(id) }`. Invalidate via the same `getXQueryKey` helper after mutations.
-- A rental car carries `rentalModes: ('self_drive' | 'with_driver')[]` (at least one). Any listing that includes `with_driver` MUST have a valid `driverId` belonging to the same `ownerPhone`; the server validates and the UI prevents otherwise. Dropping `with_driver` on update nulls `driverId` automatically. With-driver bookings use `withDriverDailyRate` (falling back to `dailyRate` when unset).
-- Renter KYC minimum is a government ID photo; the driver's licence is optional for everyone. Use `isProfileReadyForBooking` for the base gate and `isProfileReadyForMode(profile, mode)` to require licence info only for self-drive bookings.
-- KYC approval is admin-only: `PATCH /renter-profiles/:id` returns **403** when a non-admin includes `kycStatus` in the body. The renter `UpsertRenterProfileInput` doesn't expose the field at all.
-- All rental tracking + incident endpoints are guarded server-side. `authorizeBookingAccess` in `routes/rentals.ts` lets through (1) admin/super_admin, (2) the booking's renter (matched by `req.user.phone`), or (3) the car owner (matched by `rentalCarsTable.ownerPhone`). Use it for any new endpoint that touches a single booking's tracking, incident, or signature data — don't add new IDOR-prone routes without it.
-- Incidents derive `reportedBy` from the verified relationship, not the request body — the client cannot spoof it. When the renter ships GPS in the body, the server inserts a `trip_locations` ping and uses those coords as `lastKnown*`; otherwise it falls back to the most recent ping.
-- Fleet members have four roles (`ORG_MEMBER_ROLES` in `lib/db/src/schema/organizations.ts`): **admin** (full control), **finance** (parts-order approval + billing visibility), **manager** (places parts orders, manages day-to-day), **driver** (assigned vehicles + parts requests). The sidebar is trimmed per role by `fleetNavFor()` in `AppShell.tsx` — drivers only see Dashboard, Vehicles, Marketplace, Parts Orders; admins see everything.
-- Parts-order approval workflow is org-scoped, not vendor-scoped. When `organizations.requireFinanceApproval` is on, manager/driver cart checkouts route through the fleet branch in `Checkout.tsx` and create a `fleet_parts_orders` row in `pending_finance` status. `organization_members.canCheckoutDirectly` is a per-member override that lets a specific manager/driver bypass the queue. Admins and finance always bypass. The button label in checkout flips between **"Pay now"** and **"Submit for finance approval"** based on the resolved permission. Endpoints (`POST/GET /organizations/:orgId/parts-orders`, `.../pay`, `.../reject`) live in `routes/organizations.ts` and use `canCheckoutDirectly()` + `isFinanceLevel()` helpers. Vendor-side fulfilment is intentionally NOT wired — "paid" represents both approval + settlement on the fleet ledger; the demo stops there. The Orders page (`pages/fleet/Orders.tsx`) has pending/paid/rejected/all tabs with **Approve & pay** and **Reject (with reason)** actions for finance/admin; everyone else sees only the orders they submitted (filtered server-side).
-- Fleet management is a first-class subscriber tier (`subscriberKind = "organization"`). Orgs have a many-to-many **preferred-pool** of service centers. `requireOrgMember(req, res, orgId, minRole?)` is the single auth helper — platform admins synthesize an `admin` membership for support without being added to the members table. Fleet routes are deliberately **outside OpenAPI** (same precedent as the maintenance-history CSV/PDF route): they're consumed by one client, so we hit plain Express + Zod with React Query and skip the codegen churn. Quotas enforced today: org `maxFleetVehicles` on `POST /organizations/:orgId/vehicles` (402 quota_exceeded), `partsCostTransparency` gating `GET /organizations/:orgId/parts-spend`, `canExportHistory` gating both fleet maintenance-history routes (org-wide + per-vehicle), and `priorityBooking` from Fleet Pro flows into `POST /bookings` for org-attached vehicles (ORed with the owner-subscription value so either path can upgrade the booking). `POST /bookings` also enforces the preferred-pool: if `vehicle.organizationId` is set, the chosen center must be in `organization_preferred_centers` (platform admins can override). `dedicatedSupport` is a UI/marketing flag (no server gate). Free-tier default is `{ maxFleetVehicles: 3 }`.
-- Subscription plans carry both free-form `features` (marketing copy on the plan card) and `limits` (machine-enforced `PlanLimits`). Server gates only ever read `limits` — never parse `features`. Quotas enforced today: center `maxBookingsPerMonth` on `POST /bookings` (402 quota_exceeded), vendor `maxPartsListed` on `POST /vendors/:vendorId/parts`, owner `priorityBooking` materialised onto `bookings.priority` at create time, owner `canExportHistory` gating the CSV export. `featuredPlacement` floats centers/vendors to the top of their directories. Free-tier defaults live in `FREE_LIMITS` inside `entitlements.ts`. `getEntitlements` orders by `subscriptions.startedAt DESC` so multiple active subs resolve deterministically to the newest plan.
-- Maintenance-history export lives outside OpenAPI by design. Two sibling routes — `GET /vehicles/:vehicleId/maintenance-history.csv` and `.pdf` — share a single handler factory (`maintenanceHistoryHandler(format)`) because Express 5's path-to-regexp rejects inline regex like `:format(csv|pdf)`. Both require auth, allow only the matched owner (by `req.user.phone === vehicle.ownerPhone`) or admin, and 402 when the owner's plan lacks `canExportHistory`. The PDF is streamed via `pdfkit` (kept external in `build.mjs` along with `fontkit` and `brotli` because their CJS helper resolution breaks under esbuild bundling). The owner UI exposes "Export PDF" and "Export CSV" buttons on the vehicle detail page; both hit the route with `fetch(..., { credentials: "include" })` and trigger a Blob download.
-- Fleet maintenance-history export mirrors the owner version with two scopes: org-wide rollup at `GET /organizations/:orgId/maintenance-history.{csv,pdf}` (admin-only, includes a Vehicle column / per-section header) and per-vehicle at `GET /organizations/:orgId/vehicles/:vehicleId/maintenance-history.{csv,pdf}` (admin **or** the assigned driver, via `requireOrgVehicle`). Implemented in `routes/organizations.ts` with a shared `buildHistoryRows` + `sendHistoryCsv` / `sendHistoryPdf` pair. Both routes gate on `canExportHistory` (402 `entitlement_required` when the org's plan doesn't include it; platform admins bypass). Hard-capped at 5000 rows with a "truncated" footer to bound memory and CPU. The Fleet UI exposes "Export CSV" / "Export PDF" in the Dashboard header (fleet-wide) and on each Fleet Vehicles row (per vehicle); both reuse `downloadFleetHistory()` in `lib/fleet-api.ts`.
+### Foundations
+- **Contract-first**: every API change goes OpenAPI → codegen → server route + client hook. Server handlers consume the generated Zod schemas, so types cannot drift. Exceptions (intentionally outside OpenAPI, single-client + plain Express+Zod): the maintenance-history CSV/PDF routes and all fleet endpoints.
+- **Role switch is localStorage-backed**, driving navigation and which actions appear on shared pages. Renter and fleet are first-class roles with their own dashboards and trimmed sidebars (`RENTER_NAV`, `fleetNavFor()`).
+- **Booking lifecycle** is a finite-state machine guarded server-side (`requested → accepted → in_progress → awaiting_approval → approved → completed`, with `cancelled`/`rejected` terminals); UI only surfaces legal transitions.
+- **Conditional query hooks** require both `enabled` and an explicit `queryKey` — always pair `{ enabled, queryKey: getXQueryKey(id) }`. Invalidate via the same helper.
+
+### Rentals
+- A car carries `rentalModes: ('self_drive' | 'with_driver')[]`. `with_driver` requires a `driverId` owned by the same `ownerPhone`; dropping `with_driver` nulls `driverId`. With-driver bookings use `withDriverDailyRate` (falls back to `dailyRate`).
+- Renter KYC minimum is a government ID photo; licence is optional. Use `isProfileReadyForBooking` for the base gate and `isProfileReadyForMode(profile, mode)` to require licence for self-drive.
+- KYC approval is admin-only: `PATCH /renter-profiles/:id` returns **403** when a non-admin sends `kycStatus`. `UpsertRenterProfileInput` doesn't expose the field at all.
+- `authorizeBookingAccess` in `routes/rentals.ts` is the single auth helper for any single-booking tracking/incident/signature endpoint — admin OR booking renter (by `req.user.phone`) OR car owner (by `ownerPhone`). Do not add new IDOR-prone routes without it.
+- Incidents derive `reportedBy` from the verified relationship, not the request body. Renter-submitted GPS becomes a `trip_locations` ping + `lastKnown*`.
+- **Owner/chauffeur PII redaction**: `GET /rental-cars` and `GET /rental-cars/:id` strip `ownerPhone`/`ownerEmail`/driver contact unless caller is admin, the car's owner, or a renter with a booking on the car in `contract_pending|awaiting_payment|confirmed|active|completed` (constants `OWNER_PII_BOOKING_STATUSES` / `DRIVER_PII_BOOKING_STATUSES` in `routes/rentals.ts`). Per-row owner self-unredact preserves "My Listings".
+- **Share-link CTA** (`pages/rentals/SharedCar.tsx`) branches on auth: anonymous → Create renter account + Sign in (both `?next=/rentals/<id>`); signed-in non-renter → disabled "Switch to renter"; renter no-KYC → finish KYC; renter ready → book.
+
+### Service bookings & parts orders
+- `routes/bookings.ts` + `routes/invoices.ts` enforce ownership via `authorizeServiceBooking(req, res, bookingId)` — admin, vehicle owner (by phone), or center staff (`center_staff` table). Owner-only actions: approve/pay invoice. Center-only: status transitions, assign mechanic, create invoice. List endpoints are scoped per caller.
+- `POST /orders` derives buyer identity from `req.user` (direct buy) or the booking's vehicle owner (proposal), never from the body — buyer name/phone can't be spoofed. `GET /orders?mine=true` scopes by session phone; only admin/vendor see the unfiltered list. Direct-buy checkout prefills shipping from the buyer's most recent direct-buy order (filter is `!bookingId && !mechanicId`, not status-based, so proposal orders never leak the service-center address).
+
+### Subscriptions & entitlements
+- Plans carry `features` (marketing copy on the plan card) and `limits` (`PlanLimits`, machine-enforced). Server gates only ever read `limits`. `getEntitlements` orders by `subscriptions.startedAt DESC` so multiple active subs resolve to the newest plan deterministically. Free-tier defaults live in `FREE_LIMITS` inside `entitlements.ts`.
+- Quotas enforced today:
+  - center `maxBookingsPerMonth` → `POST /bookings` (402 quota_exceeded)
+  - vendor `maxPartsListed` → `POST /vendors/:vendorId/parts`
+  - owner `priorityBooking` materialised on `bookings.priority` at create (ORed with org Fleet Pro when vehicle is org-attached)
+  - owner `canExportHistory` → maintenance-history CSV/PDF
+  - org `maxFleetVehicles` → `POST /organizations/:orgId/vehicles`
+  - org `partsCostTransparency` → `GET /organizations/:orgId/parts-spend`
+  - org `canExportHistory` → both fleet maintenance-history routes
+- `featuredPlacement` floats centers/vendors to top of their directories. `dedicatedSupport` is a UI/marketing flag (no server gate).
+
+### Fleet (organizations)
+- `subscriberKind = "organization"`. Orgs have a many-to-many **preferred-pool** of service centers; `POST /bookings` enforces the pool when `vehicle.organizationId` is set (platform admins can override).
+- `requireOrgMember(req, res, orgId, minRole?)` is the single fleet auth helper — platform admins synthesize an `admin` membership.
+- Org member roles (`ORG_MEMBER_ROLES`): **admin** (full), **finance** (parts-order approval + billing), **manager** (places orders, day-to-day), **driver** (assigned vehicles + parts requests).
+- **Parts-order approval** is org-scoped: when `organizations.requireFinanceApproval` is on, manager/driver checkouts create a `fleet_parts_orders` row in `pending_finance`. `organization_members.canCheckoutDirectly` overrides per-member. Admins + finance always bypass. Vendor-side fulfilment is intentionally NOT wired — "paid" represents approval + ledger settlement; the demo stops there.
+- **Maintenance-history export** (CSV + PDF) at owner scope (`/vehicles/:vehicleId/maintenance-history.{csv,pdf}`) and fleet scope (`/organizations/:orgId/...` + per-vehicle, latter allows assigned driver). PDF streamed via `pdfkit` (external in `build.mjs` along with `fontkit`+`brotli` due to CJS resolution under esbuild). Hard cap 5000 rows. Two separate routes per format because Express 5 path-to-regexp rejects `:format(csv|pdf)`.
 
 ## Product
 
-- **Owner experience**: dashboard with status breakdown and reminders, vehicle garage, service-center browser, multi-step booking flow, booking timeline, invoice approval + payment.
-- **Service-center experience**: control-panel dashboard, incoming-requests queue, active jobs board, mechanic roster, accept/assign-mechanic/create-invoice/complete workflow.
-- **Shared**: bookings list with status filters, booking detail with role-aware actions, invoice detail.
-- **Admin rentals safety**: Renters page (KYC queue + history) and Safety & Tracking page (live trip list with freshness badges, SVG trip trail viewer, incident triage with one-tap "Open in Google Maps" deep links — no Leaflet dependency).
-- **Renter incident reporting**: MyRentals exposes "Report incident" on confirmed/active bookings; dialog captures browser geolocation (opt-in) and posts it alongside the report so admins see a fresh `lastKnown` ping.
-- **Fleet experience** (`role = "fleet"`): org admins manage their fleet from a dedicated dashboard (KPIs + reminders + parts-spend chart when on Fleet Pro), Vehicles page (add/assign drivers), Team & Drivers page (invite by phone with one of 4 roles + per-member direct-checkout toggle), Preferred Centers (multi-select from the global directory), Safety & Tracking (live last-known positions + incident triage with Google Maps deep links), Settings (org profile + **Require finance approval** toggle), and a Parts Orders queue with pending/paid/rejected tabs. Fleet users also access the shared Parts Marketplace (via `buyersOnly` which now allows `fleet`); checkout there routes through the org's approval workflow. Public signup at `/register-fleet`. Demo seed: "MTN Ghana" with 4 vehicles, admin (Akosua, fleet@autocare.test/fleet1234), finance (Ama, finance@autocare.test/finance1234), 2 drivers (Kwame canCheckoutDirectly=false, Yaa=true), 2 preferred centers, subscribed to Fleet Pro, `requireFinanceApproval=true`.
+- **Owner**: dashboard with status breakdown + reminders, garage, center browser, multi-step booking, timeline, invoice approval + payment.
+- **Service center**: control-panel dashboard, incoming-requests queue, active jobs, mechanic roster, accept/assign/invoice/complete workflow.
+- **Renter**: dashboard (active/upcoming trips, KYC, lifetime spend), browse cars, MyRentals with incident reporting (opt-in geolocation).
+- **Admin rentals**: Renters (KYC queue + history); Safety & Tracking (live trip list with freshness badges, SVG trail viewer, incident triage with Google Maps deep links — no Leaflet).
+- **Fleet** (`role = "fleet"`): Dashboard (KPIs + reminders + parts-spend chart when on Fleet Pro), Vehicles (add/assign drivers), Team & Drivers (invite by phone + per-member direct-checkout toggle), Preferred Centers, Safety & Tracking, Settings (`Require finance approval` toggle), Parts Orders queue. Also accesses the shared Parts Marketplace via `buyersOnly` (now allows `fleet`).
+- **Demo accounts** (`*@autocare.test`): owner/renter/center/vendor/delivery/admin/super_admin (password = `<role>1234`); fleet — admin Akosua (`fleet@autocare.test`), finance Ama (`finance@autocare.test`), drivers Kwame (cannot checkout directly) and Yaa (can). Demo fleet "MTN Ghana" has 4 vehicles, 2 preferred centers, Fleet Pro subscription, `requireFinanceApproval=true`.
 
 ## Onboarding & approvals
 
-- `renter` is a first-class `users.role` value with its own dashboard (`pages/renter/Dashboard.tsx`) and trimmed sidebar (`RENTER_NAV` in `AppShell.tsx`: Dashboard, Browse Cars, My Rentals, Renter Profile). `POST /auth/signup` writes `role = requestedRole` directly (no longer aliases renter to owner), and `scripts/src/seedUsers.ts` backfills any legacy `requestedRole='renter' AND role='owner'` rows on every run. Rental routes that were previously `ownerOnly` (`/rentals/my-bookings`, `/rentals/profile`) are now `renterOnly` — owners who want to rent must switch role to "renter" via the role tabs so the renter experience stays first-class. Demo renter account: `renter@autocare.test / renter1234`.
-- Self-signup at `/signup` lets anyone apply as one of: car owner, renter, service center, parts vendor, delivery agent, or fleet/institution. The form is two-step (role picker → role-specific details) and posts to `POST /auth/signup` with `requestedRole` + `applicantData`.
-- Applicants are inserted with `approvalStatus=pending` + `kycStatus=not_submitted` and DO NOT receive a session cookie. They cannot sign in until a super admin approves them.
-- Super admin reviews queues at `/super-admin/approvals` with tabs for Applications, KYC submissions, and Rejected. Approve provisions the matching directory row (service-center / vendor / delivery-agent / organisation with the applicant as `admin` member / renter-profile shell) keyed by phone; reject stores `approvalNote` shown back to the applicant on next login attempt.
-- After approval, the user lands on `/onboarding/kyc` with a role-specific checklist (gov ID + selfie for everyone; driver's licence for renters & delivery; business registration for centers/vendors; org reg + sample vehicle reg for fleet). Uploads reuse `@workspace/object-storage-web` `useUpload` and store as `/api/storage{objectPath}`. Resubmitting flips `kycStatus` back to `submitted` for re-review.
-- Server enforcement: `routes/onboarding.ts` exports a `requireKycVerified` middleware mounted in `routes/index.ts` AFTER auth/storage/onboarding/landing-content but BEFORE every other resource router. Anonymous traffic and admin/super_admin bypass; everyone else gets 403 `{reason}` until verified.
-- Login enforcement: `POST /auth/login` returns 403 with `{reason:"pending"}` or `{reason:"rejected", note}` for non-approved users; Login.tsx parses these into banner UX instead of the generic toast.
-- Share-link CTA on `pages/rentals/SharedCar.tsx` is auth-aware in four branches: anonymous (primary "Create a renter account" → `/signup?role=renter&next=/rentals/<id>`, secondary "Sign in" → `/login?next=...`), signed-in non-renter (disabled "Switch to renter to book" prompt), renter with incomplete KYC (→ `/rentals/profile?next=...`), renter ready (→ `/rentals/<id>`). `Login.tsx` and `Signup.tsx` both read `?next=` / `?role=` via `useSearch()`; `Login` sanitises `next` (must start with `/`, not `//`) and uses it on both the already-authed effect and post-submit. `Signup` prefills role from `?role=` validated against the `ROLES` list and intentionally ignores `?next=` (applicants can't be auto-redirected — they must wait for super-admin approval).
-- Grandfathering: existing seeded demo accounts are backfilled to `approved`+`verified` via `seedUsers.ts` so the demo experience is unchanged. New legacy `POST /auth/signup` calls (no `requestedRole` — used by the rentals quick-signup flow) still auto-approve as `owner` and issue a cookie so existing flows keep working.
-- Decision emails: `PATCH /admin/approvals/:userId` and `PATCH /admin/kyc/:userId` fire a transactional email to the applicant (approved / rejected / KYC verified / KYC rejected). Templates and the SendGrid wrapper live in `artifacts/api-server/src/lib/email.ts`; sends are fire-and-forget (failure never blocks the decision response). Set `SENDGRID_API_KEY` (and optionally `EMAIL_FROM`, default `AutoCare <no-reply@autocare.test>`) to enable delivery — without it the message is logged via pino and `sendEmail` returns `{ok:false, reason:"not_configured"}`, same pattern as `whatsapp.ts`.
-- KYC upload hardening: `POST /me/kyc` runs every submitted `url` through `validateKycDocumentUrl` (in `routes/onboarding.ts`), which (1) rejects anything that isn't `/api/storage/objects/...` or `/objects/...` so applicants can't smuggle in off-platform URLs, (2) calls `getObjectEntityFile()` to confirm the object exists in our private bucket, and (3) reads GCS metadata to re-enforce `contentType ∈ {jpeg,png,webp}` and `size ≤ 10 MB` on the actual stored blob (constants exported from `routes/storage.ts` as `ALLOWED_UPLOAD_MIME` / `MAX_UPLOAD_BYTES` so the request-url gate and the submit gate stay in sync). The URL is normalised back to canonical form before being persisted. Each validated document is then passed to `scanKycDocument` (`lib/kycScanner.ts`) which, when `CLAMAV_HOST`+`CLAMAV_PORT` (or `CLAMAV_SOCKET`) are set, streams the blob through clamd via the `clamscan` npm bridge and maps the verdict to `{clean,infected,error}` — an unreachable clamd is **fail-closed** (route returns 503, doc is NOT persisted). Without those env vars, it falls back to a local EICAR + magic-byte / declared-MIME heuristic so onboarding still works on Replit / in dev. The heuristic also runs **before** ClamAV in both modes, because clamd by default doesn't flag "rename payload.exe to photo.png" mismatches. Infected uploads are moved to a `quarantine/` prefix in the same bucket via `objectStorageService.quarantineObjectEntity` and the user row never gains a reference to them. Persisted `KycDocument`s carry `scanStatus` / `scanCheckedAt` / `scanDetails`, and the super-admin Approvals UI refuses to render any document whose `scanStatus !== 'clean'` — pending / errored / quarantined documents show a labelled placeholder instead. The scanner contract is intentionally pluggable: a VirusTotal / Cloudmersive backend slots in by replacing the `getClam`/`scanStream` block without touching the route.
+- **Self-signup at `/signup`**: anyone applies as owner / renter / center / vendor / delivery / fleet. Form is role picker → role-specific details → `POST /auth/signup` with `requestedRole` + `applicantData`. Applicants get `approvalStatus=pending` + `kycStatus=not_submitted` and **no** session cookie until a super admin approves.
+- **Legacy `/auth/signup`** (no `requestedRole`, used by the rentals quick-signup) still auto-approves as `owner` and issues a cookie, so existing demo flows keep working. Seeded demo accounts are backfilled to `approved`+`verified` by `seedUsers.ts`.
+- **Super-admin queues** at `/super-admin/approvals` (tabs: Applications / KYC / Rejected). Approve provisions the matching directory row (center / vendor / delivery / org with applicant as `admin` / renter-profile shell) keyed by phone; reject stores `approvalNote` shown on next login attempt.
+- **Approved users land on `/onboarding/kyc`** with a role-specific checklist (gov ID + selfie for everyone; licence for renters & delivery; business reg for centers/vendors; org reg + sample vehicle reg for fleet). Uploads go through `@workspace/object-storage-web` `useUpload` and store as `/api/storage{objectPath}`. Resubmit flips `kycStatus` back to `submitted`.
+- **Server enforcement**: `requireKycVerified` is mounted in `routes/index.ts` AFTER auth/storage/onboarding/landing-content but BEFORE every other resource router. Anonymous + admin/super_admin bypass; everyone else gets 403 `{reason}` until verified. `POST /auth/login` returns 403 `{reason:"pending"|"rejected", note?}` for non-approved users; `Login.tsx` shows banner UX.
+- **Decision emails**: `PATCH /admin/approvals/:userId` + `PATCH /admin/kyc/:userId` fire a transactional email (approved / rejected / KYC verified / KYC rejected) via `lib/email.ts`. Fire-and-forget; failure never blocks the decision. Set `SENDGRID_API_KEY` (+ optional `EMAIL_FROM`) to enable delivery; without it the message is logged and `sendEmail` returns `{ok:false, reason:"not_configured"}`.
+- **KYC upload hardening** (`POST /me/kyc`): every submitted URL runs through `validateKycDocumentUrl` which (1) rejects anything not `/api/storage/objects/...` or `/objects/...`, (2) confirms the object exists in our private bucket via `getObjectEntityFile()`, (3) re-enforces `contentType ∈ {jpeg,png,webp}` and `size ≤ 10 MB` from GCS metadata (constants exported from `routes/storage.ts` as `ALLOWED_UPLOAD_MIME` / `MAX_UPLOAD_BYTES`). Validated docs are passed to `scanKycDocument` (`lib/kycScanner.ts`): ClamAV via `CLAMAV_HOST`+`CLAMAV_PORT`/`CLAMAV_SOCKET` when set (fail-closed; 503 if unreachable), with a local EICAR + magic-byte / MIME-mismatch heuristic always running first because clamd doesn't catch rename attacks. Infected uploads are moved to `quarantine/` via `objectStorageService.quarantineObjectEntity` and never referenced from the user row. Docs carry `scanStatus` / `scanCheckedAt` / `scanDetails`; the super-admin Approvals UI hides anything with `scanStatus !== 'clean'`. Scanner backend is pluggable (swap `getClam`/`scanStream` for VirusTotal/Cloudmersive without touching the route).
 
 ## User preferences
 
@@ -105,9 +123,9 @@ Connected automotive service platform that pairs vehicle owners with service cen
 
 - After editing `lib/db/src/schema.ts`, run `pnpm run typecheck:libs` once so other packages pick up new declarations.
 - After editing `lib/api-spec/openapi.yaml`, run `pnpm --filter @workspace/api-spec run codegen` before touching server routes or web hooks.
-- When adding a new `PlanLimits` field, you MUST: (1) extend the TS type + `DEFAULT_PLAN_LIMITS` in `lib/db/src/schema/subscriptionPlans.ts`, (2) extend `PlanLimits` in `lib/api-spec/openapi.yaml` and run codegen, (3) backfill every plan-seed `limits` object in `scripts/src/seedPlatform.ts`, and (4) update `EMPTY_LIMITS` + `LIMIT_LABEL` in `artifacts/autocare/src/pages/admin/Plans.tsx`. Skipping any of these breaks typecheck via the generated Zod schema.
-- Do not hand-edit files under `lib/api-client-react/src/generated/` — they are overwritten by codegen.
-- Conditional query hooks must include both `enabled` and `queryKey` in the `query` option, otherwise TypeScript will reject them.
+- Adding a new `PlanLimits` field requires four edits: (1) the TS type + `DEFAULT_PLAN_LIMITS` in `lib/db/src/schema/subscriptionPlans.ts`, (2) `PlanLimits` in `lib/api-spec/openapi.yaml` + codegen, (3) every plan-seed `limits` in `scripts/src/seedPlatform.ts`, (4) `EMPTY_LIMITS` + `LIMIT_LABEL` in `pages/admin/Plans.tsx`. Missing any breaks typecheck via the generated Zod schema.
+- Do not hand-edit files under `lib/api-client-react/src/generated/` — they're overwritten.
+- Conditional query hooks must include both `enabled` and `queryKey`, otherwise TS rejects them.
 
 ## Pointers
 
