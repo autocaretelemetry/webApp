@@ -89,6 +89,14 @@ export const AuthedUserNotificationChannelsItem = {
   whatsapp: 'whatsapp',
 } as const;
 
+export type AuthedUserPendingVerificationChannelsItem = typeof AuthedUserPendingVerificationChannelsItem[keyof typeof AuthedUserPendingVerificationChannelsItem];
+
+
+export const AuthedUserPendingVerificationChannelsItem = {
+  email: 'email',
+  whatsapp: 'whatsapp',
+} as const;
+
 export interface AuthedUser {
   id: string;
   email: string;
@@ -104,6 +112,64 @@ export interface AuthedUser {
   kycNote?: string | null;
   requestedRole?: string | null;
   notificationChannels?: AuthedUserNotificationChannelsItem[];
+  emailVerifiedAt?: string | null;
+  phoneVerifiedAt?: string | null;
+  pendingVerificationChannels?: AuthedUserPendingVerificationChannelsItem[];
+}
+
+export type VerifySignupCodeInputChannel = typeof VerifySignupCodeInputChannel[keyof typeof VerifySignupCodeInputChannel];
+
+
+export const VerifySignupCodeInputChannel = {
+  email: 'email',
+  whatsapp: 'whatsapp',
+} as const;
+
+export interface VerifySignupCodeInput {
+  userId: string;
+  channel: VerifySignupCodeInputChannel;
+  /**
+     * @minLength 4
+     * @maxLength 12
+     */
+  code: string;
+}
+
+export type ResendSignupVerificationInputChannel = typeof ResendSignupVerificationInputChannel[keyof typeof ResendSignupVerificationInputChannel];
+
+
+export const ResendSignupVerificationInputChannel = {
+  email: 'email',
+  whatsapp: 'whatsapp',
+} as const;
+
+export interface ResendSignupVerificationInput {
+  userId: string;
+  channel: ResendSignupVerificationInputChannel;
+}
+
+export type SignupVerificationStatusVerifiedChannelsItem = typeof SignupVerificationStatusVerifiedChannelsItem[keyof typeof SignupVerificationStatusVerifiedChannelsItem];
+
+
+export const SignupVerificationStatusVerifiedChannelsItem = {
+  email: 'email',
+  whatsapp: 'whatsapp',
+} as const;
+
+export type SignupVerificationStatusPendingChannelsItem = typeof SignupVerificationStatusPendingChannelsItem[keyof typeof SignupVerificationStatusPendingChannelsItem];
+
+
+export const SignupVerificationStatusPendingChannelsItem = {
+  email: 'email',
+  whatsapp: 'whatsapp',
+} as const;
+
+export interface SignupVerificationStatus {
+  userId: string;
+  verifiedChannels: SignupVerificationStatusVerifiedChannelsItem[];
+  pendingChannels: SignupVerificationStatusPendingChannelsItem[];
+  allVerified: boolean;
+  retryAfterSeconds?: number | null;
 }
 
 export interface KycDocument {

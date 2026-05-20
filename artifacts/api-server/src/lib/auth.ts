@@ -7,6 +7,7 @@ import {
 import type { Request, Response, NextFunction } from "express";
 import { eq } from "drizzle-orm";
 import { db, usersTable, type User } from "@workspace/db";
+import type { NotificationChannel, PendingVerifications } from "@workspace/db";
 
 const SCRYPT_KEYLEN = 64;
 const COOKIE_NAME = "autocare_session";
@@ -78,7 +79,37 @@ export function clearSessionCookie(res: Response): void {
   res.clearCookie(COOKIE_NAME, { path: "/" });
 }
 
-export type AuthedUser = Omit<User, "passwordHash">;
+/**
+ * Public-safe shape of a user row. We must strip both `passwordHash` AND
+ * `pendingVerifications` before sending the row to any client — the
+ * latter contains hashed verification codes that, given the tiny 6-digit
+ * search space and unsalted SHA-256, would be trivially recoverable
+ * offline and let an attacker complete signup verification without
+ * controlling the email or phone we sent the code to. We expose the
+ * derived `pendingVerificationChannels` list instead so the client knows
+ * what still needs verifying.
+ */
+export type AuthedUser = Omit<User, "passwordHash" | "pendingVerifications"> & {
+  pendingVerificationChannels: NotificationChannel[];
+};
+
+export function toAuthedUser(row: User): AuthedUser {
+  const {
+    passwordHash: _ph,
+    pendingVerifications,
+    ...rest
+  } = row;
+  const selected = (row.notificationChannels ?? ["email", "whatsapp"]) as
+    | NotificationChannel[]
+    | readonly NotificationChannel[];
+  const pendingChannels = (selected as NotificationChannel[]).filter((c) => {
+    const verifiedAt =
+      c === "email" ? row.emailVerifiedAt : row.phoneVerifiedAt;
+    return !verifiedAt;
+  });
+  void pendingVerifications;
+  return { ...rest, pendingVerificationChannels: pendingChannels };
+}
 
 declare global {
   namespace Express {
@@ -100,8 +131,7 @@ async function loadUser(req: Request): Promise<AuthedUser | null> {
     .from(usersTable)
     .where(eq(usersTable.id, payload.uid));
   if (!row || !row.active) return null;
-  const { passwordHash: _ph, ...safe } = row;
-  return safe;
+  return toAuthedUser(row);
 }
 
 export async function attachUser(

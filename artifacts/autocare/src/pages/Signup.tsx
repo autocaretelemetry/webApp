@@ -1,6 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { signup as signupApi } from "@workspace/api-client-react";
+import {
+  signup as signupApi,
+  verifySignupCode as verifySignupCodeApi,
+  resendSignupVerification as resendSignupVerificationApi,
+  ApiError,
+} from "@workspace/api-client-react";
+import type {
+  AuthedUser,
+  SignupVerificationStatus,
+  VerifySignupCodeInputChannel,
+} from "@workspace/api-client-react";
 import {
   Wrench,
   UserPlus,
@@ -81,6 +91,11 @@ export default function SignupPage() {
   const [form, setForm] = useState<FormState>(EMPTY);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [verification, setVerification] = useState<{
+    userId: string;
+    pending: VerifySignupCodeInputChannel[];
+    verified: VerifySignupCodeInputChannel[];
+  } | null>(null);
   const [channels, setChannels] = useState<NotifChannel[]>(() => [
     ...NOTIFICATION_CHANNELS,
   ]);
@@ -138,7 +153,7 @@ export default function SignupPage() {
     }
     setSubmitting(true);
     try {
-      await signupApi({
+      const created = (await signupApi({
         name: form.name.trim(),
         email: form.email.trim(),
         password: form.password,
@@ -146,8 +161,25 @@ export default function SignupPage() {
         requestedRole: role,
         applicantData,
         notificationChannels: channels,
-      });
-      setSubmitted(true);
+      })) as AuthedUser;
+      const pendingFromServer =
+        (created.pendingVerificationChannels ?? []) as VerifySignupCodeInputChannel[];
+      // Server tells us exactly which channels need a code. If both came
+      // back already verified (e.g. user has no phone and only picked
+      // email and somehow it pre-verified — defensive fallback), skip
+      // straight to the success screen.
+      if (pendingFromServer.length === 0) {
+        setSubmitted(true);
+      } else {
+        setVerification({
+          userId: created.id,
+          pending: pendingFromServer,
+          verified: channels.filter(
+            (c) =>
+              !pendingFromServer.includes(c as VerifySignupCodeInputChannel),
+          ) as VerifySignupCodeInputChannel[],
+        });
+      }
     } catch (err) {
       const msg =
         err instanceof Error && err.message
@@ -161,6 +193,24 @@ export default function SignupPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (verification) {
+    return (
+      <Shell>
+        <VerificationStep
+          state={verification}
+          contactFor={(c) =>
+            c === "email" ? form.email.trim() : form.phone.trim()
+          }
+          onAllVerified={() => {
+            setVerification(null);
+            setSubmitted(true);
+          }}
+          onUpdate={(next) => setVerification(next)}
+        />
+      </Shell>
+    );
   }
 
   if (submitted) {
@@ -366,6 +416,210 @@ export default function SignupPage() {
         </CardContent>
       </Card>
     </Shell>
+  );
+}
+
+function VerificationStep({
+  state,
+  contactFor,
+  onAllVerified,
+  onUpdate,
+}: {
+  state: {
+    userId: string;
+    pending: VerifySignupCodeInputChannel[];
+    verified: VerifySignupCodeInputChannel[];
+  };
+  contactFor: (channel: VerifySignupCodeInputChannel) => string;
+  onAllVerified: () => void;
+  onUpdate: (
+    next: {
+      userId: string;
+      pending: VerifySignupCodeInputChannel[];
+      verified: VerifySignupCodeInputChannel[];
+    },
+  ) => void;
+}) {
+  return (
+    <Card className="max-w-xl mx-auto">
+      <CardHeader>
+        <CardTitle className="text-2xl flex items-center gap-2">
+          <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+          Confirm your contact details
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-5 text-sm">
+        <p className="text-muted-foreground">
+          We sent a 6-digit code to each channel you ticked. Enter the codes
+          below so we know how to reach you with your application result.
+        </p>
+        {state.verified.length > 0 && (
+          <div className="rounded-md border border-emerald-200 bg-emerald-50 text-emerald-900 px-3 py-2 text-xs">
+            Verified: {state.verified.map(channelLabel).join(", ")}
+          </div>
+        )}
+        {state.pending.map((channel) => (
+          <ChannelVerifier
+            key={channel}
+            userId={state.userId}
+            channel={channel}
+            recipient={contactFor(channel)}
+            onVerified={() => {
+              const nextPending = state.pending.filter((c) => c !== channel);
+              const nextVerified = [...state.verified, channel];
+              if (nextPending.length === 0) {
+                onAllVerified();
+              } else {
+                onUpdate({
+                  userId: state.userId,
+                  pending: nextPending,
+                  verified: nextVerified,
+                });
+              }
+            }}
+          />
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function channelLabel(c: VerifySignupCodeInputChannel): string {
+  return c === "email" ? "Email" : "WhatsApp";
+}
+
+function ChannelVerifier({
+  userId,
+  channel,
+  recipient,
+  onVerified,
+}: {
+  userId: string;
+  channel: VerifySignupCodeInputChannel;
+  recipient: string;
+  onVerified: () => void;
+}) {
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Track the resend cooldown locally. The server is the source of truth
+  // (it returns retryAfterSeconds and 429 on repeat), but a ticking
+  // countdown makes the UX obvious. Initial value matches the server-side
+  // cooldown so the freshly-issued signup code can't be re-requested for
+  // 60s after the page loads.
+  const [cooldown, setCooldown] = useState(60);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = window.setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => window.clearTimeout(t);
+  }, [cooldown]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    const clean = code.trim();
+    if (clean.length < 4) {
+      setError("Enter the code we sent you.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const result = (await verifySignupCodeApi({
+        userId,
+        channel,
+        code: clean,
+      })) as SignupVerificationStatus;
+      if (
+        result.verifiedChannels.includes(
+          channel as unknown as SignupVerificationStatus["verifiedChannels"][number],
+        )
+      ) {
+        onVerified();
+      } else {
+        setError("That code didn't match. Please try again.");
+      }
+    } catch (err) {
+      const msg =
+        err instanceof ApiError && err.data && typeof err.data === "object"
+          ? (err.data as { error?: string }).error
+          : err instanceof Error
+            ? err.message
+            : null;
+      setError(msg || "Could not verify that code.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resend() {
+    if (busy || cooldown > 0) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = (await resendSignupVerificationApi({
+        userId,
+        channel,
+      })) as SignupVerificationStatus & { retryAfterSeconds?: number | null };
+      setCooldown(result.retryAfterSeconds ?? 60);
+      toast.success(`New code sent to your ${channelLabel(channel).toLowerCase()}.`);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 429) {
+        const data = (err.data as { retryAfterSeconds?: number } | null) ?? null;
+        const wait = data?.retryAfterSeconds ?? 60;
+        setCooldown(wait);
+        setError(`Please wait ${wait}s before requesting another code.`);
+      } else {
+        const msg =
+          err instanceof ApiError && err.data && typeof err.data === "object"
+            ? (err.data as { error?: string }).error
+            : err instanceof Error
+              ? err.message
+              : null;
+        setError(msg || "Could not resend that code.");
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-2 rounded-md border bg-card p-4">
+      <div className="flex items-baseline justify-between">
+        <div className="font-medium">{channelLabel(channel)}</div>
+        <div className="text-xs text-muted-foreground truncate ml-3 max-w-[60%]">
+          {recipient}
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Input
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={8}
+          placeholder="123456"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          aria-label={`${channelLabel(channel)} verification code`}
+        />
+        <Button type="submit" disabled={busy}>
+          {busy ? "Checking…" : "Verify"}
+        </Button>
+      </div>
+      <div className="flex items-center justify-between text-xs">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-auto px-1 py-0.5 text-xs"
+          disabled={busy || cooldown > 0}
+          onClick={resend}
+        >
+          {cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code"}
+        </Button>
+        {error && <span className="text-destructive">{error}</span>}
+      </div>
+    </form>
   );
 }
 

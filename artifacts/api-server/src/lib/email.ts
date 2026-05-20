@@ -72,6 +72,20 @@ function notePara(note: string | null | undefined): { text: string; html: string
   };
 }
 
+export function signupVerificationEmail(
+  name: string,
+  code: string,
+  expiresMinutes: number,
+): Omit<EmailMessage, "to"> {
+  return {
+    subject: `Your AutoCare verification code: ${code}`,
+    text: `Hi ${name},\n\nEnter this code on the signup page to confirm your email address:\n\n    ${code}\n\nThe code expires in ${expiresMinutes} minutes. If you didn't apply for an AutoCare account, you can ignore this message.\n\n— The AutoCare team`,
+    html: wrap(
+      `<h2 style="margin:0 0 16px;">Confirm your email</h2><p>Hi ${escape(name)},</p><p>Enter this code on the signup page to confirm your email address:</p><p style="font-size:28px;font-weight:700;letter-spacing:6px;margin:24px 0;padding:16px;background:#f3f4f6;border-radius:8px;text-align:center;">${escape(code)}</p><p style="color:#6b7280;font-size:13px;">The code expires in ${expiresMinutes} minutes. If you didn't apply for an AutoCare account, you can ignore this message.</p>`,
+    ),
+  };
+}
+
 export function applicationApprovedEmail(
   name: string,
   note: string | null | undefined,

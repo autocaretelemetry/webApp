@@ -102,6 +102,7 @@ import type {
   RentalIncident,
   RenterProfile,
   RenterProfileSummary,
+  ResendSignupVerificationInput,
   Retainer,
   RetainerPlan,
   RevenueOverview,
@@ -109,6 +110,7 @@ import type {
   ServiceRecord,
   ServiceType,
   SignupInput,
+  SignupVerificationStatus,
   StorageError,
   Subscription,
   SubscriptionPlan,
@@ -141,7 +143,8 @@ import type {
   Vehicle,
   Vendor,
   VendorDashboard,
-  VendorStaff
+  VendorStaff,
+  VerifySignupCodeInput
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -8885,6 +8888,148 @@ export const useSignup = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getSignupMutationOptions(options));
+    }
+
+export const getVerifySignupCodeUrl = () => {
+
+
+
+
+  return `/api/auth/signup/verify`
+}
+
+/**
+ * @summary Verify the one-time code we sent to a signup contact channel
+ */
+export const verifySignupCode = async (verifySignupCodeInput: VerifySignupCodeInput, options?: RequestInit): Promise<SignupVerificationStatus> => {
+
+  return customFetch<SignupVerificationStatus>(getVerifySignupCodeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      verifySignupCodeInput,)
+  }
+);}
+
+
+
+
+export const getVerifySignupCodeMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifySignupCode>>, TError,{data: BodyType<VerifySignupCodeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof verifySignupCode>>, TError,{data: BodyType<VerifySignupCodeInput>}, TContext> => {
+
+const mutationKey = ['verifySignupCode'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof verifySignupCode>>, {data: BodyType<VerifySignupCodeInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  verifySignupCode(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VerifySignupCodeMutationResult = NonNullable<Awaited<ReturnType<typeof verifySignupCode>>>
+    export type VerifySignupCodeMutationBody = BodyType<VerifySignupCodeInput>
+    export type VerifySignupCodeMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Verify the one-time code we sent to a signup contact channel
+ */
+export const useVerifySignupCode = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifySignupCode>>, TError,{data: BodyType<VerifySignupCodeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof verifySignupCode>>,
+        TError,
+        {data: BodyType<VerifySignupCodeInput>},
+        TContext
+      > => {
+      return useMutation(getVerifySignupCodeMutationOptions(options));
+    }
+
+export const getResendSignupVerificationUrl = () => {
+
+
+
+
+  return `/api/auth/signup/resend-verification`
+}
+
+/**
+ * @summary Resend the one-time code for a signup contact channel
+ */
+export const resendSignupVerification = async (resendSignupVerificationInput: ResendSignupVerificationInput, options?: RequestInit): Promise<SignupVerificationStatus> => {
+
+  return customFetch<SignupVerificationStatus>(getResendSignupVerificationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      resendSignupVerificationInput,)
+  }
+);}
+
+
+
+
+export const getResendSignupVerificationMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resendSignupVerification>>, TError,{data: BodyType<ResendSignupVerificationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resendSignupVerification>>, TError,{data: BodyType<ResendSignupVerificationInput>}, TContext> => {
+
+const mutationKey = ['resendSignupVerification'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resendSignupVerification>>, {data: BodyType<ResendSignupVerificationInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  resendSignupVerification(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResendSignupVerificationMutationResult = NonNullable<Awaited<ReturnType<typeof resendSignupVerification>>>
+    export type ResendSignupVerificationMutationBody = BodyType<ResendSignupVerificationInput>
+    export type ResendSignupVerificationMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Resend the one-time code for a signup contact channel
+ */
+export const useResendSignupVerification = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resendSignupVerification>>, TError,{data: BodyType<ResendSignupVerificationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resendSignupVerification>>,
+        TError,
+        {data: BodyType<ResendSignupVerificationInput>},
+        TContext
+      > => {
+      return useMutation(getResendSignupVerificationMutationOptions(options));
     }
 
 export const getLogoutUrl = () => {

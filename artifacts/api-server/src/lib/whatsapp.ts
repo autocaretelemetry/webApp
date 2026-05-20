@@ -63,6 +63,14 @@ function noteLine(note: string | null | undefined): string {
   return `\n\nReviewer note: ${note.trim()}`;
 }
 
+export function signupVerificationWhatsApp(
+  name: string,
+  code: string,
+  expiresMinutes: number,
+): string {
+  return `Hi ${name}, your AutoCare verification code is ${code}. It expires in ${expiresMinutes} minutes. Enter it on the signup page to confirm this WhatsApp number. If you didn't apply for an AutoCare account, you can ignore this message.`;
+}
+
 export function applicationApprovedWhatsApp(
   name: string,
   note: string | null | undefined,

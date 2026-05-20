@@ -1914,6 +1914,63 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /auth/signup/verify:
+    post:
+      operationId: verifySignupCode
+      tags: [auth]
+      summary: Verify the one-time code we sent to a signup contact channel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VerifySignupCodeInput" }
+      responses:
+        "200":
+          description: Channel verified
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SignupVerificationStatus" }
+        "400":
+          description: Invalid or expired code
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /auth/signup/resend-verification:
+    post:
+      operationId: resendSignupVerification
+      tags: [auth]
+      summary: Resend the one-time code for a signup contact channel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResendSignupVerificationInput" }
+      responses:
+        "200":
+          description: Code resent
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SignupVerificationStatus" }
+        "400":
+          description: Channel not pending verification
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "429":
+          description: Resend cooldown not elapsed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /auth/logout:
     post:
       operationId: logout
@@ -2195,6 +2252,40 @@ components:
         notificationChannels:
           type: array
           items: { type: string, enum: [email, whatsapp] }
+        emailVerifiedAt: { type: string, format: date-time, nullable: true }
+        phoneVerifiedAt: { type: string, format: date-time, nullable: true }
+        pendingVerificationChannels:
+          type: array
+          items: { type: string, enum: [email, whatsapp] }
+
+    VerifySignupCodeInput:
+      type: object
+      required: [userId, channel, code]
+      properties:
+        userId: { type: string }
+        channel: { type: string, enum: [email, whatsapp] }
+        code: { type: string, minLength: 4, maxLength: 12 }
+
+    ResendSignupVerificationInput:
+      type: object
+      required: [userId, channel]
+      properties:
+        userId: { type: string }
+        channel: { type: string, enum: [email, whatsapp] }
+
+    SignupVerificationStatus:
+      type: object
+      required: [userId, verifiedChannels, pendingChannels, allVerified]
+      properties:
+        userId: { type: string }
+        verifiedChannels:
+          type: array
+          items: { type: string, enum: [email, whatsapp] }
+        pendingChannels:
+          type: array
+          items: { type: string, enum: [email, whatsapp] }
+        allVerified: { type: boolean }
+        retryAfterSeconds: { type: integer, nullable: true }
 
     KycDocument:
       type: object

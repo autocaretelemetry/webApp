@@ -107,6 +107,8 @@ async function main() {
         // self-signup / KYC funnel entirely.
         approvalStatus: "approved",
         kycStatus: "verified",
+        emailVerifiedAt: new Date(),
+        phoneVerifiedAt: new Date(),
       })
       .onConflictDoUpdate({
         target: usersTable.email,
@@ -118,6 +120,8 @@ async function main() {
           active: true,
           approvalStatus: "approved",
           kycStatus: "verified",
+          emailVerifiedAt: new Date(),
+          phoneVerifiedAt: new Date(),
         },
       });
     console.log(`Seeded ${s.role} -> ${s.email}`);

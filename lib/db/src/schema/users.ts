@@ -83,9 +83,34 @@ export const usersTable = pgTable("users", {
   // one-resend-per-minute cooldown survives API restarts and is honoured
   // across multiple server instances.
   lastResendEmailAt: timestamp("last_resend_email_at", { withTimezone: true }),
+  // Per-channel contact verification — set when the applicant proves they
+  // own the address by entering the one-time code we sent them at signup.
+  // Used by `fireDecisionNotifications` to skip channels we never confirmed
+  // so the four pre-sign-in decision notices don't silently bounce or land
+  // in a stranger's inbox. Legacy/seeded rows are backfilled (see
+  // `scripts/src/seedUsers.ts`) so existing behaviour is unchanged.
+  emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
+  phoneVerifiedAt: timestamp("phone_verified_at", { withTimezone: true }),
+  // Pending verification codes per channel. Stored as hashes — the
+  // plaintext code is only ever in the email/WhatsApp body. Each entry
+  // carries `expiresAt` (codes are short-lived), `lastSentAt` (drives the
+  // resend cooldown), and `attempts` (caps brute-force tries before the
+  // applicant must request a fresh code).
+  pendingVerifications: jsonb("pending_verifications").$type<PendingVerifications>(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
 });
+
+export type PendingVerificationEntry = {
+  codeHash: string;
+  expiresAt: string;
+  lastSentAt: string;
+  attempts: number;
+};
+
+export type PendingVerifications = Partial<
+  Record<NotificationChannel, PendingVerificationEntry>
+>;
 
 export type User = typeof usersTable.$inferSelect;

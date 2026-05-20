@@ -15,7 +15,7 @@ import {
   type EventChannelEntry,
   type KycDocument,
 } from "@workspace/db";
-import { requireAuth, requireSuperAdmin } from "../lib/auth";
+import { requireAuth, requireSuperAdmin, toAuthedUser } from "../lib/auth";
 import {
   sendEmail,
   applicationApprovedEmail,
@@ -60,24 +60,29 @@ function fireWhatsApp(to: string | null | undefined, body: string): void {
  * fire-and-forget; this is a recording of intent at decision time.
  */
 function buildChannelEntries(user: DecisionUser): EventChannelEntry[] {
+  const list = user.notificationChannels;
+  const wantsEmail = !list || list.length === 0 || list.includes("email");
+  const wantsWhatsapp = !list || list.length === 0 || list.includes("whatsapp");
   const entries: EventChannelEntry[] = [];
-  if (wantsChannel(user, "email")) {
-    entries.push(
-      user.email
-        ? { channel: "email", status: "sent" }
-        : { channel: "email", status: "skipped", reason: "no_address" },
-    );
-  } else {
+  if (!wantsEmail) {
     entries.push({ channel: "email", status: "skipped", reason: "opted_out" });
-  }
-  if (wantsChannel(user, "whatsapp")) {
-    entries.push(
-      user.phone
-        ? { channel: "whatsapp", status: "sent" }
-        : { channel: "whatsapp", status: "skipped", reason: "no_phone" },
-    );
+  } else if (!user.email) {
+    entries.push({ channel: "email", status: "skipped", reason: "no_address" });
+  } else if (!user.emailVerifiedAt) {
+    // Signup-time channel verification was never completed for this
+    // address, so we never actually fire the notification.
+    entries.push({ channel: "email", status: "skipped", reason: "no_address" });
   } else {
+    entries.push({ channel: "email", status: "sent" });
+  }
+  if (!wantsWhatsapp) {
     entries.push({ channel: "whatsapp", status: "skipped", reason: "opted_out" });
+  } else if (!user.phone) {
+    entries.push({ channel: "whatsapp", status: "skipped", reason: "no_phone" });
+  } else if (!user.phoneVerifiedAt) {
+    entries.push({ channel: "whatsapp", status: "skipped", reason: "no_phone" });
+  } else {
+    entries.push({ channel: "whatsapp", status: "sent" });
   }
   return entries;
 }
@@ -92,6 +97,8 @@ type DecisionUser = {
   approvalNote: string | null;
   kycNote: string | null;
   notificationChannels?: readonly string[] | null;
+  emailVerifiedAt?: Date | null;
+  phoneVerifiedAt?: Date | null;
 };
 
 function wantsChannel(
@@ -101,8 +108,16 @@ function wantsChannel(
   // Default to delivering on every channel when the field is missing/empty so
   // grandfathered users keep getting notified until they explicitly opt out.
   const list = user.notificationChannels;
-  if (!list || list.length === 0) return true;
-  return list.includes(channel);
+  if (list && list.length > 0 && !list.includes(channel)) return false;
+  // Contact verification gate: only deliver on a channel the applicant
+  // proved they own at signup. Legacy/grandfathered rows have the
+  // verifiedAt columns backfilled (see seedUsers + backfill SQL) so the
+  // existing demo flow keeps working. New applicants whose codes haven't
+  // been entered yet have null timestamps — fireDecisionNotifications
+  // silently skips those channels until they verify.
+  const verifiedAt =
+    channel === "email" ? user.emailVerifiedAt : user.phoneVerifiedAt;
+  return Boolean(verifiedAt);
 }
 
 function fireDecisionNotifications(
@@ -424,7 +439,7 @@ router.post("/me/kyc", requireAuth, async (req, res): Promise<void> => {
     actorUserId: row.id,
     actorName: row.name,
   });
-  const { passwordHash: _ph, ...safe } = row;
+  const safe = toAuthedUser(row);
   res.json(safe);
 });
 
@@ -612,7 +627,7 @@ router.get("/admin/approvals", requireSuperAdmin, async (req, res): Promise<void
 
   res.json({
     items: page.map((r) => {
-      const { passwordHash: _ph, ...safe } = r;
+      const safe = toAuthedUser(r);
       return safe;
     }),
     nextCursor,
@@ -666,7 +681,7 @@ router.patch(
         note: parsed.data.note ?? null,
         channels: rejectedChannels,
       });
-      const { passwordHash: _ph, ...safe } = row!;
+      const safe = toAuthedUser(row!);
       fireDecisionNotifications("rejected", row!);
       res.json(safe);
       return;
@@ -715,7 +730,7 @@ router.patch(
       }
       throw err;
     }
-    const { passwordHash: _ph, ...safe } = updated!;
+    const safe = toAuthedUser(updated!);
     fireDecisionNotifications("approved", updated!);
     res.json(safe);
   },
@@ -867,7 +882,7 @@ router.patch(
       note: parsed.data.note ?? null,
       channels: buildChannelEntries(row!),
     });
-    const { passwordHash: _ph, ...safe } = row!;
+    const safe = toAuthedUser(row!);
     fireDecisionNotifications(
       parsed.data.decision === "verify" ? "kyc_verified" : "kyc_rejected",
       row!,

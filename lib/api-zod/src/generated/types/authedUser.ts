@@ -8,6 +8,7 @@
 import type { AuthedUserApprovalStatus } from './authedUserApprovalStatus';
 import type { AuthedUserKycStatus } from './authedUserKycStatus';
 import type { AuthedUserNotificationChannelsItem } from './authedUserNotificationChannelsItem';
+import type { AuthedUserPendingVerificationChannelsItem } from './authedUserPendingVerificationChannelsItem';
 import type { AuthedUserRole } from './authedUserRole';
 
 export interface AuthedUser {
@@ -25,4 +26,7 @@ export interface AuthedUser {
   kycNote?: string | null;
   requestedRole?: string | null;
   notificationChannels?: AuthedUserNotificationChannelsItem[];
+  emailVerifiedAt?: Date | null;
+  phoneVerifiedAt?: Date | null;
+  pendingVerificationChannels?: AuthedUserPendingVerificationChannelsItem[];
 }
