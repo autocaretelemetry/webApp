@@ -54,31 +54,66 @@ export default function SharedCar() {
     },
   });
 
-  const cta = useMemo(() => {
+  // Build the call-to-action based on auth state. The share link is
+  // public, so visitors fall into one of four buckets:
+  //   1. Anonymous — offer sign-in OR create-renter-account, both
+  //      with `?next=` so they land back on the booking page.
+  //   2. Signed-in but not a renter (e.g. owner / center / vendor) —
+  //      prompt to switch role; we don't auto-create a renter
+  //      profile for them.
+  //   3. Renter, KYC incomplete — send to the renter profile page
+  //      with `?next=` back to booking.
+  //   4. Renter, KYC ready — straight to booking.
+  const cta = useMemo<{
+    label: string;
+    href: string;
+    helper: string;
+    secondary?: { label: string; href: string };
+    disabled?: boolean;
+  } | null>(() => {
     if (!car) return null;
     const bookingHref = `/rentals/${car.id}`;
-    if (!hasProfile || !renter) {
+    const nextParam = encodeURIComponent(bookingHref);
+
+    // 1. Anonymous visitor.
+    if (!user) {
       return {
-        label: "Sign up & complete KYC to book",
-        href: `/rentals/profile?next=${encodeURIComponent(bookingHref)}`,
+        label: "Create a renter account",
+        href: `/signup?role=renter&next=${nextParam}`,
+        secondary: { label: "Sign in", href: `/login?next=${nextParam}` },
         helper:
-          "We'll set up your renter profile and KYC, then bring you straight back to book this car.",
+          "New here? Apply as a renter — usually a few hours to approve. Already have an AutoCare account? Sign in instead.",
       };
     }
-    if (!isProfileReadyForBooking(renter)) {
+
+    // 2. Signed in but not as a renter.
+    if (user.role !== "renter") {
+      return {
+        label: "Switch to renter to book",
+        href: "/", // home — they can flip role from the top bar
+        helper:
+          "You're signed in as a different role. Switch to the renter experience to book this car.",
+        disabled: true,
+      };
+    }
+
+    // 3. Renter, profile/KYC incomplete.
+    if (!hasProfile || !renter || !isProfileReadyForBooking(renter)) {
       return {
         label: "Finish KYC to book",
-        href: `/rentals/profile?next=${encodeURIComponent(bookingHref)}`,
+        href: `/rentals/profile?next=${nextParam}`,
         helper:
           "Add your driver's licence and ID document — usually under a minute — and we'll bring you back here.",
       };
     }
+
+    // 4. Renter, ready to book.
     return {
       label: "Book this car",
       href: bookingHref,
       helper: `You're booking as ${renter.name}. The owner will review and confirm.`,
     };
-  }, [car, renter, hasProfile]);
+  }, [car, user, renter, hasProfile]);
 
   const copyLink = async () => {
     try {
@@ -187,11 +222,24 @@ export default function SharedCar() {
                     </p>
                   </div>
 
-                  <Link href={cta.href}>
-                    <Button className="w-full gap-2" size="lg">
-                      {cta.label} <ArrowRight className="h-4 w-4" />
+                  {cta.disabled ? (
+                    <Button className="w-full gap-2" size="lg" disabled>
+                      {cta.label}
                     </Button>
-                  </Link>
+                  ) : (
+                    <Link href={cta.href}>
+                      <Button className="w-full gap-2" size="lg">
+                        {cta.label} <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                  )}
+                  {cta.secondary && (
+                    <Link href={cta.secondary.href}>
+                      <Button className="w-full" size="lg" variant="outline">
+                        {cta.secondary.label}
+                      </Button>
+                    </Link>
+                  )}
                   <p className="text-xs text-muted-foreground text-center">{cta.helper}</p>
 
                   <div className="rounded-md border bg-muted/40 p-3 space-y-2">

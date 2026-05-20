@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, useLocation } from "wouter";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useSearch } from "wouter";
 import {
   signup as signupApi,
   verifySignupCode as verifySignupCodeApi,
@@ -87,7 +87,19 @@ const EMPTY: FormState = {
 
 export default function SignupPage() {
   const [, setLocation] = useLocation();
-  const [role, setRole] = useState<RoleKey | null>(null);
+  // Allow the page to be deep-linked with a pre-selected role,
+  // e.g. the share-link "Create a renter account" CTA points at
+  // `/signup?role=renter`. (We don't honour `?next=` here — applicants
+  // must wait for super-admin approval before they can use the
+  // destination, so we drop the user on the standard "application
+  // submitted" screen.)
+  const search = useSearch();
+  const initialRole = useMemo<RoleKey | null>(() => {
+    const raw = new URLSearchParams(search).get("role");
+    if (!raw) return null;
+    return ROLES.find((r) => r.key === raw)?.key ?? null;
+  }, [search]);
+  const [role, setRole] = useState<RoleKey | null>(initialRole);
   const [form, setForm] = useState<FormState>(EMPTY);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);

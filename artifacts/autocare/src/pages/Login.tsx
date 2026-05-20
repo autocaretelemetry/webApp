@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Link, useLocation } from "wouter";
+import { useState, useEffect, useMemo } from "react";
+import { Link, useLocation, useSearch } from "wouter";
 import { Wrench, LogIn, KeyRound, Clock, XCircle, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,22 @@ const DEMO = [
 export default function Login() {
   const { user, login, loading } = useAuth();
   const [, navigate] = useLocation();
+  const search = useSearch();
+  // Honour `?next=` so flows like the public share link can bring the
+  // user back to the page they were trying to reach (e.g. the booking
+  // page for a specific car) after a successful sign-in. Defaults to
+  // the home route.
+  const nextHref = useMemo(() => {
+    const raw = new URLSearchParams(search).get("next");
+    // Only accept same-app relative paths — never an absolute URL —
+    // so a malicious share link can't redirect the user off-platform.
+    if (raw && raw.startsWith("/") && !raw.startsWith("//")) return raw;
+    return "/";
+  }, [search]);
+  const signupHref = useMemo(
+    () => (nextHref === "/" ? "/signup" : `/signup?next=${encodeURIComponent(nextHref)}`),
+    [nextHref],
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -35,8 +51,8 @@ export default function Login() {
   >(null);
 
   useEffect(() => {
-    if (!loading && user) navigate("/", { replace: true });
-  }, [loading, user, navigate]);
+    if (!loading && user) navigate(nextHref, { replace: true });
+  }, [loading, user, navigate, nextHref]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -49,7 +65,7 @@ export default function Login() {
     try {
       await login(email.trim(), password);
       toast.success("Welcome back");
-      navigate("/", { replace: true });
+      navigate(nextHref, { replace: true });
     } catch (err) {
       const data =
         err instanceof ApiError && err.data && typeof err.data === "object"
@@ -151,7 +167,7 @@ export default function Login() {
               <div className="text-xs text-muted-foreground text-center space-y-1">
                 <p>
                   New to AutoCare?{" "}
-                  <Link href="/signup" className="text-primary font-medium hover:underline inline-flex items-center gap-1">
+                  <Link href={signupHref} className="text-primary font-medium hover:underline inline-flex items-center gap-1">
                     <UserPlus className="h-3 w-3" /> Apply for access
                   </Link>
                 </p>
