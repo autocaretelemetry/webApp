@@ -78,6 +78,11 @@ export const usersTable = pgTable("users", {
   // resend) and how many times it has been sent in total.
   lastDecisionEmailAt: timestamp("last_decision_email_at", { withTimezone: true }),
   decisionEmailCount: integer("decision_email_count").notNull().default(0),
+  // Timestamp of the last super-admin "resend decision email" action for
+  // this user. Persisted (rather than held in a process-local Map) so the
+  // one-resend-per-minute cooldown survives API restarts and is honoured
+  // across multiple server instances.
+  lastResendEmailAt: timestamp("last_resend_email_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

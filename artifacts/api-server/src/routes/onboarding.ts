@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { and, asc, count, desc, eq, gt, ilike, inArray, lt, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, ilike, inArray, isNull, lt, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import {
   db,
@@ -680,7 +680,6 @@ router.patch(
 );
 
 const RESEND_COOLDOWN_MS = 60_000;
-const lastResendAt = new Map<string, number>();
 
 type ResendKind = "approved" | "rejected" | "kyc_verified" | "kyc_rejected";
 
@@ -724,9 +723,11 @@ router.post(
       return;
     }
     const now = Date.now();
-    const prev = lastResendAt.get(userId);
-    if (prev && now - prev < RESEND_COOLDOWN_MS) {
-      const retryAfter = Math.ceil((RESEND_COOLDOWN_MS - (now - prev)) / 1000);
+    const prev = target.lastResendEmailAt;
+    if (prev && now - prev.getTime() < RESEND_COOLDOWN_MS) {
+      const retryAfter = Math.ceil(
+        (RESEND_COOLDOWN_MS - (now - prev.getTime())) / 1000,
+      );
       res.setHeader("Retry-After", String(retryAfter));
       res.status(429).json({
         error: `Please wait ${retryAfter}s before resending.`,
@@ -734,7 +735,42 @@ router.post(
       });
       return;
     }
-    lastResendAt.set(userId, now);
+    // Reserve the cooldown slot BEFORE sending. Using a conditional update
+    // means two concurrent resend clicks race for the same row — only one
+    // passes the `lastResendEmailAt IS NULL OR < cutoff` guard, the other
+    // sees zero rows updated and gets a 429. This makes the limit safe
+    // across multiple API instances, not just a single process.
+    const cutoff = new Date(now - RESEND_COOLDOWN_MS);
+    const reserved = await db
+      .update(usersTable)
+      .set({ lastResendEmailAt: new Date(now) })
+      .where(
+        and(
+          eq(usersTable.id, userId),
+          or(
+            isNull(usersTable.lastResendEmailAt),
+            lt(usersTable.lastResendEmailAt, cutoff),
+          )!,
+        ),
+      )
+      .returning({ id: usersTable.id });
+    if (reserved.length === 0) {
+      const [fresh] = await db
+        .select({ lastResendEmailAt: usersTable.lastResendEmailAt })
+        .from(usersTable)
+        .where(eq(usersTable.id, userId));
+      const prevMs = fresh?.lastResendEmailAt?.getTime() ?? now;
+      const retryAfter = Math.max(
+        1,
+        Math.ceil((RESEND_COOLDOWN_MS - (now - prevMs)) / 1000),
+      );
+      res.setHeader("Retry-After", String(retryAfter));
+      res.status(429).json({
+        error: `Please wait ${retryAfter}s before resending.`,
+        retryAfter,
+      });
+      return;
+    }
     void recordDecisionEmailDispatch(userId);
     const msg =
       kind === "approved"
