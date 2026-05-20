@@ -1,25 +1,33 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import request from "supertest";
-import { inArray, eq } from "drizzle-orm";
-import { db, usersTable, notificationsTable } from "@workspace/db";
+import { inArray, eq, desc } from "drizzle-orm";
+import { db, usersTable, notificationsTable, reminderRunsTable } from "@workspace/db";
 import app from "../app";
 import { hashPassword } from "../lib/auth";
+import { runReminderJob } from "../lib/reminders";
 
 const TAG = "task61-notif";
 const USER_A_EMAIL = `${TAG}-a@autocare.test`;
 const USER_B_EMAIL = `${TAG}-b@autocare.test`;
 const USER_A_PHONE = `+99900061001`;
 const USER_B_PHONE = `+99900061002`;
+const ADMIN_EMAIL = `${TAG}-admin@autocare.test`;
+const ADMIN_PHONE = `+99900061003`;
 const PASSWORD = "test-password-1234";
 
-async function seedUser(email: string, phone: string, name: string) {
+async function seedUser(
+  email: string,
+  phone: string,
+  name: string,
+  role: "owner" | "admin" = "owner",
+) {
   const [row] = await db
     .insert(usersTable)
     .values({
       email: email.toLowerCase(),
       passwordHash: hashPassword(PASSWORD),
       name,
-      role: "owner",
+      role,
       phone,
       active: true,
       approvalStatus: "approved",
@@ -61,6 +69,7 @@ async function loginCookie(email: string): Promise<string> {
 let notifAId: string;
 let notifBId: string;
 let cookieA: string;
+let cookieAdmin: string;
 
 async function cleanup() {
   await db
@@ -68,16 +77,18 @@ async function cleanup() {
     .where(inArray(notificationsTable.ownerPhone, [USER_A_PHONE, USER_B_PHONE]));
   await db
     .delete(usersTable)
-    .where(inArray(usersTable.email, [USER_A_EMAIL, USER_B_EMAIL]));
+    .where(inArray(usersTable.email, [USER_A_EMAIL, USER_B_EMAIL, ADMIN_EMAIL]));
 }
 
 beforeAll(async () => {
   await cleanup();
   await seedUser(USER_A_EMAIL, USER_A_PHONE, "User A");
   await seedUser(USER_B_EMAIL, USER_B_PHONE, "User B");
+  await seedUser(ADMIN_EMAIL, ADMIN_PHONE, "Admin", "admin");
   notifAId = (await seedNotification(USER_A_PHONE, `${TAG}-a-1`)).id;
   notifBId = (await seedNotification(USER_B_PHONE, `${TAG}-b-1`)).id;
   cookieA = await loginCookie(USER_A_EMAIL);
+  cookieAdmin = await loginCookie(ADMIN_EMAIL);
 });
 
 afterAll(async () => {
@@ -138,6 +149,21 @@ describe("Notifications access isolation", () => {
     expect(res.status).toBe(403);
   });
 
+  it("403s on GET /notifications/reminder-runs for non-admin", async () => {
+    const res = await request(app)
+      .get(`/api/notifications/reminder-runs`)
+      .set("Cookie", cookieA);
+    expect(res.status).toBe(403);
+  });
+
+  it("200s on GET /notifications/reminder-runs for admin and returns rows", async () => {
+    const res = await request(app)
+      .get(`/api/notifications/reminder-runs`)
+      .set("Cookie", cookieAdmin);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+  });
+
   it("ignores spoofed ownerPhone on mark-all-read and only touches caller's rows", async () => {
     const res = await request(app)
       .post(`/api/notifications/mark-all-read`)
@@ -156,5 +182,73 @@ describe("Notifications access isolation", () => {
       .from(notificationsTable)
       .where(eq(notificationsTable.id, notifAId));
     expect(aRow?.readAt).not.toBeNull();
+  });
+});
+
+describe("runReminderJob persists run rows", () => {
+  it("records a success row with the created count when the generator returns", async () => {
+    const before = new Date();
+    const result = await runReminderJob("manual");
+    expect(result.status).toBe("success");
+    expect(result.errorMessage).toBeNull();
+
+    const [row] = await db
+      .select()
+      .from(reminderRunsTable)
+      .where(eq(reminderRunsTable.id, result.runId));
+    expect(row).toBeDefined();
+    expect(row!.status).toBe("success");
+    expect(row!.trigger).toBe("manual");
+    expect(row!.createdCount).toBe(result.created);
+    expect(row!.errorMessage).toBeNull();
+    expect(row!.finishedAt).not.toBeNull();
+    expect(row!.startedAt.getTime()).toBeGreaterThanOrEqual(before.getTime() - 1000);
+  });
+
+  it("records an error row with the thrown message when the generator throws", async () => {
+    const spy = vi
+      .spyOn(db, "select")
+      .mockImplementationOnce(() => {
+        throw new Error("boom-task75");
+      });
+    try {
+      const result = await runReminderJob("scheduler");
+      expect(result.status).toBe("error");
+      expect(result.created).toBe(0);
+      expect(result.errorMessage).toBe("boom-task75");
+
+      spy.mockRestore();
+
+      const [row] = await db
+        .select()
+        .from(reminderRunsTable)
+        .where(eq(reminderRunsTable.id, result.runId));
+      expect(row).toBeDefined();
+      expect(row!.status).toBe("error");
+      expect(row!.trigger).toBe("scheduler");
+      expect(row!.createdCount).toBe(0);
+      expect(row!.errorMessage).toBe("boom-task75");
+      expect(row!.finishedAt).not.toBeNull();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("surfaces the most recent runs to admins via GET /notifications/reminder-runs", async () => {
+    const result = await runReminderJob("external");
+    const res = await request(app)
+      .get(`/api/notifications/reminder-runs`)
+      .set("Cookie", cookieAdmin);
+    expect(res.status).toBe(200);
+    const rows = res.body as Array<{ id: string; trigger: string }>;
+    const found = rows.find((r) => r.id === result.runId);
+    expect(found).toBeDefined();
+    expect(found!.trigger).toBe("external");
+    const ordered = [...rows].sort(
+      (a, b) =>
+        new Date((b as unknown as { startedAt: string }).startedAt).getTime() -
+        new Date((a as unknown as { startedAt: string }).startedAt).getTime(),
+    );
+    expect(rows.map((r) => r.id)).toEqual(ordered.map((r) => r.id));
   });
 });
