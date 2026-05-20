@@ -162,10 +162,20 @@ router.post("/orders", async (req, res): Promise<void> => {
   // Mechanic-proposed orders skip the stock decrement until the owner approves.
   const isProposal = !!(parsed.data.bookingId && parsed.data.mechanicId);
 
+  // Direct-buy orders must be placed by a signed-in user — buyer identity
+  // (name + phone) is derived from the session, never the request body, so a
+  // signed-in user can't spoof someone else's name+phone (which would also
+  // make the order disappear from their own `mine=true` listing).
+  if (!isProposal && (!req.user || !req.user.phone)) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+
   // If a proposal, resolve the mechanic + their service center to derive the ship-to address.
   let mechanicCenter: typeof serviceCentersTable.$inferSelect | null = null;
   let mechanic: typeof mechanicsTable.$inferSelect | null = null;
   let booking: typeof bookingsTable.$inferSelect | null = null;
+  let bookingVehicle: typeof vehiclesTable.$inferSelect | null = null;
   if (isProposal) {
     const [m] = await db
       .select()
@@ -211,6 +221,18 @@ router.post("/orders", async (req, res): Promise<void> => {
       .from(serviceCentersTable)
       .where(eq(serviceCentersTable.id, m.serviceCenterId));
     mechanicCenter = c ?? null;
+    // Proposal buyer identity comes from the booking's vehicle owner, not
+    // the request body — the mechanic placing the proposal can't impersonate
+    // a different owner.
+    const [v] = await db
+      .select()
+      .from(vehiclesTable)
+      .where(eq(vehiclesTable.id, b.vehicleId));
+    if (!v) {
+      res.status(400).json({ error: "Vehicle not found" });
+      return;
+    }
+    bookingVehicle = v;
   } else if (parsed.data.bookingId || parsed.data.mechanicId) {
     // Half-specified link is never valid — both must be present for a proposal,
     // and neither is allowed for a direct buy.
@@ -284,6 +306,16 @@ router.post("/orders", async (req, res): Promise<void> => {
       const deliveryRegion =
         parsed.data.deliveryRegion ?? (isProposal && mechanicCenter ? mechanicCenter.region : "");
 
+      // Buyer identity is server-derived, never trusted from the body:
+      //  - proposal: comes from the booking's vehicle owner
+      //  - direct buy: comes from the authenticated session
+      const buyerName = isProposal
+        ? (bookingVehicle?.ownerName ?? "")
+        : (req.user!.name ?? "");
+      const buyerPhone = isProposal
+        ? (bookingVehicle?.ownerPhone ?? "")
+        : (req.user!.phone ?? "");
+
       const [order] = await tx
         .insert(ordersTable)
         .values({
@@ -291,8 +323,8 @@ router.post("/orders", async (req, res): Promise<void> => {
           bookingId: parsed.data.bookingId ?? null,
           mechanicId: parsed.data.mechanicId ?? null,
           buyerKind: parsed.data.buyerKind,
-          buyerName: parsed.data.buyerName,
-          buyerPhone: parsed.data.buyerPhone,
+          buyerName,
+          buyerPhone,
           shippingAddress,
           deliveryCity,
           deliveryRegion,

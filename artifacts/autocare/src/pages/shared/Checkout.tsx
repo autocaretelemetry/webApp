@@ -281,13 +281,30 @@ export default function Checkout() {
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="name">{buyerKind === "center" ? "Shop name" : "Owner name"}</Label>
-                  <Input id="name" value={buyerName} onChange={(e) => setBuyerName(e.target.value)} className="mt-1.5" />
+                  <Input
+                    id="name"
+                    value={buyerName}
+                    onChange={(e) => setBuyerName(e.target.value)}
+                    className="mt-1.5"
+                    readOnly={!isProposal}
+                  />
                 </div>
                 <div>
                   <Label htmlFor="phone">Phone</Label>
-                  <Input id="phone" value={buyerPhone} onChange={(e) => setBuyerPhone(e.target.value)} className="mt-1.5" />
+                  <Input
+                    id="phone"
+                    value={buyerPhone}
+                    onChange={(e) => setBuyerPhone(e.target.value)}
+                    className="mt-1.5"
+                    readOnly={!isProposal}
+                  />
                 </div>
               </div>
+              {!isProposal && (
+                <p className="text-xs text-muted-foreground -mt-2">
+                  Buyer name and phone come from your account — manage them in your profile.
+                </p>
+              )}
               <div>
                 <Label htmlFor="addr">{isProposal ? "Delivery address (service center)" : "Shipping address"}</Label>
                 <Textarea id="addr" rows={2} value={shippingAddress} onChange={(e) => setShippingAddress(e.target.value)} className="mt-1.5" />
