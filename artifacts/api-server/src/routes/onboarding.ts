@@ -536,6 +536,75 @@ router.patch(
   },
 );
 
+const RESEND_COOLDOWN_MS = 60_000;
+const lastResendAt = new Map<string, number>();
+
+type ResendKind = "approved" | "rejected" | "kyc_verified" | "kyc_rejected";
+
+function resolveResendKind(
+  user: typeof usersTable.$inferSelect,
+): ResendKind | null {
+  if (user.kycStatus === "verified") return "kyc_verified";
+  if (user.kycStatus === "rejected") return "kyc_rejected";
+  if (user.approvalStatus === "rejected") return "rejected";
+  if (user.approvalStatus === "approved") return "approved";
+  return null;
+}
+
+/**
+ * POST /admin/approvals/:userId/resend-email — re-fire the decision email
+ * matching the user's current approval/KYC state. Useful when the applicant
+ * lost or filtered the original message. Rate-limited per user (in-memory)
+ * to prevent accidental spamming; the action is super-admin-only and very
+ * low volume so a process-local map is sufficient.
+ */
+router.post(
+  "/admin/approvals/:userId/resend-email",
+  requireSuperAdmin,
+  async (req, res): Promise<void> => {
+    const userId = String(req.params["userId"]);
+    const [target] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, userId));
+    if (!target) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    if (!target.email) {
+      res.status(400).json({ error: "User has no email on file." });
+      return;
+    }
+    const kind = resolveResendKind(target);
+    if (!kind) {
+      res.status(409).json({ error: "No decision has been made yet." });
+      return;
+    }
+    const now = Date.now();
+    const prev = lastResendAt.get(userId);
+    if (prev && now - prev < RESEND_COOLDOWN_MS) {
+      const retryAfter = Math.ceil((RESEND_COOLDOWN_MS - (now - prev)) / 1000);
+      res.setHeader("Retry-After", String(retryAfter));
+      res.status(429).json({
+        error: `Please wait ${retryAfter}s before resending.`,
+        retryAfter,
+      });
+      return;
+    }
+    lastResendAt.set(userId, now);
+    const msg =
+      kind === "approved"
+        ? applicationApprovedEmail(target.name, target.approvalNote)
+        : kind === "rejected"
+          ? applicationRejectedEmail(target.name, target.approvalNote)
+          : kind === "kyc_verified"
+            ? kycVerifiedEmail(target.name, target.kycNote)
+            : kycRejectedEmail(target.name, target.kycNote);
+    const result = await sendEmail({ to: target.email, ...msg });
+    res.json({ kind, sent: result.ok, reason: result.reason ?? null });
+  },
+);
+
 const KycDecisionBody = z.object({
   decision: z.enum(["verify", "reject"]),
   note: z.string().nullish(),

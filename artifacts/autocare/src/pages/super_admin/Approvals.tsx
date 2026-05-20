@@ -34,6 +34,7 @@ import {
   StickyNote,
   Send,
   Loader2,
+  Mail,
 } from "lucide-react";
 
 type ApprovalEvent = {
@@ -241,6 +242,33 @@ function ApprovalsList({ kind }: { kind: "applications" | "kyc" | "rejected" }) 
     }
   }
 
+  async function resend(row: AuthedUserRow) {
+    setBusy(row.id);
+    try {
+      const res = await fetch(`/api/admin/approvals/${row.id}/resend-email`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.error ?? "Failed to resend");
+      }
+      if (body.sent) {
+        toast.success("Email resent.");
+      } else if (body.reason === "not_configured") {
+        toast.success("Email queued (delivery not configured in this environment).");
+      } else if (body.reason === "no_recipient") {
+        toast.error("User has no email on file.");
+      } else {
+        toast.error("Email could not be delivered. Check server logs.");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to resend");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   const filters = (
     <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
       <Input
@@ -330,6 +358,20 @@ function ApprovalsList({ kind }: { kind: "applications" | "kyc" | "rejected" }) 
                       <XCircle className="h-4 w-4 mr-1" /> Reject
                     </Button>
                   </>
+                )}
+                {(kind === "rejected" ||
+                  row.approvalStatus !== "pending" ||
+                  row.kycStatus === "verified" ||
+                  row.kycStatus === "rejected") && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => resend(row)}
+                    disabled={busy === row.id}
+                    title="Re-send the latest decision email to this applicant"
+                  >
+                    <Mail className="h-4 w-4 mr-1" /> Resend email
+                  </Button>
                 )}
               </div>
             </div>
