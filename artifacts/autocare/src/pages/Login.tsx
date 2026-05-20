@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
+import { ApiError } from "@workspace/api-client-react";
 
 const DEMO = [
   { label: "Owner / Renter", email: "owner@autocare.test", password: "owner1234" },
@@ -49,21 +50,14 @@ export default function Login() {
       toast.success("Welcome back");
       navigate("/", { replace: true });
     } catch (err) {
-      // The generated client serializes the JSON body into the error message.
-      // Try to parse a structured `{ reason, note }` payload before falling
-      // back to the generic toast.
-      const raw = err instanceof Error ? err.message : String(err);
-      let parsed: { reason?: string; note?: string | null; error?: string } | null = null;
-      try {
-        const match = raw.match(/\{[\s\S]*\}/);
-        if (match) parsed = JSON.parse(match[0]);
-      } catch {
-        /* not JSON */
-      }
-      if (parsed?.reason === "pending") {
+      const data =
+        err instanceof ApiError && err.data && typeof err.data === "object"
+          ? (err.data as { reason?: string; note?: string | null })
+          : null;
+      if (data?.reason === "pending") {
         setStatusBanner({ kind: "pending" });
-      } else if (parsed?.reason === "rejected") {
-        setStatusBanner({ kind: "rejected", note: parsed.note ?? null });
+      } else if (data?.reason === "rejected") {
+        setStatusBanner({ kind: "rejected", note: data.note ?? null });
       } else {
         toast.error("Invalid email or password");
       }
