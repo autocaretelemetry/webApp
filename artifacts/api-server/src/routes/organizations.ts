@@ -1035,6 +1035,16 @@ const fleetHistoryAllHandler = (format: "csv" | "pdf") =>
   async (req: Request, res: Response): Promise<void> => {
     const m = await requireOrgMember(req, res, String(req.params.orgId), "admin");
     if (!m) return;
+    if (!m.isPlatform) {
+      const limits = await getEntitlements("organization", m.org.id);
+      if (!limits.canExportHistory) {
+        res.status(402).json({
+          error: "Maintenance history export requires a Fleet plan upgrade.",
+          reason: "entitlement_required",
+        });
+        return;
+      }
+    }
     const vehicles = await db
       .select()
       .from(vehiclesTable)
@@ -1062,6 +1072,16 @@ const fleetHistoryVehicleHandler = (format: "csv" | "pdf") =>
       String(req.params.vehicleId),
     );
     if (!ctx) return;
+    if (!ctx.m.isPlatform) {
+      const limits = await getEntitlements("organization", ctx.m.org.id);
+      if (!limits.canExportHistory) {
+        res.status(402).json({
+          error: "Maintenance history export requires a Fleet plan upgrade.",
+          reason: "entitlement_required",
+        });
+        return;
+      }
+    }
     const v = ctx.vehicle;
     const { rows, truncated } = await buildHistoryRows([
       { id: v.id, brand: v.brand, model: v.model, year: v.year, plateNumber: v.plateNumber },

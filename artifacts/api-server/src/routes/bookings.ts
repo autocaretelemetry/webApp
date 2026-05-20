@@ -8,6 +8,7 @@ import {
   bookingsTable,
   bookingEventsTable,
   invoicesTable,
+  organizationPreferredCentersTable,
 } from "@workspace/db";
 import { getEntitlements, getOwnerEntitlementsForVehicle } from "../lib/entitlements";
 import {
@@ -136,6 +137,32 @@ router.post("/bookings", async (req, res): Promise<void> => {
     return;
   }
 
+  // Fleet vehicles can only be booked at centers in the org's preferred
+  // pool. Platform admins can override (e.g. to triage on behalf of an
+  // org during onboarding) — every other caller is held to the pool.
+  if (vehicle.organizationId) {
+    const user = req.user;
+    const isPlatformAdmin = user?.role === "admin" || user?.role === "super_admin";
+    if (!isPlatformAdmin) {
+      const [preferred] = await db
+        .select({ id: organizationPreferredCentersTable.serviceCenterId })
+        .from(organizationPreferredCentersTable)
+        .where(
+          and(
+            eq(organizationPreferredCentersTable.organizationId, vehicle.organizationId),
+            eq(organizationPreferredCentersTable.serviceCenterId, center.id),
+          ),
+        );
+      if (!preferred) {
+        res.status(400).json({
+          error: `${center.name} is not in this fleet's preferred service centers. Add it to the preferred pool first.`,
+          reason: "center_not_preferred",
+        });
+        return;
+      }
+    }
+  }
+
   // Quota gate: the receiving center's plan caps how many bookings it can
   // take per calendar month. Free tier defaults apply when no active sub.
   const centerLimits = await getEntitlements("center", center.id);
@@ -162,9 +189,16 @@ router.post("/bookings", async (req, res): Promise<void> => {
   }
 
   // Priority flag: owner's plan grants it. Cheap one-query lookup; safe to
-  // miss (defaults to false) if the vehicle has no ownerPhone yet.
+  // miss (defaults to false) if the vehicle has no ownerPhone yet. For
+  // fleet vehicles, the org's plan ALSO contributes — Fleet Pro grants
+  // priority booking, and we OR the two entitlements so either path can
+  // upgrade the booking.
   const ownerEntitlements = await getOwnerEntitlementsForVehicle(vehicle.id);
-  const priority = ownerEntitlements.limits.priorityBooking;
+  let priority = ownerEntitlements.limits.priorityBooking;
+  if (!priority && vehicle.organizationId) {
+    const orgLimits = await getEntitlements("organization", vehicle.organizationId);
+    priority = priority || orgLimits.priorityBooking;
+  }
 
   const [row] = await db
     .insert(bookingsTable)
