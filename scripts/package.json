@@ -9,6 +9,7 @@
     "seed:platform": "tsx ./src/seedPlatform.ts",
     "seed:rentals": "tsx ./src/seedRentals.ts",
     "seed:users": "tsx ./src/seedUsers.ts",
+    "reminders:run": "tsx ./src/runReminders.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {

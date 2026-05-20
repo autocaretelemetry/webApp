@@ -36,6 +36,7 @@ import {
   PanelLeftOpen,
   ChevronRight,
   Paintbrush,
+  BellRing,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { AuthedUser } from "@workspace/api-client-react";
@@ -218,6 +219,7 @@ const ADMIN_NAV: NavSection[] = [
       { href: "/admin/rentals", label: "Rentals", icon: KeyRound },
       { href: "/admin/renters", label: "Renters", icon: Users },
       { href: "/admin/safety", label: "Safety & Tracking", icon: ShieldAlert },
+      { href: "/admin/reminder-runs", label: "Reminder Runs", icon: BellRing },
     ],
   },
   {

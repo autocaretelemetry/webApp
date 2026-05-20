@@ -7,7 +7,7 @@ import {
   MarkAllNotificationsReadBody,
   GenerateReminderNotificationsBody,
 } from "@workspace/api-zod";
-import { generateServiceReminderNotifications } from "../lib/reminders";
+import { runReminderJob, listRecentReminderRuns } from "../lib/reminders";
 import { requireAuth, requireAdmin } from "../lib/auth";
 
 const router: IRouter = Router();
@@ -120,8 +120,29 @@ router.post(
       res.status(400).json({ error: body.error.message });
       return;
     }
-    const created = await generateServiceReminderNotifications();
-    res.json({ created });
+    const result = await runReminderJob("manual");
+    if (result.status === "error") {
+      res.status(500).json({
+        created: 0,
+        runId: result.runId,
+        error: result.errorMessage,
+      });
+      return;
+    }
+    res.json({ created: result.created, runId: result.runId });
+  },
+);
+
+// Admin-only audit of recent reminder runs (in-process scheduler, manual
+// trigger, or external scheduled deployment). Powers the "Reminder runs"
+// panel in the admin dashboard so operators can confirm the cron is
+// actually firing and see any failures without tailing server logs.
+router.get(
+  "/notifications/reminder-runs",
+  requireAdmin,
+  async (_req, res): Promise<void> => {
+    const runs = await listRecentReminderRuns(25);
+    res.json(runs);
   },
 );
 

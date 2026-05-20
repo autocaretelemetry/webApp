@@ -1,4 +1,5 @@
-import { db, vehiclesTable, type Vehicle } from "@workspace/db";
+import { db, vehiclesTable, reminderRunsTable, type Vehicle, type ReminderRun, type ReminderRunTrigger } from "@workspace/db";
+import { desc, eq } from "drizzle-orm";
 import { createOwnerNotification } from "./notify";
 import { appPublicUrl } from "./whatsapp";
 import { logger } from "./logger";
@@ -89,6 +90,11 @@ function weekBucket(d: Date = new Date()): string {
  * Scan all vehicles, identify any whose time-or-mileage service window has
  * elapsed, and create an in-app notification (+ web push) for the owner.
  * Idempotent via (ownerPhone, dedupeKey) — safe to call on an interval.
+ *
+ * Prefer {@link runReminderJob} for scheduled / admin-triggered runs so the
+ * outcome is persisted to `reminder_runs` for admin visibility. This raw
+ * function is still exported so other call-sites (tests, ad hoc tooling)
+ * can invoke the generator without recording a run row.
  */
 export async function generateServiceReminderNotifications(): Promise<number> {
   const vehicles = await db.select().from(vehiclesTable);
@@ -131,4 +137,55 @@ export async function generateServiceReminderNotifications(): Promise<number> {
     }
   }
   return createdCount;
+}
+
+export type ReminderJobResult = {
+  runId: string;
+  created: number;
+  status: "success" | "error";
+  errorMessage: string | null;
+};
+
+/**
+ * Run the reminder generator and persist the outcome to `reminder_runs` so
+ * admins can audit when it last ran and whether it succeeded. Used by the
+ * in-process scheduler, the admin manual trigger, and the standalone
+ * `scripts/runReminders.ts` entry point invoked by Replit Scheduled
+ * Deployments. Never throws — errors are recorded on the run row.
+ */
+export async function runReminderJob(
+  trigger: ReminderRunTrigger,
+): Promise<ReminderJobResult> {
+  const [row] = await db
+    .insert(reminderRunsTable)
+    .values({ trigger, status: "running" })
+    .returning({ id: reminderRunsTable.id });
+  const runId = row!.id;
+  try {
+    const created = await generateServiceReminderNotifications();
+    await db
+      .update(reminderRunsTable)
+      .set({ status: "success", createdCount: created, finishedAt: new Date() })
+      .where(eq(reminderRunsTable.id, runId));
+    if (created > 0) {
+      logger.info({ runId, trigger, created }, "Reminder run completed");
+    }
+    return { runId, created, status: "success", errorMessage: null };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await db
+      .update(reminderRunsTable)
+      .set({ status: "error", errorMessage: message, finishedAt: new Date() })
+      .where(eq(reminderRunsTable.id, runId));
+    logger.error({ err, runId, trigger }, "Reminder run failed");
+    return { runId, created: 0, status: "error", errorMessage: message };
+  }
+}
+
+export async function listRecentReminderRuns(limit = 25): Promise<ReminderRun[]> {
+  return db
+    .select()
+    .from(reminderRunsTable)
+    .orderBy(desc(reminderRunsTable.startedAt))
+    .limit(limit);
 }

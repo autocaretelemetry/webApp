@@ -41,6 +41,8 @@ Connected automotive service platform pairing vehicle owners, renters, service c
 - `artifacts/api-server/src/routes/` — Express handlers per resource
 - `artifacts/api-server/src/lib/entitlements.ts` — `getEntitlements(kind,id)`, `getOwnerEntitlementsForVehicle`, `featuredSubscriberIds`; every plan-gated action goes through here
 - `artifacts/api-server/src/routes/onboarding.ts` — KYC submit, super-admin approval queues, `requireKycVerified` middleware
+- `artifacts/api-server/src/lib/reminders.ts` — `runReminderJob(trigger)` wraps the generator and records to `reminder_runs`; in-process scheduler in `index.ts` calls it on a recurring interval (default 24h, `REMINDER_INTERVAL_MS` / `DISABLE_REMINDER_SCHEDULER=1` to override)
+- `scripts/src/runReminders.ts` — standalone entry point (`pnpm --filter @workspace/scripts run reminders:run`) for Replit Scheduled Deployments; records each run as `trigger=external`
 - `artifacts/api-server/src/routes/organizations.ts` — fleet endpoints (intentionally outside OpenAPI; plain Express + Zod)
 - `artifacts/api-server/src/lib/email.ts` — SendGrid wrapper for approval/KYC decision emails
 - `artifacts/api-server/src/lib/kycScanner.ts` — ClamAV + heuristic upload scanner
