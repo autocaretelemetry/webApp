@@ -20,6 +20,7 @@ import FleetDriversPage from "@/pages/fleet/Drivers";
 import FleetCentersPage from "@/pages/fleet/Centers";
 import FleetSettingsPage from "@/pages/fleet/Settings";
 import FleetSafetyPage from "@/pages/fleet/Safety";
+import FleetOrdersPage from "@/pages/fleet/Orders";
 
 // Owner Pages
 import OwnerDashboard from "@/pages/owner/Dashboard";
@@ -180,6 +181,7 @@ function AppRouter() {
         <Route path="/fleet/centers" component={fleetOnly(FleetCentersPage)} />
         <Route path="/fleet/settings" component={fleetOnly(FleetSettingsPage)} />
         <Route path="/fleet/safety" component={fleetOnly(FleetSafetyPage)} />
+        <Route path="/fleet/orders" component={fleetOnly(FleetOrdersPage)} />
         <Route path="/register-fleet" component={RegisterFleet} />
 
         {/* Admin Routes */}

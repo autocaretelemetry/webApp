@@ -12,6 +12,8 @@ import {
   invoicesTable,
   fleetTripLocationsTable,
   fleetIncidentsTable,
+  fleetPartsOrdersTable,
+  ORG_MEMBER_ROLES,
   type Organization,
   type OrganizationMember,
 } from "@workspace/db";
@@ -28,7 +30,35 @@ function isPlatformAdmin(req: Request): boolean {
   return req.user?.role === "admin" || req.user?.role === "super_admin";
 }
 
-type OrgRole = "admin" | "driver";
+type OrgRole = "admin" | "finance" | "manager" | "driver";
+
+// Roles considered "finance-level" for parts-order approval/payment + billing
+// access. Admins are always included so a small org can run without a
+// dedicated finance person.
+const FINANCE_LEVEL_ROLES: OrgRole[] = ["admin", "finance"];
+
+/**
+ * True when the actor may checkout (pay) a parts order directly without
+ * finance approval. Admins/finance always can. Other members can only
+ * when the org doesn't require finance approval OR they have the
+ * per-member override. Platform admins always pass.
+ */
+function canCheckoutDirectly(
+  m: { org: Organization; member: OrganizationMember | null; isPlatform: boolean },
+): boolean {
+  if (m.isPlatform) return true;
+  if (!m.member) return false;
+  if (FINANCE_LEVEL_ROLES.includes(m.member.role as OrgRole)) return true;
+  if (!m.org.requireFinanceApproval) return true;
+  return m.member.canCheckoutDirectly;
+}
+
+function isFinanceLevel(
+  m: { member: OrganizationMember | null; isPlatform: boolean },
+): boolean {
+  if (m.isPlatform) return true;
+  return !!m.member && FINANCE_LEVEL_ROLES.includes(m.member.role as OrgRole);
+}
 
 /**
  * Ensure the authenticated user is a member of the org (or a platform
@@ -39,6 +69,9 @@ type OrgRole = "admin" | "driver";
  * Platform admins synthesize an "admin" membership so they can manage
  * any org for support/QA purposes, but they are NOT auto-added to the
  * members table — visible membership stays the org's own list.
+ *
+ * `minRole === "admin"` accepts only admin; for other gates use
+ * `isFinanceLevel()` / `canCheckoutDirectly()` on the returned member.
  */
 async function requireOrgMember(
   req: Request,
@@ -104,12 +137,44 @@ const CreateOrgBody = z.object({
   logoUrl: z.string().url().optional(),
 });
 
-const UpdateOrgBody = CreateOrgBody.partial();
+const UpdateOrgBody = CreateOrgBody.partial().extend({
+  requireFinanceApproval: z.boolean().optional(),
+});
 
 const UpsertMemberBody = z.object({
   phone: z.string().min(6),
   name: z.string().min(2),
-  role: z.enum(["admin", "driver"]).default("driver"),
+  role: z.enum(ORG_MEMBER_ROLES).default("driver"),
+  canCheckoutDirectly: z.boolean().optional(),
+});
+
+const CreatePartsOrderBody = z.object({
+  items: z
+    .array(
+      z.object({
+        partId: z.string().uuid(),
+        vendorId: z.string().uuid(),
+        vendorName: z.string(),
+        name: z.string(),
+        sku: z.string(),
+        unitPrice: z.number().nonnegative(),
+        quantity: z.number().int().min(1),
+        imageUrl: z.string().nullable().optional(),
+      }),
+    )
+    .min(1),
+  totalAmount: z.number().nonnegative(),
+  shippingAddress: z.string().min(3),
+  deliveryCity: z.string().nullable().optional(),
+  deliveryRegion: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  // If "pay_now", the requester must have direct-checkout permission;
+  // otherwise the server forces "submit_for_approval".
+  mode: z.enum(["submit_for_approval", "pay_now"]).default("submit_for_approval"),
+});
+
+const RejectPartsOrderBody = z.object({
+  reason: z.string().min(1).max(500),
 });
 
 const ReplacePreferredCentersBody = z.object({
@@ -151,6 +216,7 @@ router.get("/organizations/mine", requireAuth, async (req, res): Promise<void> =
     .select({
       org: organizationsTable,
       role: organizationMembersTable.role,
+      canCheckoutDirectly: organizationMembersTable.canCheckoutDirectly,
     })
     .from(organizationMembersTable)
     .innerJoin(
@@ -159,7 +225,11 @@ router.get("/organizations/mine", requireAuth, async (req, res): Promise<void> =
     )
     .where(eq(organizationMembersTable.phone, phone));
   res.json({
-    organizations: memberships.map((m) => ({ ...m.org, myRole: m.role })),
+    organizations: memberships.map((m) => ({
+      ...m.org,
+      myRole: m.role,
+      myCanCheckoutDirectly: m.canCheckoutDirectly,
+    })),
   });
 });
 
@@ -214,6 +284,13 @@ router.get(
   async (req, res): Promise<void> => {
     const m = await requireOrgMember(req, res, String(req.params.orgId));
     if (!m) return;
+    // Driver role doesn't get the team directory — phones + override
+    // flags are admin/finance/manager material. Keep this in sync with
+    // `fleetNavFor()` in AppShell which already hides /fleet/drivers.
+    if (!m.isPlatform && m.member && m.member.role === "driver") {
+      res.status(403).json({ error: "Drivers cannot view the team directory." });
+      return;
+    }
     const members = await db
       .select()
       .from(organizationMembersTable)
@@ -247,7 +324,13 @@ router.post(
     if (existing) {
       const [updated] = await db
         .update(organizationMembersTable)
-        .set({ name: parsed.data.name, role: parsed.data.role })
+        .set({
+          name: parsed.data.name,
+          role: parsed.data.role,
+          ...(parsed.data.canCheckoutDirectly !== undefined
+            ? { canCheckoutDirectly: parsed.data.canCheckoutDirectly }
+            : {}),
+        })
         .where(
           and(
             eq(organizationMembersTable.organizationId, m.org.id),
@@ -260,7 +343,13 @@ router.post(
     }
     const [inserted] = await db
       .insert(organizationMembersTable)
-      .values({ ...parsed.data, organizationId: m.org.id })
+      .values({
+        organizationId: m.org.id,
+        phone: parsed.data.phone,
+        name: parsed.data.name,
+        role: parsed.data.role,
+        canCheckoutDirectly: parsed.data.canCheckoutDirectly ?? false,
+      })
       .returning();
     res.status(201).json(inserted);
   },
@@ -272,7 +361,9 @@ router.delete(
   async (req, res): Promise<void> => {
     const m = await requireOrgMember(req, res, String(req.params.orgId), "admin");
     if (!m) return;
-    // Guard: can't remove the last admin — would orphan the org.
+    // Guard: can't remove the last admin — would orphan the org. The
+    // check uses the strict `admin` role only (finance/manager/driver
+    // don't count for this purpose).
     const admins = await db
       .select({ phone: organizationMembersTable.phone })
       .from(organizationMembersTable)
@@ -1118,6 +1209,225 @@ router.get(
   "/organizations/:orgId/vehicles/:vehicleId/maintenance-history.pdf",
   requireAuth,
   fleetHistoryVehicleHandler("pdf"),
+);
+
+// ───── Fleet parts orders (RBAC + finance-approval workflow) ─────
+//
+// Roles & flow:
+//   • driver/manager submit a parts request from the marketplace checkout.
+//   • If the org requires finance approval AND the submitter lacks the
+//     per-member `canCheckoutDirectly` override, the request lands in the
+//     finance queue as `pending_finance`. Otherwise it's marked `paid`
+//     immediately (direct checkout — payment integration is out of scope
+//     for the demo; "paid" represents both approval and settlement).
+//   • finance/admin can `approve+pay` (→ paid) or `reject` (→ rejected)
+//     items from the queue.
+//
+// Vendor-side order rows are intentionally NOT created here — the demo
+// stops at "paid" on the fleet ledger. Wiring through to real vendor
+// orders would happen in a follow-up.
+
+router.post(
+  "/organizations/:orgId/parts-orders",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    const m = await requireOrgMember(req, res, String(req.params.orgId));
+    if (!m) return;
+    const parsed = CreatePartsOrderBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+    const wantsPayNow = parsed.data.mode === "pay_now";
+    const allowedPayNow = canCheckoutDirectly(m);
+    if (wantsPayNow && !allowedPayNow) {
+      res.status(403).json({
+        error: "Finance approval required before this order can be paid.",
+        reason: "approval_required",
+      });
+      return;
+    }
+    // Server is the source of truth for the total — never trust the
+    // client. We accept the item snapshot (which the user already saw on
+    // the cart screen, vendor name + sku for receipt purposes) but the
+    // money figure is always recomputed from unitPrice × quantity.
+    const computedTotal = parsed.data.items.reduce(
+      (s, it) => s + it.unitPrice * it.quantity,
+      0,
+    );
+    if (Math.abs(computedTotal - parsed.data.totalAmount) > 0.01) {
+      res.status(400).json({
+        error: "Total amount does not match line items.",
+        reason: "total_mismatch",
+        expected: computedTotal,
+      });
+      return;
+    }
+    const status = wantsPayNow && allowedPayNow ? "paid" : "pending_finance";
+    const now = new Date();
+    const requesterPhone = m.member?.phone ?? req.user!.phone ?? "platform-admin";
+    const requesterName = m.member?.name ?? req.user!.name ?? "Platform admin";
+    const [inserted] = await db
+      .insert(fleetPartsOrdersTable)
+      .values({
+        organizationId: m.org.id,
+        requestedByPhone: requesterPhone,
+        requestedByName: requesterName,
+        status,
+        items: parsed.data.items.map((it) => ({
+          partId: it.partId,
+          vendorId: it.vendorId,
+          vendorName: it.vendorName,
+          name: it.name,
+          sku: it.sku,
+          unitPrice: it.unitPrice,
+          quantity: it.quantity,
+          imageUrl: it.imageUrl ?? null,
+        })),
+        totalAmount: computedTotal.toFixed(2),
+        shippingAddress: parsed.data.shippingAddress,
+        deliveryCity: parsed.data.deliveryCity ?? null,
+        deliveryRegion: parsed.data.deliveryRegion ?? null,
+        notes: parsed.data.notes ?? null,
+        ...(status === "paid"
+          ? {
+              approvedByPhone: requesterPhone,
+              approvedByName: requesterName,
+              approvedAt: now,
+              paidByPhone: requesterPhone,
+              paidByName: requesterName,
+              paidAt: now,
+            }
+          : {}),
+      })
+      .returning();
+    res.status(201).json(inserted);
+  },
+);
+
+router.get(
+  "/organizations/:orgId/parts-orders",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    const m = await requireOrgMember(req, res, String(req.params.orgId));
+    if (!m) return;
+    const baseWhere = eq(fleetPartsOrdersTable.organizationId, m.org.id);
+    const rows = await db
+      .select()
+      .from(fleetPartsOrdersTable)
+      .where(
+        isFinanceLevel(m)
+          ? baseWhere
+          : and(
+              baseWhere,
+              eq(fleetPartsOrdersTable.requestedByPhone, m.member?.phone ?? ""),
+            ),
+      )
+      .orderBy(desc(fleetPartsOrdersTable.createdAt));
+    res.json({ orders: rows });
+  },
+);
+
+async function loadOrgOrder(
+  m: { org: Organization; member: OrganizationMember | null; isPlatform: boolean },
+  orderId: string,
+) {
+  const [order] = await db
+    .select()
+    .from(fleetPartsOrdersTable)
+    .where(eq(fleetPartsOrdersTable.id, orderId));
+  if (!order || order.organizationId !== m.org.id) return null;
+  return order;
+}
+
+router.post(
+  "/organizations/:orgId/parts-orders/:id/pay",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    const m = await requireOrgMember(req, res, String(req.params.orgId));
+    if (!m) return;
+    const order = await loadOrgOrder(m, String(req.params.id));
+    if (!order) {
+      res.status(404).json({ error: "Order not found" });
+      return;
+    }
+    // Pay-permission: finance/admin always; the requester themselves only
+    // if they have direct-checkout permission (covers the "submitted for
+    // visibility but I can still pay it" edge case for trusted managers).
+    const isRequester = order.requestedByPhone === m.member?.phone;
+    const allowed = isFinanceLevel(m) || (isRequester && canCheckoutDirectly(m));
+    if (!allowed) {
+      res.status(403).json({ error: "Only finance or admin can pay this order." });
+      return;
+    }
+    if (order.status === "paid") {
+      res.json(order);
+      return;
+    }
+    if (order.status === "rejected") {
+      res.status(400).json({ error: "Rejected orders can't be paid." });
+      return;
+    }
+    const now = new Date();
+    const actorPhone = m.member?.phone ?? req.user!.phone ?? "platform-admin";
+    const actorName = m.member?.name ?? req.user!.name ?? "Platform admin";
+    const [updated] = await db
+      .update(fleetPartsOrdersTable)
+      .set({
+        status: "paid",
+        approvedByPhone: order.approvedByPhone ?? actorPhone,
+        approvedByName: order.approvedByName ?? actorName,
+        approvedAt: order.approvedAt ?? now,
+        paidByPhone: actorPhone,
+        paidByName: actorName,
+        paidAt: now,
+      })
+      .where(eq(fleetPartsOrdersTable.id, order.id))
+      .returning();
+    res.json(updated);
+  },
+);
+
+router.post(
+  "/organizations/:orgId/parts-orders/:id/reject",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    const m = await requireOrgMember(req, res, String(req.params.orgId));
+    if (!m) return;
+    if (!isFinanceLevel(m)) {
+      res.status(403).json({ error: "Only finance or admin can reject orders." });
+      return;
+    }
+    const parsed = RejectPartsOrderBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+    const order = await loadOrgOrder(m, String(req.params.id));
+    if (!order) {
+      res.status(404).json({ error: "Order not found" });
+      return;
+    }
+    if (order.status !== "pending_finance") {
+      res.status(400).json({ error: "Only pending orders can be rejected." });
+      return;
+    }
+    const now = new Date();
+    const actorPhone = m.member?.phone ?? req.user!.phone ?? "platform-admin";
+    const actorName = m.member?.name ?? req.user!.name ?? "Platform admin";
+    const [updated] = await db
+      .update(fleetPartsOrdersTable)
+      .set({
+        status: "rejected",
+        rejectedByPhone: actorPhone,
+        rejectedByName: actorName,
+        rejectedAt: now,
+        rejectionReason: parsed.data.reason,
+      })
+      .where(eq(fleetPartsOrdersTable.id, order.id))
+      .returning();
+    res.json(updated);
+  },
 );
 
 export default router;

@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, primaryKey, boolean } from "drizzle-orm/pg-core";
 import { serviceCentersTable } from "./serviceCenters";
 
 export const organizationsTable = pgTable("organizations", {
@@ -14,8 +14,18 @@ export const organizationsTable = pgTable("organizations", {
   region: text("region"),
   logoUrl: text("logo_url"),
   kycStatus: text("kyc_status").notNull().default("pending"),
+  // When true, parts orders submitted by managers/drivers go to the finance
+  // queue for approval+payment instead of letting the requester checkout
+  // directly. Per-member overrides via `canCheckoutDirectly` still apply.
+  requireFinanceApproval: boolean("require_finance_approval").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Allowed values for `organization_members.role` (stored as text to avoid
+// migrations when adding new ones). Kept here so the server and seeds share
+// one list.
+export const ORG_MEMBER_ROLES = ["admin", "finance", "manager", "driver"] as const;
+export type OrgMemberRole = (typeof ORG_MEMBER_ROLES)[number];
 
 export const organizationMembersTable = pgTable(
   "organization_members",
@@ -26,6 +36,10 @@ export const organizationMembersTable = pgTable(
     phone: text("phone").notNull(),
     name: text("name").notNull(),
     role: text("role").notNull().default("driver"),
+    // Per-member override: when the org requires finance approval, this lets
+    // a trusted manager or driver still checkout directly. Admins and finance
+    // are always allowed regardless of this flag.
+    canCheckoutDirectly: boolean("can_checkout_directly").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({ pk: primaryKey({ columns: [t.organizationId, t.phone] }) }),

@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { useRole, type Role } from "@/lib/role";
+import { useRole, useFleetOrgId, type Role } from "@/lib/role";
+import { useMyFleetOrgs } from "@/lib/fleet-api";
 import { useCart } from "@/lib/cart";
 import { cn } from "@/lib/utils";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -127,27 +128,47 @@ const VENDOR_NAV: NavSection[] = [
   },
 ];
 
-const FLEET_NAV: NavSection[] = [
-  {
-    label: "Fleet",
-    items: [
-      { href: "/", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/fleet/vehicles", label: "Vehicles", icon: Car },
-      { href: "/fleet/drivers", label: "Team & Drivers", icon: Users },
-      { href: "/fleet/centers", label: "Preferred Centers", icon: Store },
-      { href: "/fleet/safety", label: "Safety & Tracking", icon: ShieldAlert },
-      { href: "/bookings", label: "Bookings", icon: CalendarDays },
-      { href: "/fleet/settings", label: "Settings", icon: Settings },
-    ],
-  },
-  {
-    label: "Parts",
-    items: [
-      { href: "/marketplace", label: "Marketplace", icon: ShoppingBag },
-      { href: "/orders", label: "Orders", icon: Package },
-    ],
-  },
-];
+type FleetMemberRoleNav = "admin" | "finance" | "manager" | "driver";
+
+// Role-trimmed fleet navigation. Each role sees only the workspaces it
+// needs — finance has billing/orders, drivers see their own vehicle and
+// the parts queue, etc. Admin sees everything.
+function fleetNavFor(role: FleetMemberRoleNav | undefined): NavSection[] {
+  const isAdmin = role === "admin";
+  const isFinance = role === "finance";
+  const isManager = role === "manager";
+  const isDriver = role === "driver";
+
+  const fleetItems = [
+    { href: "/", label: "Dashboard", icon: LayoutDashboard },
+    ...(isAdmin || isFinance || isManager || isDriver
+      ? [{ href: "/fleet/vehicles", label: "Vehicles", icon: Car }]
+      : []),
+    ...(isAdmin || isManager
+      ? [{ href: "/fleet/drivers", label: "Team & Drivers", icon: Users }]
+      : []),
+    ...(isAdmin || isManager
+      ? [{ href: "/fleet/centers", label: "Preferred Centers", icon: Store }]
+      : []),
+    ...(isAdmin || isFinance || isManager
+      ? [{ href: "/fleet/safety", label: "Safety & Tracking", icon: ShieldAlert }]
+      : []),
+    ...(isAdmin || isFinance || isManager
+      ? [{ href: "/bookings", label: "Bookings", icon: CalendarDays }]
+      : []),
+    ...(isAdmin ? [{ href: "/fleet/settings", label: "Settings", icon: Settings }] : []),
+  ];
+
+  const partsItems = [
+    { href: "/marketplace", label: "Marketplace", icon: ShoppingBag },
+    { href: "/fleet/orders", label: "Parts Orders", icon: Package },
+  ];
+
+  return [
+    { label: "Fleet", items: fleetItems },
+    { label: "Parts", items: partsItems },
+  ];
+}
 
 const DELIVERY_NAV: NavSection[] = [
   {
@@ -207,12 +228,16 @@ const SUPER_ADMIN_NAV: NavSection[] = [
   },
 ];
 
-function navFor(role: Role, isSuperAdmin: boolean): NavSection[] {
+function navFor(
+  role: Role,
+  isSuperAdmin: boolean,
+  fleetRole: FleetMemberRoleNav | undefined,
+): NavSection[] {
   const base = (() => {
     if (role === "owner") return OWNER_NAV;
     if (role === "center") return CENTER_NAV;
     if (role === "vendor") return VENDOR_NAV;
-    if (role === "fleet") return FLEET_NAV;
+    if (role === "fleet") return fleetNavFor(fleetRole);
     if (role === "admin") return ADMIN_NAV;
     if (role === "super_admin") return SUPER_ADMIN_NAV;
     return DELIVERY_NAV;
@@ -368,6 +393,7 @@ function SidebarItem({
 
 function SidebarBody({
   role,
+  fleetRole,
   setRole,
   user,
   logout,
@@ -377,6 +403,7 @@ function SidebarBody({
   onNavigate,
 }: {
   role: Role;
+  fleetRole: FleetMemberRoleNav | undefined;
   setRole: (r: Role) => void;
   user: AuthedUser | null;
   logout: () => void | Promise<void>;
@@ -385,7 +412,7 @@ function SidebarBody({
   location: string;
   onNavigate?: () => void;
 }) {
-  const sections = navFor(role, user?.role === "super_admin");
+  const sections = navFor(role, user?.role === "super_admin", fleetRole);
   const showCart = role === "owner" || role === "center";
   const showBell = role === "owner";
 
@@ -577,6 +604,13 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const canSwitchRole = user?.role === "super_admin";
 
+  // Active fleet org role drives the trimmed fleet sidebar. Hook is safe
+  // to call unconditionally; query is disabled when not signed in.
+  const fleetOrgId = useFleetOrgId();
+  const { data: fleetMine } = useMyFleetOrgs();
+  const fleetRole = (fleetMine?.organizations.find((o) => o.id === fleetOrgId)
+    ?.myRole ?? undefined) as FleetMemberRoleNav | undefined;
+
   return (
     <div className="flex min-h-screen bg-background">
       {/* Desktop sidebar — animated width collapse */}
@@ -589,6 +623,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="w-full">
           <SidebarBody
             role={role}
+            fleetRole={fleetRole}
             setRole={setRole}
             user={user}
             logout={logout}
@@ -621,6 +656,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <SidebarBody
             role={role}
+            fleetRole={fleetRole}
             setRole={setRole}
             user={user}
             logout={logout}

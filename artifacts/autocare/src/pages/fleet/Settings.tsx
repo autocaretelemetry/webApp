@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { useFleetOrgId } from "@/lib/role";
 import { useMyFleetOrgs, useUpdateFleetOrg, type FleetOrg } from "@/lib/fleet-api";
@@ -62,6 +63,39 @@ export default function FleetSettingsPage() {
         title="Fleet settings"
         description="Update your organisation's profile and billing contact."
       />
+
+      <Card className="max-w-3xl">
+        <CardHeader>
+          <CardTitle>Parts order approvals</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start justify-between gap-4 rounded-md border bg-muted/30 p-4">
+            <div className="space-y-1">
+              <div className="font-medium text-sm">Require finance approval</div>
+              <p className="text-xs text-muted-foreground max-w-md">
+                When on, parts orders submitted by managers and drivers land in
+                the finance queue for approval and payment. Admins, finance, and
+                members with the direct-checkout override can still pay
+                immediately.
+              </p>
+            </div>
+            <Switch
+              checked={!!org.requireFinanceApproval}
+              disabled={update.isPending}
+              onCheckedChange={async (v) => {
+                try {
+                  await update.mutateAsync({ requireFinanceApproval: v });
+                  toast.success(
+                    v ? "Finance approval is now required." : "Finance approval turned off.",
+                  );
+                } catch (err) {
+                  toast.error((err as Error).message);
+                }
+              }}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="max-w-3xl">
         <CardHeader>

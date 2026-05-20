@@ -36,6 +36,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 // ───── Types (mirroring server payload shape) ─────
 
+export type FleetMemberRole = "admin" | "finance" | "manager" | "driver";
+
 export type FleetOrg = {
   id: string;
   name: string;
@@ -48,14 +50,55 @@ export type FleetOrg = {
   city: string | null;
   region: string | null;
   logoUrl: string | null;
-  myRole?: "admin" | "driver";
+  requireFinanceApproval: boolean;
+  myRole?: FleetMemberRole;
+  myCanCheckoutDirectly?: boolean;
 };
 
 export type FleetMember = {
   organizationId: string;
   phone: string;
   name: string;
-  role: "admin" | "driver";
+  role: FleetMemberRole;
+  canCheckoutDirectly: boolean;
+  createdAt: string;
+};
+
+export type FleetPartsOrderItem = {
+  partId: string;
+  vendorId: string;
+  vendorName: string;
+  name: string;
+  sku: string;
+  unitPrice: number;
+  quantity: number;
+  imageUrl: string | null;
+};
+
+export type FleetPartsOrderStatus = "pending_finance" | "approved" | "paid" | "rejected";
+
+export type FleetPartsOrder = {
+  id: string;
+  organizationId: string;
+  requestedByPhone: string;
+  requestedByName: string;
+  status: FleetPartsOrderStatus;
+  items: FleetPartsOrderItem[];
+  totalAmount: string;
+  shippingAddress: string;
+  deliveryCity: string | null;
+  deliveryRegion: string | null;
+  notes: string | null;
+  approvedByPhone: string | null;
+  approvedByName: string | null;
+  approvedAt: string | null;
+  paidByPhone: string | null;
+  paidByName: string | null;
+  paidAt: string | null;
+  rejectedByPhone: string | null;
+  rejectedByName: string | null;
+  rejectedAt: string | null;
+  rejectionReason: string | null;
   createdAt: string;
 };
 
@@ -196,7 +239,7 @@ export function useCreateFleetOrg() {
 export function useUpdateFleetOrg(orgId: string | null) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: Partial<FleetOrg>) =>
+    mutationFn: (body: Partial<FleetOrg> & { requireFinanceApproval?: boolean }) =>
       request<FleetOrg>(`/organizations/${orgId}`, { method: "PATCH", body: JSON.stringify(body) }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["fleet", "mine"] });
@@ -208,9 +251,67 @@ export function useUpdateFleetOrg(orgId: string | null) {
 export function useUpsertFleetMember(orgId: string | null) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { phone: string; name: string; role: "admin" | "driver" }) =>
+    mutationFn: (body: {
+      phone: string;
+      name: string;
+      role: FleetMemberRole;
+      canCheckoutDirectly?: boolean;
+    }) =>
       request(`/organizations/${orgId}/members`, { method: "POST", body: JSON.stringify(body) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["fleet", "members", orgId] }),
+  });
+}
+
+// ───── Parts orders ─────
+
+export function useFleetPartsOrders(orgId: string | null) {
+  return useQuery({
+    queryKey: ["fleet", "parts-orders", orgId],
+    queryFn: () => request<{ orders: FleetPartsOrder[] }>(`/organizations/${orgId}/parts-orders`),
+    enabled: !!orgId,
+  });
+}
+
+export function useCreateFleetPartsOrder(orgId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      items: FleetPartsOrderItem[];
+      totalAmount: number;
+      shippingAddress: string;
+      deliveryCity?: string | null;
+      deliveryRegion?: string | null;
+      notes?: string | null;
+      mode: "submit_for_approval" | "pay_now";
+    }) =>
+      request<FleetPartsOrder>(`/organizations/${orgId}/parts-orders`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["fleet", "parts-orders", orgId] }),
+  });
+}
+
+export function usePayFleetPartsOrder(orgId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (orderId: string) =>
+      request<FleetPartsOrder>(`/organizations/${orgId}/parts-orders/${orderId}/pay`, {
+        method: "POST",
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["fleet", "parts-orders", orgId] }),
+  });
+}
+
+export function useRejectFleetPartsOrder(orgId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ orderId, reason }: { orderId: string; reason: string }) =>
+      request<FleetPartsOrder>(`/organizations/${orgId}/parts-orders/${orderId}/reject`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["fleet", "parts-orders", orgId] }),
   });
 }
 

@@ -10,10 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useCart, clearCart, setCartScope } from "@/lib/cart";
-import { getBuyerProfile, useRole } from "@/lib/role";
+import { getBuyerProfile, useRole, useFleetOrgId } from "@/lib/role";
+import { useCreateFleetPartsOrder, useMyFleetOrgs } from "@/lib/fleet-api";
 import { formatCurrency } from "@/lib/format";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Wrench } from "lucide-react";
+import { ArrowLeft, Loader2, ShieldCheck, Wrench } from "lucide-react";
 
 export default function Checkout() {
   const { role } = useRole();
@@ -60,6 +61,27 @@ export default function Checkout() {
   const createOrder = useCreateOrder();
   const [submitting, setSubmitting] = useState(false);
 
+  // Fleet branch: when the active role is "fleet", parts checkout routes
+  // through the org-scoped finance-approval workflow instead of creating
+  // vendor orders directly. We MUST NOT fall back to the legacy vendor
+  // checkout when role=fleet — that would bypass approval. So we track
+  // `isFleet` (intent) and `fleetReady` (org context resolved) separately
+  // and block submit while the fleet role is active but the org hasn't
+  // loaded yet.
+  const fleetOrgId = useFleetOrgId();
+  const { data: mine, isLoading: mineLoading } = useMyFleetOrgs();
+  const fleetOrg = mine?.organizations.find((o) => o.id === fleetOrgId) ?? null;
+  const isFleet = role === "fleet" && !isProposal;
+  const fleetReady = !isFleet || !!fleetOrg;
+  const canPayDirectly = !isFleet
+    ? true
+    : !!fleetOrg &&
+      (fleetOrg.myRole === "admin" ||
+        fleetOrg.myRole === "finance" ||
+        !fleetOrg.requireFinanceApproval ||
+        !!fleetOrg.myCanCheckoutDirectly);
+  const createFleetOrder = useCreateFleetPartsOrder(fleetOrgId);
+
   if (lines.length === 0) {
     return (
       <div className="space-y-8 animate-in fade-in-50 duration-500">
@@ -83,8 +105,41 @@ export default function Checkout() {
       toast.error("Please fill in all contact and shipping fields.");
       return;
     }
+    if (isFleet && !fleetReady) {
+      toast.error("Loading your organization — please try again in a moment.");
+      return;
+    }
     setSubmitting(true);
     try {
+      if (isFleet) {
+        // Single fleet parts order rolls up all cart lines; finance/admin
+        // (or a member with the direct-checkout override) can pay now,
+        // everyone else submits for approval.
+        await createFleetOrder.mutateAsync({
+          items: lines.map((l) => ({
+            partId: l.partId,
+            vendorId: l.vendorId,
+            vendorName: l.vendorName,
+            name: l.name,
+            sku: l.sku,
+            unitPrice: l.unitPrice,
+            quantity: l.quantity,
+            imageUrl: l.imageUrl,
+          })),
+          totalAmount: totalAcrossVendors,
+          shippingAddress: shippingAddress.trim(),
+          notes: notes.trim() || null,
+          mode: canPayDirectly ? "pay_now" : "submit_for_approval",
+        });
+        clearCart();
+        toast.success(
+          canPayDirectly
+            ? "Order paid. Vendors will fulfil shortly."
+            : "Order submitted for finance approval.",
+        );
+        navigate("/fleet/orders");
+        return;
+      }
       const results = [];
       for (const group of linesByVendor) {
         const order = await createOrder.mutateAsync({
@@ -260,13 +315,38 @@ export default function Checkout() {
                 <span className="text-primary">{formatCurrency(totalAcrossVendors)}</span>
               </div>
             </div>
-            <Button className="w-full" size="lg" onClick={placeOrders} disabled={submitting}>
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : isProposal ? "Send to owner" : "Place order"}
+            <Button
+              className="w-full"
+              size="lg"
+              onClick={placeOrders}
+              disabled={submitting || (isFleet && (mineLoading || !fleetReady))}
+            >
+              {submitting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : isProposal ? (
+                "Send to owner"
+              ) : isFleet && !fleetReady ? (
+                "Loading organisation..."
+              ) : isFleet && !canPayDirectly ? (
+                "Submit for finance approval"
+              ) : isFleet ? (
+                "Pay now"
+              ) : (
+                "Place order"
+              )}
             </Button>
+            {isFleet && !canPayDirectly && (
+              <p className="text-xs text-amber-700 dark:text-amber-300 text-center flex items-center justify-center gap-1.5">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Your org requires finance approval before vendors are paid.
+              </p>
+            )}
             <p className="text-xs text-muted-foreground text-center">
               {isProposal
                 ? "Owner approval required before vendors ship. Stock is reserved at approval, not now."
-                : "No card needed for this demo — invoiced on delivery."}
+                : isFleet && canPayDirectly
+                  ? "Payment is recorded on the fleet ledger; vendors will fulfil shortly."
+                  : "No card needed for this demo — invoiced on delivery."}
             </p>
           </CardContent>
         </Card>

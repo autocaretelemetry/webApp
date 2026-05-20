@@ -302,6 +302,9 @@ async function main() {
       city: "Accra",
       region: "Greater Accra",
       logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/New-mtn-logo.jpg/320px-New-mtn-logo.jpg",
+      // MTN routes parts-order spend through the finance team by default;
+      // the per-member override on Yaa lets her bypass the queue.
+      requireFinanceApproval: true,
     })
     .returning();
 
@@ -314,15 +317,23 @@ async function main() {
     },
     {
       organizationId: mtn.id,
+      phone: "+233 24 100 0004",
+      name: "Ama Asante",
+      role: "finance",
+    },
+    {
+      organizationId: mtn.id,
       phone: "+233 24 100 0002",
       name: "Kwame Boateng",
       role: "driver",
+      canCheckoutDirectly: false,
     },
     {
       organizationId: mtn.id,
       phone: "+233 24 100 0003",
       name: "Yaa Owusu",
       role: "driver",
+      canCheckoutDirectly: true,
     },
   ]);
 

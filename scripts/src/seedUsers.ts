@@ -62,6 +62,13 @@ const SEEDS: Seed[] = [
     phone: "+233 24 100 0001",
   },
   {
+    email: "finance@autocare.test",
+    password: "finance1234",
+    name: "Ama Asante",
+    role: "fleet",
+    phone: "+233 24 100 0004",
+  },
+  {
     email: "admin@autocare.test",
     password: "admin1234",
     name: "Adaeze Okafor",
