@@ -992,7 +992,7 @@ router.patch("/rental-bookings/:rentalBookingId", requireAuth, async (req, res):
   // --- Owner review (approve/reject) ---
   if (body.data.ownerReview) {
     if (existing.status !== "pending_review") {
-      res.status(400).json({ error: "Owner review is only allowed while the booking is pending review." });
+      res.status(409).json({ error: "Owner review is only allowed while the booking is pending review." });
       return;
     }
     const { decision, notes } = body.data.ownerReview;
@@ -1039,10 +1039,21 @@ router.patch("/rental-bookings/:rentalBookingId", requireAuth, async (req, res):
   let promoteAfterSign = false;
   if (body.data.sign) {
     if (existing.status !== "contract_pending") {
-      res.status(400).json({ error: "Signing is only allowed once a contract has been generated." });
+      res.status(409).json({ error: "Signing is only allowed once a contract has been generated." });
       return;
     }
     const { party, name } = body.data.sign;
+    // Party-bound signature guard: a renter can only sign as 'renter' and an
+    // owner can only sign as 'owner'. Admins may sign on behalf of either
+    // party. Without this a renter could forge the owner's signature and
+    // flip the booking to awaiting_payment unilaterally.
+    if (
+      (access.relationship === "renter" && party !== "renter") ||
+      (access.relationship === "owner" && party !== "owner")
+    ) {
+      res.status(403).json({ error: `Only the ${party} can sign as ${party}.` });
+      return;
+    }
     if (party === "renter") {
       patch.renterSignatureName = name;
       patch.renterSignedAt = now;
@@ -1056,7 +1067,7 @@ router.patch("/rental-bookings/:rentalBookingId", requireAuth, async (req, res):
   // --- Payment ---
   if (body.data.payment) {
     if (existing.status !== "awaiting_payment") {
-      res.status(400).json({ error: "Payment can only be recorded after both parties sign." });
+      res.status(409).json({ error: "Payment can only be recorded after both parties sign." });
       return;
     }
     const { method, markPaid } = body.data.payment;
@@ -1084,7 +1095,7 @@ router.patch("/rental-bookings/:rentalBookingId", requireAuth, async (req, res):
     if (target === "active" && existing.status === "confirmed") ok = true;
     if (target === "completed" && existing.status === "active") ok = true;
     if (!ok) {
-      res.status(400).json({
+      res.status(409).json({
         error: `Cannot move rental from "${existing.status}" to "${target}".`,
       });
       return;
