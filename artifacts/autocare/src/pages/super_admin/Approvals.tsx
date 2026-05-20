@@ -134,6 +134,7 @@ type AuthedUserRow = {
   }> | null;
   lastDecisionEmailAt: string | null;
   decisionEmailCount: number;
+  lastResendEmailAt: string | null;
   createdAt: string;
 };
 
@@ -295,12 +296,15 @@ function ApprovalsList({
   const [q, setQ] = useState("");
   // Re-render every second while any row is inside the resend cooldown so
   // the "Last sent: Ns ago" label and the disabled button tick down live.
+  // Cooldown is driven by `lastResendEmailAt` — the same persisted timestamp
+  // the server uses to enforce the 429 — so refreshing the page keeps the
+  // disabled state accurate.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const inCooldown = rows?.some(
       (r) =>
-        r.lastDecisionEmailAt &&
-        Date.now() - new Date(r.lastDecisionEmailAt).getTime() < RESEND_COOLDOWN_MS,
+        r.lastResendEmailAt &&
+        Date.now() - new Date(r.lastResendEmailAt).getTime() < RESEND_COOLDOWN_MS,
     );
     if (!inCooldown) return;
     const id = window.setInterval(() => setNow(Date.now()), 1000);
@@ -388,6 +392,27 @@ function ApprovalsList({
         credentials: "include",
       });
       const body = await res.json().catch(() => ({}));
+      if (res.status === 429) {
+        // Server is enforcing the cooldown — sync local state to what it
+        // told us so the disabled button shows the correct remaining time
+        // instead of flashing back to "Resend email".
+        const retryAfter = Number(body.retryAfter ?? 0);
+        if (Number.isFinite(retryAfter) && retryAfter > 0) {
+          const reservedAtIso = new Date(
+            Date.now() - (RESEND_COOLDOWN_MS - retryAfter * 1000),
+          ).toISOString();
+          setRows((prev) =>
+            prev
+              ? prev.map((r) =>
+                  r.id === row.id ? { ...r, lastResendEmailAt: reservedAtIso } : r,
+                )
+              : prev,
+          );
+          setNow(Date.now());
+        }
+        toast.error(body.error ?? `Please wait ${retryAfter}s before resending.`);
+        return;
+      }
       if (!res.ok) {
         throw new Error(body.error ?? "Failed to resend");
       }
@@ -410,6 +435,7 @@ function ApprovalsList({
                 ? {
                     ...r,
                     lastDecisionEmailAt: sentAt,
+                    lastResendEmailAt: sentAt,
                     decisionEmailCount: (r.decisionEmailCount ?? 0) + 1,
                   }
                 : r,
@@ -530,11 +556,16 @@ function ApprovalsList({
                   row.approvalStatus !== "pending" ||
                   row.kycStatus === "verified" ||
                   row.kycStatus === "rejected") && (() => {
-                  const lastSentMs = row.lastDecisionEmailAt
-                    ? new Date(row.lastDecisionEmailAt).getTime()
+                  // Disabled-state cooldown comes from `lastResendEmailAt`
+                  // (the timestamp the server enforces 429s against), while
+                  // the "Last sent" label uses the broader
+                  // `lastDecisionEmailAt` so it still shows the initial
+                  // approval/rejection email even before any resend.
+                  const lastResendMs = row.lastResendEmailAt
+                    ? new Date(row.lastResendEmailAt).getTime()
                     : 0;
-                  const remainingMs = lastSentMs
-                    ? Math.max(0, RESEND_COOLDOWN_MS - (now - lastSentMs))
+                  const remainingMs = lastResendMs
+                    ? Math.max(0, RESEND_COOLDOWN_MS - (now - lastResendMs))
                     : 0;
                   const inCooldown = remainingMs > 0;
                   const count = row.decisionEmailCount ?? 0;
