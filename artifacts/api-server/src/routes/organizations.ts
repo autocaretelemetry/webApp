@@ -1,11 +1,12 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { z } from "zod";
-import { and, count, desc, eq, inArray, ne, sum } from "drizzle-orm";
+import { and, count, desc, eq, inArray, ne, sql, sum } from "drizzle-orm";
 import {
   db,
   organizationsTable,
   organizationMembersTable,
   organizationPreferredCentersTable,
+  organizationAddressesTable,
   vehiclesTable,
   serviceCentersTable,
   bookingsTable,
@@ -16,6 +17,7 @@ import {
   ORG_MEMBER_ROLES,
   type Organization,
   type OrganizationMember,
+  type OrganizationAddress,
 } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
 import { getEntitlements } from "../lib/entitlements";
@@ -180,6 +182,18 @@ const RejectPartsOrderBody = z.object({
 const ReplacePreferredCentersBody = z.object({
   serviceCenterIds: z.array(z.string().uuid()),
 });
+
+const OrgAddressBody = z.object({
+  label: z.string().trim().min(1).max(60),
+  recipientName: z.string().trim().min(1).max(120),
+  recipientPhone: z.string().trim().min(1).max(40),
+  addressLine: z.string().trim().min(1).max(500),
+  city: z.string().trim().max(120).optional().default(""),
+  region: z.string().trim().max(120).optional().default(""),
+  isDefault: z.boolean().optional(),
+});
+
+const OrgAddressPatch = OrgAddressBody.partial();
 
 const CreateFleetVehicleBody = z.object({
   brand: z.string().min(1),
@@ -445,6 +459,295 @@ router.put(
       );
     }
     res.status(204).send();
+  },
+);
+
+// ───── Saved shipping addresses (org-scoped address book) ─────
+
+/**
+ * Org-scoped address book used by fleet parts-order checkout. Mirrors the
+ * per-user `/me/addresses` book but rows are visible to every member, so
+ * managers/drivers see the same HQ/branch entries the admin set up. Any
+ * member may list (drivers need it to pick at checkout) and bump
+ * `lastUsedAt`; create/update/delete are gated to admin/finance/manager
+ * because driver members shouldn't be able to alter where the org's
+ * deliveries land.
+ */
+
+const ADDRESS_MUTATION_ROLES: OrgRole[] = ["admin", "finance", "manager"];
+
+function canMutateOrgAddresses(
+  m: { member: OrganizationMember | null; isPlatform: boolean },
+): boolean {
+  if (m.isPlatform) return true;
+  return !!m.member && ADDRESS_MUTATION_ROLES.includes(m.member.role as OrgRole);
+}
+
+function toOrgAddressDto(row: OrganizationAddress) {
+  return {
+    id: row.id,
+    organizationId: row.organizationId,
+    label: row.label,
+    recipientName: row.recipientName,
+    recipientPhone: row.recipientPhone,
+    addressLine: row.addressLine,
+    city: row.city,
+    region: row.region,
+    isDefault: row.isDefault,
+    lastUsedAt: row.lastUsedAt ? row.lastUsedAt.toISOString() : null,
+    createdByPhone: row.createdByPhone,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+async function clearOtherOrgDefaults(orgId: string, exceptId?: string) {
+  const whereClause = exceptId
+    ? and(
+        eq(organizationAddressesTable.organizationId, orgId),
+        sql`${organizationAddressesTable.id} <> ${exceptId}`,
+      )
+    : eq(organizationAddressesTable.organizationId, orgId);
+  await db
+    .update(organizationAddressesTable)
+    .set({ isDefault: false, updatedAt: new Date() })
+    .where(whereClause);
+}
+
+router.get(
+  "/organizations/:orgId/addresses",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    const m = await requireOrgMember(req, res, String(req.params.orgId));
+    if (!m) return;
+    // Sort: default first, then most-recently-used, then newest. The
+    // client renders the dropdown in this order and uses the first row
+    // as the auto-preselect.
+    const rows = await db
+      .select()
+      .from(organizationAddressesTable)
+      .where(eq(organizationAddressesTable.organizationId, m.org.id))
+      .orderBy(
+        desc(organizationAddressesTable.isDefault),
+        desc(
+          sql`coalesce(${organizationAddressesTable.lastUsedAt}, ${organizationAddressesTable.createdAt})`,
+        ),
+        desc(organizationAddressesTable.createdAt),
+      );
+    res.json({ addresses: rows.map(toOrgAddressDto) });
+  },
+);
+
+router.post(
+  "/organizations/:orgId/addresses",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    const m = await requireOrgMember(req, res, String(req.params.orgId));
+    if (!m) return;
+    if (!canMutateOrgAddresses(m)) {
+      res.status(403).json({
+        error: "Only admins, finance, and managers can edit the fleet address book.",
+      });
+      return;
+    }
+    const parsed = OrgAddressBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+    const existing = await db
+      .select({ id: organizationAddressesTable.id })
+      .from(organizationAddressesTable)
+      .where(eq(organizationAddressesTable.organizationId, m.org.id));
+    // First address always becomes the default — checkout expects exactly
+    // one preselected entry once the book is non-empty.
+    const shouldBeDefault = parsed.data.isDefault === true || existing.length === 0;
+    if (shouldBeDefault) {
+      await clearOtherOrgDefaults(m.org.id);
+    }
+    const [row] = await db
+      .insert(organizationAddressesTable)
+      .values({
+        organizationId: m.org.id,
+        label: parsed.data.label,
+        recipientName: parsed.data.recipientName,
+        recipientPhone: parsed.data.recipientPhone,
+        addressLine: parsed.data.addressLine,
+        city: parsed.data.city ?? "",
+        region: parsed.data.region ?? "",
+        isDefault: shouldBeDefault,
+        createdByPhone: req.user!.phone ?? null,
+      })
+      .returning();
+    if (!row) {
+      res.status(500).json({ error: "Could not save address" });
+      return;
+    }
+    res.status(201).json(toOrgAddressDto(row));
+  },
+);
+
+router.patch(
+  "/organizations/:orgId/addresses/:id",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    const m = await requireOrgMember(req, res, String(req.params.orgId));
+    if (!m) return;
+    if (!canMutateOrgAddresses(m)) {
+      res.status(403).json({
+        error: "Only admins, finance, and managers can edit the fleet address book.",
+      });
+      return;
+    }
+    const parsed = OrgAddressPatch.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+    const id = String(req.params.id);
+    const [current] = await db
+      .select()
+      .from(organizationAddressesTable)
+      .where(
+        and(
+          eq(organizationAddressesTable.id, id),
+          eq(organizationAddressesTable.organizationId, m.org.id),
+        ),
+      );
+    if (!current) {
+      res.status(404).json({ error: "Address not found" });
+      return;
+    }
+    const patch: Partial<typeof organizationAddressesTable.$inferInsert> = {
+      updatedAt: new Date(),
+    };
+    if (parsed.data.label !== undefined) patch.label = parsed.data.label;
+    if (parsed.data.recipientName !== undefined)
+      patch.recipientName = parsed.data.recipientName;
+    if (parsed.data.recipientPhone !== undefined)
+      patch.recipientPhone = parsed.data.recipientPhone;
+    if (parsed.data.addressLine !== undefined)
+      patch.addressLine = parsed.data.addressLine;
+    if (parsed.data.city !== undefined) patch.city = parsed.data.city ?? "";
+    if (parsed.data.region !== undefined)
+      patch.region = parsed.data.region ?? "";
+    const makingDefault = parsed.data.isDefault === true;
+    const clearingDefault =
+      parsed.data.isDefault === false && current.isDefault;
+    if (makingDefault) {
+      await clearOtherOrgDefaults(m.org.id, id);
+      patch.isDefault = true;
+    } else if (clearingDefault) {
+      const others = await db
+        .select({ id: organizationAddressesTable.id })
+        .from(organizationAddressesTable)
+        .where(
+          and(
+            eq(organizationAddressesTable.organizationId, m.org.id),
+            sql`${organizationAddressesTable.id} <> ${id}`,
+          ),
+        );
+      if (others.length === 0) {
+        res.status(400).json({
+          error: "At least one address must be marked as default.",
+        });
+        return;
+      }
+      patch.isDefault = false;
+    }
+    const [row] = await db
+      .update(organizationAddressesTable)
+      .set(patch)
+      .where(eq(organizationAddressesTable.id, id))
+      .returning();
+    res.json(toOrgAddressDto(row!));
+  },
+);
+
+router.delete(
+  "/organizations/:orgId/addresses/:id",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    const m = await requireOrgMember(req, res, String(req.params.orgId));
+    if (!m) return;
+    if (!canMutateOrgAddresses(m)) {
+      res.status(403).json({
+        error: "Only admins, finance, and managers can edit the fleet address book.",
+      });
+      return;
+    }
+    const id = String(req.params.id);
+    const [current] = await db
+      .select()
+      .from(organizationAddressesTable)
+      .where(
+        and(
+          eq(organizationAddressesTable.id, id),
+          eq(organizationAddressesTable.organizationId, m.org.id),
+        ),
+      );
+    if (!current) {
+      res.status(404).json({ error: "Address not found" });
+      return;
+    }
+    await db
+      .delete(organizationAddressesTable)
+      .where(eq(organizationAddressesTable.id, id));
+    // If we just removed the default, promote the most-recently-used
+    // surviving entry so checkout still has a preselected address.
+    if (current.isDefault) {
+      const [next] = await db
+        .select({ id: organizationAddressesTable.id })
+        .from(organizationAddressesTable)
+        .where(eq(organizationAddressesTable.organizationId, m.org.id))
+        .orderBy(
+          desc(
+            sql`coalesce(${organizationAddressesTable.lastUsedAt}, ${organizationAddressesTable.createdAt})`,
+          ),
+          desc(organizationAddressesTable.createdAt),
+        )
+        .limit(1);
+      if (next) {
+        await db
+          .update(organizationAddressesTable)
+          .set({ isDefault: true, updatedAt: new Date() })
+          .where(eq(organizationAddressesTable.id, next.id));
+      }
+    }
+    res.status(204).end();
+  },
+);
+
+// Bump lastUsedAt and promote to default. Any member may call this —
+// it fires after a successful fleet parts-order checkout so the next
+// visit preselects the address they just shipped to.
+router.post(
+  "/organizations/:orgId/addresses/:id/touch",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    const m = await requireOrgMember(req, res, String(req.params.orgId));
+    if (!m) return;
+    const id = String(req.params.id);
+    const [current] = await db
+      .select()
+      .from(organizationAddressesTable)
+      .where(
+        and(
+          eq(organizationAddressesTable.id, id),
+          eq(organizationAddressesTable.organizationId, m.org.id),
+        ),
+      );
+    if (!current) {
+      res.status(404).json({ error: "Address not found" });
+      return;
+    }
+    await clearOtherOrgDefaults(m.org.id, id);
+    const [row] = await db
+      .update(organizationAddressesTable)
+      .set({ lastUsedAt: new Date(), isDefault: true, updatedAt: new Date() })
+      .where(eq(organizationAddressesTable.id, id))
+      .returning();
+    res.json(toOrgAddressDto(row!));
   },
 );
 

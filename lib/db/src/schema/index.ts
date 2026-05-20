@@ -25,6 +25,7 @@ export * from "./users";
 export * from "./userAddresses";
 export * from "./landingContent";
 export * from "./organizations";
+export * from "./organizationAddresses";
 export * from "./fleetTracking";
 export * from "./fleetPartsOrders";
 export * from "./approvalEvents";

@@ -482,6 +482,91 @@ export async function downloadFleetHistory(opts: {
   URL.revokeObjectURL(url);
 }
 
+// ───── Saved addresses (org-scoped) ─────
+
+export type FleetAddress = {
+  id: string;
+  organizationId: string;
+  label: string;
+  recipientName: string;
+  recipientPhone: string;
+  addressLine: string;
+  city: string;
+  region: string;
+  isDefault: boolean;
+  lastUsedAt: string | null;
+  createdByPhone: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type FleetAddressInput = {
+  label: string;
+  recipientName: string;
+  recipientPhone: string;
+  addressLine: string;
+  city?: string;
+  region?: string;
+  isDefault?: boolean;
+};
+
+export const fleetAddressesKey = (orgId: string | null) =>
+  ["fleet", "addresses", orgId] as const;
+
+export function useFleetAddresses(orgId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: fleetAddressesKey(orgId),
+    queryFn: () =>
+      request<{ addresses: FleetAddress[] }>(`/organizations/${orgId}/addresses`),
+    enabled: !!orgId && enabled,
+    staleTime: 30_000,
+  });
+}
+
+export function useCreateFleetAddress(orgId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: FleetAddressInput) =>
+      request<FleetAddress>(`/organizations/${orgId}/addresses`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: fleetAddressesKey(orgId) }),
+  });
+}
+
+export function useUpdateFleetAddress(orgId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<FleetAddressInput> }) =>
+      request<FleetAddress>(`/organizations/${orgId}/addresses/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: fleetAddressesKey(orgId) }),
+  });
+}
+
+export function useDeleteFleetAddress(orgId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      request<void>(`/organizations/${orgId}/addresses/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: fleetAddressesKey(orgId) }),
+  });
+}
+
+export function useTouchFleetAddress(orgId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      request<FleetAddress>(`/organizations/${orgId}/addresses/${id}/touch`, {
+        method: "POST",
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: fleetAddressesKey(orgId) }),
+  });
+}
+
 export function useUpdateFleetVehicle(orgId: string | null) {
   const qc = useQueryClient();
   return useMutation({

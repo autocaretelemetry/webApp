@@ -12,7 +12,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCart, clearCart, setCartScope } from "@/lib/cart";
 import { useRole, useFleetOrgId } from "@/lib/role";
 import { useAuth } from "@/lib/auth";
-import { useCreateFleetPartsOrder, useMyFleetOrgs } from "@/lib/fleet-api";
+import {
+  useCreateFleetPartsOrder,
+  useMyFleetOrgs,
+  useFleetAddresses,
+  useCreateFleetAddress,
+  useTouchFleetAddress,
+  type FleetAddress,
+} from "@/lib/fleet-api";
 import {
   useMyAddresses,
   useCreateAddress,
@@ -58,13 +65,32 @@ export default function Checkout() {
   const [deliveryCity, setDeliveryCity] = useState("");
   const [deliveryRegion, setDeliveryRegion] = useState("");
 
+  // Fleet org context (needs to be known before resolving which address
+  // book applies). The full fleet permissions block lives further down.
+  const fleetOrgId = useFleetOrgId();
+  const isFleetIntent = role === "fleet" && !isProposal;
+
   // Saved address book: signed-in direct buyers get a dropdown of their
-  // saved entries (default preselected) plus an "Add new address" option
-  // that opens the inline form. Skipped in proposal mode — proposals
-  // always ship to the booking's service center.
-  const { data: savedAddresses } = useMyAddresses(!isProposal && !!user);
+  // personal saved entries; fleet checkout gets the org-scoped book
+  // (HQ / branches) every member sees. Skipped in proposal mode —
+  // proposals always ship to the booking's service center.
+  const { data: savedAddresses } = useMyAddresses(
+    !isProposal && !isFleetIntent && !!user,
+  );
+  const { data: fleetAddressesResp } = useFleetAddresses(
+    fleetOrgId,
+    !isProposal && isFleetIntent,
+  );
+  const fleetAddresses = fleetAddressesResp?.addresses;
+  // Unified view: which book are we showing this checkout? Fleet wins
+  // when the role is fleet, otherwise the personal book. This keeps the
+  // dropdown + auto-preselect logic below source-agnostic.
+  const addressBook: Array<FleetAddress | SavedAddress> | undefined =
+    isFleetIntent ? fleetAddresses : savedAddresses;
   const createAddress = useCreateAddress();
   const touchAddress = useTouchAddress();
+  const createFleetAddress = useCreateFleetAddress(fleetOrgId);
+  const touchFleetAddress = useTouchFleetAddress(fleetOrgId);
   // "" = use a new address (inline form), otherwise the saved address id.
   const [selectedAddressId, setSelectedAddressId] = useState<string>("");
   const [didPickSaved, setDidPickSaved] = useState(false);
@@ -118,9 +144,15 @@ export default function Checkout() {
 
   // Apply a saved address into the form fields. Memo-free — called from
   // the dropdown onValueChange and from the auto-preselect effect below.
-  const applySavedAddress = (a: SavedAddress) => {
-    setBuyerName(a.recipientName);
-    setBuyerPhone(a.recipientPhone);
+  // Works for both personal and fleet entries (same shape).
+  const applySavedAddress = (a: SavedAddress | FleetAddress) => {
+    // Fleet entries are org-level, so don't overwrite the requester's
+    // name/phone with the address's recipient — keep the signed-in
+    // member's details so the order audit trail stays accurate.
+    if (!isFleetIntent) {
+      setBuyerName(a.recipientName);
+      setBuyerPhone(a.recipientPhone);
+    }
     setShippingAddress(a.addressLine);
     setDeliveryCity(a.city ?? "");
     setDeliveryRegion(a.region ?? "");
@@ -132,13 +164,14 @@ export default function Checkout() {
   useEffect(() => {
     if (isProposal) return;
     if (didPickSaved) return;
-    if (!savedAddresses || savedAddresses.length === 0) return;
+    if (!addressBook || addressBook.length === 0) return;
     // Server returns them already sorted (default → most-recently-used).
-    const preferred = savedAddresses[0];
+    const preferred = addressBook[0];
     setSelectedAddressId(preferred.id);
     applySavedAddress(preferred);
     setDidPickSaved(true);
-  }, [isProposal, savedAddresses, didPickSaved]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isProposal, addressBook, didPickSaved]);
 
   // When the booking loads in proposal mode, prefill from owner + service center.
   useEffect(() => {
@@ -165,15 +198,11 @@ export default function Checkout() {
 
   // Fleet branch: when the active role is "fleet", parts checkout routes
   // through the org-scoped finance-approval workflow instead of creating
-  // vendor orders directly. We MUST NOT fall back to the legacy vendor
-  // checkout when role=fleet — that would bypass approval. So we track
-  // `isFleet` (intent) and `fleetReady` (org context resolved) separately
-  // and block submit while the fleet role is active but the org hasn't
-  // loaded yet.
-  const fleetOrgId = useFleetOrgId();
+  // vendor orders directly. `fleetOrgId` + `isFleetIntent` are declared
+  // higher up so the address-book hooks can use them.
   const { data: mine, isLoading: mineLoading } = useMyFleetOrgs();
   const fleetOrg = mine?.organizations.find((o) => o.id === fleetOrgId) ?? null;
-  const isFleet = role === "fleet" && !isProposal;
+  const isFleet = isFleetIntent;
   const fleetReady = !isFleet || !!fleetOrg;
   const canPayDirectly = !isFleet
     ? true
@@ -214,6 +243,38 @@ export default function Checkout() {
     setSubmitting(true);
     try {
       if (isFleet) {
+        // Persist a brand-new entry to the org book BEFORE submitting, so
+        // a subsequent crash doesn't leave the fleet without the entry.
+        // Mutation gate matches the server: admin/finance/manager only.
+        const memberRole = fleetOrg?.myRole ?? null;
+        const canEditAddressBook =
+          memberRole === "admin" ||
+          memberRole === "finance" ||
+          memberRole === "manager";
+        let fleetTouchTargetId: string | null = selectedAddressId || null;
+        if (
+          fleetOrgId &&
+          !selectedAddressId &&
+          saveNewAddress &&
+          canEditAddressBook
+        ) {
+          try {
+            const created = await createFleetAddress.mutateAsync({
+              label: newAddressLabel.trim() || "Shipping address",
+              recipientName: buyerName.trim(),
+              recipientPhone: buyerPhone.trim(),
+              addressLine: shippingAddress.trim(),
+              city: deliveryCity.trim(),
+              region: deliveryRegion.trim(),
+              isDefault: true,
+            });
+            fleetTouchTargetId = created.id;
+          } catch {
+            toast.error(
+              "Could not save address to the fleet book; order will still go through.",
+            );
+          }
+        }
         // Single fleet parts order rolls up all cart lines; finance/admin
         // (or a member with the direct-checkout override) can pay now,
         // everyone else submits for approval.
@@ -230,9 +291,20 @@ export default function Checkout() {
           })),
           totalAmount: totalAcrossVendors,
           shippingAddress: shippingAddress.trim(),
+          deliveryCity: deliveryCity.trim() || null,
+          deliveryRegion: deliveryRegion.trim() || null,
           notes: notes.trim() || null,
           mode: canPayDirectly ? "pay_now" : "submit_for_approval",
         });
+        // Bump lastUsedAt so the next visit preselects this address.
+        // Best-effort — failure shouldn't block the success path.
+        if (fleetTouchTargetId && fleetOrgId) {
+          try {
+            await touchFleetAddress.mutateAsync(fleetTouchTargetId);
+          } catch {
+            /* non-fatal */
+          }
+        }
         clearCart();
         toast.success(
           canPayDirectly
@@ -246,6 +318,7 @@ export default function Checkout() {
       // "Save to address book", persist it BEFORE creating the orders so
       // a subsequent crash doesn't leave them without the entry. The new
       // address is automatically marked default (book may be empty too).
+      // (Fleet branch handles its own save+touch above and `return`s.)
       let touchTargetId: string | null = selectedAddressId || null;
       if (!isProposal && user && !selectedAddressId && saveNewAddress) {
         try {
@@ -367,7 +440,7 @@ export default function Checkout() {
           <Card>
             <CardContent className="p-5 space-y-4">
               <h2 className="font-semibold">{isProposal ? "Owner & delivery" : "Contact & shipping"}</h2>
-              {!isProposal && user && savedAddresses && savedAddresses.length > 0 && (
+              {!isProposal && user && addressBook && addressBook.length > 0 && (
                 <div>
                   <Label htmlFor="saved-addr">Ship to</Label>
                   <Select
@@ -379,12 +452,10 @@ export default function Checkout() {
                         setShippingAddress("");
                         setDeliveryCity("");
                         setDeliveryRegion("");
-                        // Keep name/phone — they default from the user
-                        // and the buyer most likely wants them unchanged.
                         return;
                       }
                       setSelectedAddressId(value);
-                      const picked = savedAddresses.find((a) => a.id === value);
+                      const picked = addressBook.find((a) => a.id === value);
                       if (picked) applySavedAddress(picked);
                       setSaveNewAddress(false);
                       setNewAddressLabel("");
@@ -394,7 +465,7 @@ export default function Checkout() {
                       <SelectValue placeholder="Pick a saved address" />
                     </SelectTrigger>
                     <SelectContent>
-                      {savedAddresses.map((a) => (
+                      {addressBook.map((a) => (
                         <SelectItem key={a.id} value={a.id}>
                           {a.label}
                           {a.isDefault ? " · Default" : ""} — {a.addressLine}
@@ -405,7 +476,20 @@ export default function Checkout() {
                     </SelectContent>
                   </Select>
                   <p className="text-[11px] text-muted-foreground mt-1.5">
-                    Manage your address book from your <Link href="/profile" className="underline">profile</Link>.
+                    {isFleetIntent ? (
+                      <>
+                        Shared with your fleet — manage entries in{" "}
+                        <Link href="/fleet/settings" className="underline">
+                          fleet settings
+                        </Link>
+                        .
+                      </>
+                    ) : (
+                      <>
+                        Manage your address book from your{" "}
+                        <Link href="/profile" className="underline">profile</Link>.
+                      </>
+                    )}
                   </p>
                 </div>
               )}
@@ -450,14 +534,20 @@ export default function Checkout() {
                   <Input id="region" value={deliveryRegion ?? ""} onChange={(e) => setDeliveryRegion(e.target.value)} className="mt-1.5" />
                 </div>
               </div>
-              {!isProposal && user && !selectedAddressId && (
+              {!isProposal && user && !selectedAddressId &&
+                // Drivers can't write to the fleet book, so don't tease the save option.
+                (!isFleetIntent ||
+                  (fleetOrg?.myRole &&
+                    fleetOrg.myRole !== "driver")) && (
                 <div className="border rounded-md p-3 bg-muted/30 space-y-2">
                   <label className="flex items-center gap-2 text-sm cursor-pointer">
                     <Checkbox
                       checked={saveNewAddress}
                       onCheckedChange={(v) => setSaveNewAddress(v === true)}
                     />
-                    Save this to my address book for next time
+                    {isFleetIntent
+                      ? "Save this to the fleet address book for next time"
+                      : "Save this to my address book for next time"}
                   </label>
                   {saveNewAddress && (
                     <div>
