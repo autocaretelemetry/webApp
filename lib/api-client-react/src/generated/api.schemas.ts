@@ -2280,6 +2280,7 @@ export type ListApprovalsParams = {
 state?: ListApprovalsState;
 role?: ListApprovalsRole;
 q?: string;
+sort?: ListApprovalsSort;
 /**
  * @minimum 1
  * @maximum 100
@@ -2308,6 +2309,15 @@ export const ListApprovalsRole = {
   delivery: 'delivery',
   fleet: 'fleet',
   renter: 'renter',
+} as const;
+
+export type ListApprovalsSort = typeof ListApprovalsSort[keyof typeof ListApprovalsSort];
+
+
+export const ListApprovalsSort = {
+  newest: 'newest',
+  oldest: 'oldest',
+  role: 'role',
 } as const;
 
 export type ListApprovals200 = {

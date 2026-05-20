@@ -3709,6 +3709,7 @@ export const SubmitKycResponse = zod.object({
  * @summary Super-admin queue of self-signup applications
  */
 export const listApprovalsQueryStateDefault = `pending`;
+export const listApprovalsQuerySortDefault = `newest`;
 export const listApprovalsQueryLimitDefault = 25;
 export const listApprovalsQueryLimitMax = 100;
 
@@ -3718,6 +3719,7 @@ export const ListApprovalsQueryParams = zod.object({
   "state": zod.enum(['pending', 'kyc_pending', 'rejected', 'all']).default(listApprovalsQueryStateDefault),
   "role": zod.enum(['owner', 'center', 'vendor', 'delivery', 'fleet', 'renter']).optional(),
   "q": zod.coerce.string().optional(),
+  "sort": zod.enum(['newest', 'oldest', 'role']).default(listApprovalsQuerySortDefault),
   "limit": zod.coerce.number().min(1).max(listApprovalsQueryLimitMax).default(listApprovalsQueryLimitDefault),
   "cursor": zod.coerce.string().optional()
 })

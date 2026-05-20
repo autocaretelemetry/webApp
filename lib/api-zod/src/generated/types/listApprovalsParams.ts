@@ -6,12 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ListApprovalsRole } from './listApprovalsRole';
+import type { ListApprovalsSort } from './listApprovalsSort';
 import type { ListApprovalsState } from './listApprovalsState';
 
 export type ListApprovalsParams = {
 state?: ListApprovalsState;
 role?: ListApprovalsRole;
 q?: string;
+sort?: ListApprovalsSort;
 /**
  * @minimum 1
  * @maximum 100

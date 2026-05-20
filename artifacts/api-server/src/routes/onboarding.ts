@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { and, desc, eq, ilike, inArray, lt, or, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gt, ilike, inArray, lt, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import {
   db,
@@ -358,6 +358,9 @@ router.get("/admin/approvals", requireSuperAdmin, async (req, res): Promise<void
   const state = String(req.query["state"] ?? "pending");
   const role = typeof req.query["role"] === "string" ? req.query["role"] : "";
   const q = typeof req.query["q"] === "string" ? req.query["q"].trim() : "";
+  const rawSort = typeof req.query["sort"] === "string" ? req.query["sort"] : "newest";
+  const sort: "newest" | "oldest" | "role" =
+    rawSort === "oldest" || rawSort === "role" ? rawSort : "newest";
   const rawLimit = Number(req.query["limit"] ?? 25);
   const limit = Math.min(100, Math.max(1, Number.isFinite(rawLimit) ? rawLimit : 25));
   const cursor = typeof req.query["cursor"] === "string" ? req.query["cursor"] : "";
@@ -394,14 +397,56 @@ router.get("/admin/approvals", requireSuperAdmin, async (req, res): Promise<void
   if (cursor) {
     try {
       const decoded = Buffer.from(cursor, "base64url").toString("utf8");
-      const [iso, id] = decoded.split("|");
-      if (iso && id) {
+      // Cursor format: `<sort>|<role>|<iso>|<id>` (role is "" when null).
+      // Older `<iso>|<id>` cursors are still accepted and treated as `newest`.
+      const parts = decoded.split("|");
+      let cSort = sort;
+      let cRole = "";
+      let iso: string | undefined;
+      let id: string | undefined;
+      if (parts.length === 4) {
+        const [s, r, i, d] = parts;
+        if (s === "newest" || s === "oldest" || s === "role") cSort = s;
+        cRole = r ?? "";
+        iso = i;
+        id = d;
+      } else if (parts.length === 2) {
+        [iso, id] = parts;
+      }
+      if (iso && id && cSort === sort) {
         const ts = new Date(iso);
         if (!Number.isNaN(ts.getTime())) {
-          const after = or(
-            lt(usersTable.createdAt, ts),
-            and(eq(usersTable.createdAt, ts), lt(usersTable.id, id)),
-          );
+          let after: SQL | undefined;
+          if (sort === "newest") {
+            after = or(
+              lt(usersTable.createdAt, ts),
+              and(eq(usersTable.createdAt, ts), lt(usersTable.id, id)),
+            );
+          } else if (sort === "oldest") {
+            after = or(
+              gt(usersTable.createdAt, ts),
+              and(eq(usersTable.createdAt, ts), gt(usersTable.id, id)),
+            );
+          } else {
+            // sort === "role": role ASC NULLS LAST, then createdAt ASC, id ASC.
+            // The cursor's `cRole` is "" when the previous row had no requestedRole.
+            const sameRoleTail = and(
+              cRole
+                ? eq(usersTable.requestedRole, cRole)
+                : sql`${usersTable.requestedRole} is null`,
+              or(
+                gt(usersTable.createdAt, ts),
+                and(eq(usersTable.createdAt, ts), gt(usersTable.id, id)),
+              ),
+            );
+            const laterRole = cRole
+              ? or(
+                  sql`${usersTable.requestedRole} > ${cRole}`,
+                  sql`${usersTable.requestedRole} is null`,
+                )
+              : undefined; // already at the NULLS-LAST bucket; nothing comes after
+            after = laterRole ? or(laterRole, sameRoleTail) : sameRoleTail;
+          }
           if (after) conditions.push(after);
         }
       }
@@ -411,11 +456,21 @@ router.get("/admin/approvals", requireSuperAdmin, async (req, res): Promise<void
   }
 
   const where = conditions.length === 1 ? conditions[0] : and(...conditions);
+  const orderBy =
+    sort === "oldest"
+      ? [asc(usersTable.createdAt), asc(usersTable.id)]
+      : sort === "role"
+        ? [
+            sql`${usersTable.requestedRole} asc nulls last`,
+            asc(usersTable.createdAt),
+            asc(usersTable.id),
+          ]
+        : [desc(usersTable.createdAt), desc(usersTable.id)];
   const rows = await db
     .select()
     .from(usersTable)
     .where(where)
-    .orderBy(desc(usersTable.createdAt), desc(usersTable.id))
+    .orderBy(...orderBy)
     .limit(limit + 1);
 
   const hasMore = rows.length > limit;
@@ -423,9 +478,10 @@ router.get("/admin/approvals", requireSuperAdmin, async (req, res): Promise<void
   const last = page[page.length - 1];
   const nextCursor =
     hasMore && last
-      ? Buffer.from(`${last.createdAt.toISOString()}|${last.id}`, "utf8").toString(
-          "base64url",
-        )
+      ? Buffer.from(
+          `${sort}|${last.requestedRole ?? ""}|${last.createdAt.toISOString()}|${last.id}`,
+          "utf8",
+        ).toString("base64url")
       : null;
 
   res.json({

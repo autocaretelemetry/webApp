@@ -89,6 +89,7 @@ export * from './listActivityRole';
 export * from './listApprovals200';
 export * from './listApprovalsParams';
 export * from './listApprovalsRole';
+export * from './listApprovalsSort';
 export * from './listApprovalsState';
 export * from './listBookingsParams';
 export * from './listBookingsRole';

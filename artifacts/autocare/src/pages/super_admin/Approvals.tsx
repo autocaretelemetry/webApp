@@ -113,13 +113,26 @@ const ROLE_OPTIONS = [
   { value: "renter", label: "Renter" },
 ] as const;
 
+const SORT_OPTIONS = [
+  { value: "newest", label: "Newest first" },
+  { value: "oldest", label: "Oldest first" },
+  { value: "role", label: "By role" },
+] as const;
+
+type SortValue = (typeof SORT_OPTIONS)[number]["value"];
+
 async function fetchApprovals(params: {
   state: string;
   role: string;
   q: string;
+  sort: SortValue;
   cursor?: string;
 }): Promise<ApprovalsPage> {
-  const qs = new URLSearchParams({ state: params.state, limit: "25" });
+  const qs = new URLSearchParams({
+    state: params.state,
+    sort: params.sort,
+    limit: "25",
+  });
   if (params.role && params.role !== "all") qs.set("role", params.role);
   if (params.q.trim()) qs.set("q", params.q.trim());
   if (params.cursor) qs.set("cursor", params.cursor);
@@ -167,6 +180,7 @@ function ApprovalsList({ kind }: { kind: "applications" | "kyc" | "rejected" }) 
   const [historyFor, setHistoryFor] = useState<AuthedUserRow | null>(null);
 
   const [role, setRole] = useState<string>("all");
+  const [sort, setSort] = useState<SortValue>("newest");
   const [searchInput, setSearchInput] = useState("");
   const [q, setQ] = useState("");
 
@@ -185,7 +199,7 @@ function ApprovalsList({ kind }: { kind: "applications" | "kyc" | "rejected" }) 
     setRows(null);
     setNextCursor(null);
     try {
-      const page = await fetchApprovals({ state, role, q });
+      const page = await fetchApprovals({ state, role, q, sort });
       setRows(page.items);
       setNextCursor(page.nextCursor);
     } catch (err) {
@@ -198,7 +212,7 @@ function ApprovalsList({ kind }: { kind: "applications" | "kyc" | "rejected" }) 
     if (!nextCursor) return;
     setLoadingMore(true);
     try {
-      const page = await fetchApprovals({ state, role, q, cursor: nextCursor });
+      const page = await fetchApprovals({ state, role, q, sort, cursor: nextCursor });
       setRows((prev) => (prev ? [...prev, ...page.items] : page.items));
       setNextCursor(page.nextCursor);
     } catch (err) {
@@ -211,7 +225,7 @@ function ApprovalsList({ kind }: { kind: "applications" | "kyc" | "rejected" }) 
   useEffect(() => {
     void reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, role, q]);
+  }, [state, role, q, sort]);
 
   async function decide(row: AuthedUserRow, action: "approve" | "reject" | "verify", note?: string) {
     setBusy(row.id);
@@ -283,6 +297,18 @@ function ApprovalsList({ kind }: { kind: "applications" | "kyc" | "rejected" }) 
         </SelectTrigger>
         <SelectContent>
           {ROLE_OPTIONS.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value}>
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Select value={sort} onValueChange={(v) => setSort(v as SortValue)}>
+        <SelectTrigger className="sm:w-44">
+          <SelectValue placeholder="Sort" />
+        </SelectTrigger>
+        <SelectContent>
+          {SORT_OPTIONS.map((opt) => (
             <SelectItem key={opt.value} value={opt.value}>
               {opt.label}
             </SelectItem>
