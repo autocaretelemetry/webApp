@@ -245,7 +245,12 @@ function OwnerDashboard() {
                 key={`${r.vehicleId ?? "x"}-${i}`}
                 style={{ paddingHorizontal: 14, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: "#0001" }}
               >
-                <Row title={r.title ?? "Service reminder"} subtitle={r.dueLabel} />
+                <Row
+                  title={r.title ?? "Service reminder"}
+                  subtitle={r.dueLabel}
+                  leadingIcon="bell"
+                  leadingTone="warning"
+                />
               </View>
             ))}
           </Card>
@@ -264,6 +269,8 @@ function OwnerDashboard() {
                 <Row
                   title={`${v.year ?? ""} ${v.make ?? ""} ${v.model ?? ""}`.trim() || "Vehicle"}
                   subtitle={v.plate ?? undefined}
+                  leadingIcon="truck"
+                  leadingTone="secondary"
                 />
               </View>
             ))}
@@ -312,6 +319,8 @@ function CenterDashboard() {
                 <Row
                   title={b.vehicleLabel ?? "Booking"}
                   subtitle={`#${b.id.slice(0, 8)}`}
+                  leadingIcon="tool"
+                  leadingTone="primary"
                   badge={{ label: (b.status ?? "").replaceAll("_", " "), tone: statusTone(b.status) }}
                 />
               </View>
@@ -372,6 +381,8 @@ function VendorDashboard({ phone }: { phone?: string | null }) {
                 <Row
                   title={o.buyerName ?? "Buyer"}
                   subtitle={`#${o.id.slice(0, 8)}`}
+                  leadingIcon="shopping-bag"
+                  leadingTone="success"
                   badge={{ label: (o.status ?? "").replaceAll("_", " "), tone: statusTone(o.status) }}
                 />
               </View>
@@ -429,6 +440,8 @@ function RenterDashboard() {
                   <Row
                     title={t.carLabel ?? "Trip"}
                     subtitle={when ? new Date(when).toLocaleString() : undefined}
+                    leadingIcon="map-pin"
+                    leadingTone="primary"
                     badge={{ label: (t.status ?? "").replaceAll("_", " "), tone: statusTone(t.status) }}
                   />
                 </View>
@@ -524,7 +537,7 @@ function FleetDashboard() {
           <Card padding={0}>
             {(d?.upcomingReminders ?? []).slice(0, 5).map((r, i) => (
               <View key={i} style={{ paddingHorizontal: 14, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: "#0001" }}>
-                <Row title={r.title ?? "Reminder"} subtitle={r.dueLabel} />
+                <Row title={r.title ?? "Reminder"} subtitle={r.dueLabel} leadingIcon="bell" leadingTone="warning" />
               </View>
             ))}
           </Card>
@@ -564,6 +577,8 @@ function DeliveryDashboard() {
                 <Row
                   title={j.buyerName ?? "Customer"}
                   subtitle={j.shippingAddress}
+                  leadingIcon="package"
+                  leadingTone="secondary"
                   badge={{ label: (j.status ?? "").replaceAll("_", " "), tone: statusTone(j.status) }}
                 />
               </View>
@@ -603,7 +618,7 @@ function AdminDashboard() {
         <Card padding={0}>
           {((centers.data as Array<{ id: string; name: string; city?: string }>) ?? []).slice(0, 8).map((c, i) => (
             <View key={c.id} style={{ paddingHorizontal: 14, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: "#0001" }}>
-              <Row title={c.name} subtitle={c.city} />
+              <Row title={c.name} subtitle={c.city} leadingIcon="tool" leadingTone="primary" />
             </View>
           ))}
         </Card>

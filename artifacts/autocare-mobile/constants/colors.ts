@@ -43,7 +43,7 @@ const colors = {
     success: "#5fae6a",
     warning: "#e0a23a",
   },
-  radius: 6,
+  radius: 12,
 };
 
 export default colors;

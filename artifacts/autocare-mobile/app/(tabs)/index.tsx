@@ -1,8 +1,8 @@
 import React from "react";
-import { ScrollView, Text, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Badge } from "@/components/ui";
+import { Badge, ScreenHeader } from "@/components/ui";
 import { QuickActions, RoleDashboard } from "@/components/dashboards";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
@@ -17,42 +17,28 @@ export default function HomeScreen() {
   const greeting = user.name?.split(" ")[0] ?? "there";
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: c.background }}
-      contentContainerStyle={{
-        padding: 18,
-        paddingBottom: insets.bottom + 96,
-        gap: 20,
-      }}
-    >
-      <View style={{ gap: 8 }}>
-        <Text
-          style={{
-            color: c.mutedForeground,
-            fontFamily: "Inter_500Medium",
-            fontSize: 13,
-          }}
-        >
-          Welcome back
-        </Text>
-        <Text
-          style={{
-            color: c.foreground,
-            fontFamily: "Inter_700Bold",
-            fontSize: 26,
-            letterSpacing: -0.2,
-          }}
-        >
-          {greeting}
-        </Text>
-        <View style={{ flexDirection: "row" }}>
-          <Badge label={ROLE_LABEL[role]} tone="primary" />
-        </View>
-      </View>
-
-      <QuickActions role={role} />
-
-      <RoleDashboard role={role} phone={user.phone as string | null | undefined} />
-    </ScrollView>
+    <View style={{ flex: 1, backgroundColor: c.background }}>
+      <ScreenHeader
+        eyebrow="Welcome back"
+        title={greeting}
+        right={
+          <View>
+            <Badge label={ROLE_LABEL[role]} tone="primary" />
+          </View>
+        }
+      />
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingTop: 4,
+          paddingBottom: insets.bottom + 110,
+          gap: 22,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        <QuickActions role={role} />
+        <RoleDashboard role={role} phone={user.phone as string | null | undefined} />
+      </ScrollView>
+    </View>
   );
 }

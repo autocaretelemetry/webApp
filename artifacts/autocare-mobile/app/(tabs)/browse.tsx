@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -9,7 +9,7 @@ import {
   useListParts,
 } from "@workspace/api-client-react";
 
-import { Card, EmptyState, LoadingScreen, Row } from "@/components/ui";
+import { Chip, EmptyState, IconCircle, ListCard, LoadingScreen, Row, ScreenHeader } from "@/components/ui";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { apiFetch } from "@/lib/api-mobile";
@@ -34,6 +34,13 @@ const TAB_LABEL: Record<Tab, string> = {
   vendors: "Vendors",
 };
 
+const SUBTITLES: Record<Tab, string> = {
+  centers: "Workshops near you",
+  cars: "Cars available to rent",
+  parts: "Replacement parts catalog",
+  vendors: "Parts suppliers",
+};
+
 export default function BrowseScreen() {
   const c = useColors();
   const { role } = useAuth();
@@ -43,47 +50,31 @@ export default function BrowseScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
+      <ScreenHeader title="Browse" subtitle={SUBTITLES[tab]} />
       <View
         style={{
-          flexDirection: "row",
-          padding: 14,
-          gap: 8,
-          borderBottomWidth: 1,
-          borderBottomColor: c.border,
+          paddingHorizontal: 20,
+          paddingBottom: 14,
           backgroundColor: c.background,
         }}
       >
-        {tabs.map((t) => {
-          const active = tab === t;
-          return (
-            <Pressable
-              key={t}
-              onPress={() => setTab(t)}
-              style={({ pressed }) => ({
-                paddingVertical: 8,
-                paddingHorizontal: 14,
-                borderRadius: 999,
-                borderWidth: 1,
-                borderColor: active ? c.primary : c.border,
-                backgroundColor: active ? c.primary : "transparent",
-                opacity: pressed ? 0.8 : 1,
-              })}
-            >
-              <Text
-                style={{
-                  color: active ? "#fff" : c.foreground,
-                  fontFamily: "Inter_600SemiBold",
-                  fontSize: 13,
-                }}
-              >
-                {TAB_LABEL[t]}
-              </Text>
-            </Pressable>
-          );
-        })}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ flexDirection: "row", gap: 8, paddingRight: 20 }}
+        >
+          {tabs.map((t) => (
+            <Chip key={t} label={TAB_LABEL[t]} active={tab === t} onPress={() => setTab(t)} />
+          ))}
+        </ScrollView>
       </View>
       <ScrollView
-        contentContainerStyle={{ padding: 18, paddingBottom: insets.bottom + 96, gap: 14 }}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingBottom: insets.bottom + 110,
+          gap: 14,
+        }}
+        showsVerticalScrollIndicator={false}
       >
         {tab === "centers" ? <CentersList /> : null}
         {tab === "cars" ? <CarsList /> : null}
@@ -98,18 +89,20 @@ function CentersList() {
   const { data, isLoading } = useListServiceCenters();
   if (isLoading) return <LoadingScreen />;
   const list = (data as Array<{ id: string; name: string; city?: string; rating?: number }>) ?? [];
-  if (list.length === 0) return <EmptyState title="No service centers" />;
+  if (list.length === 0)
+    return <EmptyState title="No service centers" body="Check back soon — we're adding partners across the region." icon="tool" />;
   return (
-    <Card padding={0}>
-      {list.map((s, i) => (
-        <View key={s.id} style={{ paddingHorizontal: 14, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: "#0001" }}>
-          <Row
-            title={s.name}
-            subtitle={[s.city, s.rating ? `${s.rating.toFixed(1)} ★` : null].filter(Boolean).join("  ·  ")}
-          />
-        </View>
+    <ListCard>
+      {list.map((s) => (
+        <Row
+          key={s.id}
+          leadingIcon="tool"
+          leadingTone="primary"
+          title={s.name}
+          subtitle={[s.city, s.rating ? `${s.rating.toFixed(1)} ★` : null].filter(Boolean).join("  ·  ")}
+        />
       ))}
-    </Card>
+    </ListCard>
   );
 }
 
@@ -117,15 +110,20 @@ function VendorsList() {
   const { data, isLoading } = useListVendors();
   if (isLoading) return <LoadingScreen />;
   const list = (data as Array<{ id: string; name: string; city?: string }>) ?? [];
-  if (list.length === 0) return <EmptyState title="No vendors" />;
+  if (list.length === 0)
+    return <EmptyState title="No vendors" body="Parts suppliers will appear here once they're onboarded." icon="briefcase" />;
   return (
-    <Card padding={0}>
-      {list.map((v, i) => (
-        <View key={v.id} style={{ paddingHorizontal: 14, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: "#0001" }}>
-          <Row title={v.name} subtitle={v.city} />
-        </View>
+    <ListCard>
+      {list.map((v) => (
+        <Row
+          key={v.id}
+          leadingIcon="briefcase"
+          leadingTone="secondary"
+          title={v.name}
+          subtitle={v.city}
+        />
       ))}
-    </Card>
+    </ListCard>
   );
 }
 
@@ -133,20 +131,22 @@ function PartsList() {
   const { data, isLoading } = useListParts();
   if (isLoading) return <LoadingScreen />;
   const list = (data as Array<{ id: string; name: string; vendorName?: string; priceCents?: number }>) ?? [];
-  if (list.length === 0) return <EmptyState title="No parts listed" />;
+  if (list.length === 0)
+    return <EmptyState title="No parts listed" body="Vendors haven't listed anything yet." icon="package" />;
   return (
-    <Card padding={0}>
-      {list.slice(0, 40).map((p, i) => (
-        <View key={p.id} style={{ paddingHorizontal: 14, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: "#0001" }}>
-          <Row
-            title={p.name}
-            subtitle={[p.vendorName, p.priceCents != null ? `GHS ${(p.priceCents / 100).toFixed(2)}` : null]
-              .filter(Boolean)
-              .join("  ·  ")}
-          />
-        </View>
+    <ListCard>
+      {list.slice(0, 40).map((p) => (
+        <Row
+          key={p.id}
+          leadingIcon="package"
+          leadingTone="warning"
+          title={p.name}
+          subtitle={[p.vendorName, p.priceCents != null ? `GHS ${(p.priceCents / 100).toFixed(2)}` : null]
+            .filter(Boolean)
+            .join("  ·  ")}
+        />
       ))}
-    </Card>
+    </ListCard>
   );
 }
 
@@ -168,20 +168,22 @@ function CarsList() {
   });
   if (q.isLoading) return <LoadingScreen />;
   const list = q.data ?? [];
-  if (list.length === 0) return <EmptyState title="No cars available right now" />;
+  if (list.length === 0)
+    return <EmptyState title="No cars available" body="Pull to refresh or check back later." icon="truck" />;
   return (
-    <Card padding={0}>
-      {list.map((car, i) => (
-        <View key={car.id} style={{ paddingHorizontal: 14, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: "#0001" }}>
-          <Row
-            title={`${car.year ?? ""} ${car.make ?? ""} ${car.model ?? ""}`.trim() || "Car"}
-            subtitle={[car.city, car.dailyRate != null ? `GHS ${car.dailyRate.toFixed(0)} / day` : null]
-              .filter(Boolean)
-              .join("  ·  ")}
-            onPress={() => router.push(`/rentals/${car.id}`)}
-          />
-        </View>
+    <ListCard>
+      {list.map((car) => (
+        <Row
+          key={car.id}
+          leadingIcon="truck"
+          leadingTone="primary"
+          title={`${car.year ?? ""} ${car.make ?? ""} ${car.model ?? ""}`.trim() || "Car"}
+          subtitle={[car.city, car.dailyRate != null ? `GHS ${car.dailyRate.toFixed(0)} / day` : null]
+            .filter(Boolean)
+            .join("  ·  ")}
+          onPress={() => router.push(`/rentals/${car.id}`)}
+        />
       ))}
-    </Card>
+    </ListCard>
   );
 }

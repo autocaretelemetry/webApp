@@ -12,36 +12,44 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
+        headerShown: false,
         tabBarActiveTintColor: c.primary,
         tabBarInactiveTintColor: c.mutedForeground,
-        headerStyle: {
-          backgroundColor: c.background,
-          borderBottomWidth: 1,
-          borderBottomColor: c.border,
-        },
-        headerTitleStyle: {
-          color: c.foreground,
-          fontFamily: "Inter_600SemiBold",
-          fontSize: 17,
-        },
-        headerShadowVisible: false,
         sceneStyle: { backgroundColor: c.background },
         tabBarStyle: {
-          backgroundColor: c.card,
-          borderTopWidth: 1,
-          borderTopColor: c.border,
+          position: "absolute",
+          backgroundColor: "transparent",
+          borderTopWidth: 0,
           elevation: 0,
-          ...(isWeb ? { height: 64 } : {}),
+          height: isWeb ? 68 : 84,
+          paddingTop: 8,
         },
         tabBarLabelStyle: {
-          fontFamily: "Inter_500Medium",
+          fontFamily: "Inter_600SemiBold",
           fontSize: 11,
+          letterSpacing: 0.2,
+          marginTop: 2,
         },
+        tabBarItemStyle: { paddingTop: 4 },
         tabBarBackground: () => (
           <View
             style={[
               StyleSheet.absoluteFill,
-              { backgroundColor: c.card, borderTopWidth: 1, borderTopColor: c.border },
+              {
+                backgroundColor: c.card,
+                borderTopWidth: StyleSheet.hairlineWidth,
+                borderTopColor: c.border,
+                ...Platform.select({
+                  ios: {
+                    shadowColor: "#101010",
+                    shadowOpacity: 0.08,
+                    shadowOffset: { width: 0, height: -4 },
+                    shadowRadius: 14,
+                  },
+                  android: { elevation: 12 },
+                  default: {},
+                }),
+              },
             ]}
           />
         ),
@@ -50,33 +58,37 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
           tabBarLabel: "Home",
-          tabBarIcon: ({ color }) => <Feather name="home" size={22} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Feather name="home" size={focused ? 24 : 22} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="work"
         options={{
-          title: "Activity",
           tabBarLabel: "Activity",
-          tabBarIcon: ({ color }) => <Feather name="clipboard" size={22} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Feather name="clipboard" size={focused ? 24 : 22} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="browse"
         options={{
-          title: "Browse",
           tabBarLabel: "Browse",
-          tabBarIcon: ({ color }) => <Feather name="compass" size={22} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Feather name="compass" size={focused ? 24 : 22} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Profile",
           tabBarLabel: "Profile",
-          tabBarIcon: ({ color }) => <Feather name="user" size={22} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Feather name="user" size={focused ? 24 : 22} color={color} />
+          ),
         }}
       />
     </Tabs>
