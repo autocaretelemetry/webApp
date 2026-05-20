@@ -44,6 +44,18 @@ function sign(payload: SessionPayload): string {
   return `${body}.${mac}`;
 }
 
+/**
+ * Mint a fresh signed session token for the given user ID. Wire format is
+ * identical to the value of the `autocare_session` cookie — mobile clients
+ * persist this token and send it via `Authorization: Bearer <token>` so
+ * `loadUser` accepts it interchangeably with the cookie. Returned in the
+ * JSON body of /auth/login and /auth/signup (auto-login flavour) so mobile
+ * apps can grab it without parsing Set-Cookie.
+ */
+export function signSessionToken(userId: string): string {
+  return sign({ uid: userId, iat: Date.now() });
+}
+
 function verify(token: string): SessionPayload | null {
   const [body, mac] = token.split(".");
   if (!body || !mac) return null;
@@ -119,10 +131,20 @@ declare global {
   }
 }
 
+function readBearerToken(req: Request): string | null {
+  const h = req.headers["authorization"];
+  if (typeof h !== "string") return null;
+  const m = h.match(/^Bearer\s+(.+)$/i);
+  return m && m[1] ? m[1].trim() : null;
+}
+
 async function loadUser(req: Request): Promise<AuthedUser | null> {
-  const token = (req as Request & { cookies?: Record<string, string> }).cookies?.[
+  const cookieToken = (req as Request & { cookies?: Record<string, string> }).cookies?.[
     COOKIE_NAME
   ];
+  // Cookie wins (web), Bearer header is the mobile fallback. Both carry the
+  // same signed session payload.
+  const token = cookieToken ?? readBearerToken(req);
   if (!token) return null;
   const payload = verify(token);
   if (!payload) return null;

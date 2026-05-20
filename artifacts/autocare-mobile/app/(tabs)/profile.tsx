@@ -1,0 +1,158 @@
+import { Feather } from "@expo/vector-icons";
+import React from "react";
+import { Pressable, ScrollView, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { Badge, Button, Card, Section } from "@/components/ui";
+import { useAuth } from "@/contexts/AuthContext";
+import { useColors } from "@/hooks/useColors";
+import { ALL_ROLES, ROLE_LABEL, type Role } from "@/lib/roles";
+
+export default function ProfileScreen() {
+  const c = useColors();
+  const { user, role, logout, setRoleOverride } = useAuth();
+  const insets = useSafeAreaInsets();
+  if (!user) return null;
+  const canImpersonate = user.role === "super_admin";
+
+  const kycLabel =
+    user.kycStatus === "verified"
+      ? "KYC verified"
+      : user.kycStatus === "submitted"
+        ? "KYC under review"
+        : "KYC pending";
+  const kycTone =
+    user.kycStatus === "verified" ? "success" : user.kycStatus === "submitted" ? "warning" : "muted";
+
+  return (
+    <ScrollView
+      style={{ flex: 1, backgroundColor: c.background }}
+      contentContainerStyle={{ padding: 18, paddingBottom: insets.bottom + 96, gap: 20 }}
+    >
+      <Card>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+          <View
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 28,
+              backgroundColor: c.primary,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Text
+              style={{
+                color: "#fff",
+                fontFamily: "Inter_700Bold",
+                fontSize: 22,
+              }}
+            >
+              {(user.name ?? "?").trim().charAt(0).toUpperCase()}
+            </Text>
+          </View>
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={{ color: c.foreground, fontFamily: "Inter_700Bold", fontSize: 18 }}>
+              {user.name}
+            </Text>
+            <Text style={{ color: c.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>
+              {user.email}
+            </Text>
+            {user.phone ? (
+              <Text style={{ color: c.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>
+                {user.phone}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+        <View style={{ flexDirection: "row", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+          <Badge label={ROLE_LABEL[role]} tone="primary" />
+          <Badge label={kycLabel} tone={kycTone} />
+          {user.approvalStatus && user.approvalStatus !== "approved" ? (
+            <Badge label={String(user.approvalStatus)} tone="warning" />
+          ) : null}
+        </View>
+      </Card>
+
+      {canImpersonate ? (
+        <Section title="View as">
+          <Card padding={8}>
+            {ALL_ROLES.map((r) => {
+              const active = r === role;
+              return (
+                <Pressable
+                  key={r}
+                  onPress={() => setRoleOverride(r)}
+                  style={({ pressed }) => ({
+                    flexDirection: "row",
+                    alignItems: "center",
+                    paddingVertical: 12,
+                    paddingHorizontal: 10,
+                    borderRadius: c.radius,
+                    backgroundColor: active ? c.accent : "transparent",
+                    opacity: pressed ? 0.7 : 1,
+                  })}
+                >
+                  <Text
+                    style={{
+                      color: c.foreground,
+                      fontFamily: "Inter_500Medium",
+                      fontSize: 14,
+                      flex: 1,
+                    }}
+                  >
+                    {ROLE_LABEL[r as Role]}
+                  </Text>
+                  {active ? <Feather name="check" size={18} color={c.primary} /> : null}
+                </Pressable>
+              );
+            })}
+          </Card>
+        </Section>
+      ) : null}
+
+      <Section title="Account">
+        <Card padding={0}>
+          <ActionRow icon="external-link" label="Open full web app" hint={(process.env as Record<string, string | undefined>)["EXPO_PUBLIC_DOMAIN"] ?? ""} />
+          <ActionRow icon="help-circle" label="Help & support" hint="Contact AutoCare" />
+        </Card>
+      </Section>
+
+      <Button label="Sign out" tone="destructive" onPress={() => void logout()} />
+    </ScrollView>
+  );
+}
+
+function ActionRow({
+  icon,
+  label,
+  hint,
+}: {
+  icon: React.ComponentProps<typeof Feather>["name"];
+  label: string;
+  hint?: string;
+}) {
+  const c = useColors();
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 14,
+        paddingVertical: 14,
+        borderTopWidth: 1,
+        borderTopColor: c.border,
+      }}
+    >
+      <Feather name={icon} size={18} color={c.mutedForeground} />
+      <View style={{ flex: 1, marginLeft: 12 }}>
+        <Text style={{ color: c.foreground, fontFamily: "Inter_500Medium", fontSize: 14 }}>{label}</Text>
+        {hint ? (
+          <Text style={{ color: c.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+            {hint}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}

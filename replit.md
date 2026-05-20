@@ -48,6 +48,13 @@ Connected automotive service platform pairing vehicle owners, renters, service c
 - `artifacts/api-server/src/lib/kycScanner.ts` — ClamAV + heuristic upload scanner
 - `artifacts/api-server/src/routes/rentals.access.test.ts` + `bookings.access.test.ts` — vitest IDOR/access-isolation coverage
 
+### Mobile (`artifacts/autocare-mobile`)
+- Expo + expo-router app sharing the AutoCare API; full role parity (owner / center / renter / vendor / delivery / fleet / admin / super_admin).
+- Auth: `contexts/AuthContext.tsx` stores a long-lived `sessionToken` in `AsyncStorage` (`lib/token-store.ts`). `/auth/login` and the auto-login `/auth/signup` flow now return `sessionToken` (plus the normal cookie for web). `lib/auth.ts` `loadUser` reads `Authorization: Bearer <token>` as a fallback to the session cookie, and `signSessionToken(uid)` reuses the same HMAC scheme.
+- `app/_layout.tsx` calls `setBaseUrl(EXPO_PUBLIC_DOMAIN)` and `setAuthTokenGetter(getStoredToken)` once at boot so every generated Orval hook just works.
+- Role-adaptive 4-tab shell (`Home / Activity / Browse / Profile`) in `app/(tabs)/`. Per-role content lives in `components/dashboards.tsx` (`RoleDashboard`, `WorkList`); super admin can impersonate any role via the Profile screen.
+- Warm-industrial palette in `constants/colors.ts` (orange #f26a0d primary, slate-teal #3d5a66 secondary, light + dark variants).
+
 ### Web
 - `artifacts/autocare/src/index.css` — warm-industrial theme tokens
 - `artifacts/autocare/src/lib/role.ts` — role switch (owner/center/renter/fleet/vendor/delivery) persisted to localStorage

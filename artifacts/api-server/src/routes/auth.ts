@@ -24,6 +24,7 @@ import {
   clearSessionCookie,
   requireAuth,
   toAuthedUser,
+  signSessionToken,
 } from "../lib/auth";
 import { sendEmail, signupVerificationEmail } from "../lib/email";
 import { sendWhatsAppText, signupVerificationWhatsApp } from "../lib/whatsapp";
@@ -162,7 +163,9 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     return;
   }
   issueSessionCookie(res, row.id);
-  res.json(toAuthedUser(row));
+  // `sessionToken` is an extra field for mobile clients (which can't see the
+  // Set-Cookie). Web ignores it; OpenAPI consumers see the standard AuthedUser.
+  res.json({ ...toAuthedUser(row), sessionToken: signSessionToken(row.id) });
 });
 
 /**
@@ -291,10 +294,15 @@ router.post("/auth/signup", async (req, res): Promise<void> => {
   }
   // Only the legacy auto-approved path issues a cookie. Applications get
   // returned without a session so the client can show "pending" UX.
+  const sessionToken = isApplication ? null : signSessionToken(row.id);
   if (!isApplication) {
     issueSessionCookie(res, row.id);
   }
-  res.status(isApplication ? 202 : 201).json(toAuthedUser(row));
+  // `sessionToken` is an extra mobile-only field (null when application is
+  // still pending approval and no session is issued yet).
+  res
+    .status(isApplication ? 202 : 201)
+    .json({ ...toAuthedUser(row), sessionToken });
 });
 
 /**
