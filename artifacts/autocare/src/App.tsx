@@ -19,6 +19,7 @@ import FleetVehiclesPage from "@/pages/fleet/Vehicles";
 import FleetDriversPage from "@/pages/fleet/Drivers";
 import FleetCentersPage from "@/pages/fleet/Centers";
 import FleetSettingsPage from "@/pages/fleet/Settings";
+import FleetSafetyPage from "@/pages/fleet/Safety";
 
 // Owner Pages
 import OwnerDashboard from "@/pages/owner/Dashboard";
@@ -134,7 +135,7 @@ function RoleGuard({
 const ownerOnly = (c: ComponentType) => () => <RoleGuard allow={["owner"]} component={c} />;
 const centerOnly = (c: ComponentType) => () => <RoleGuard allow={["center"]} component={c} />;
 const vendorOnly = (c: ComponentType) => () => <RoleGuard allow={["vendor"]} component={c} />;
-const buyersOnly = (c: ComponentType) => () => <RoleGuard allow={["owner", "center"]} component={c} />;
+const buyersOnly = (c: ComponentType) => () => <RoleGuard allow={["owner", "center", "fleet"]} component={c} />;
 const deliveryOnly = (c: ComponentType) => () => <RoleGuard allow={["delivery"]} component={c} />;
 const fleetOnly = (c: ComponentType) => () => <RoleGuard allow={["fleet"]} component={c} />;
 const adminOnly = (c: ComponentType) => () => <RoleGuard allow={["admin", "super_admin"]} component={c} />;
@@ -178,6 +179,7 @@ function AppRouter() {
         <Route path="/fleet/drivers" component={fleetOnly(FleetDriversPage)} />
         <Route path="/fleet/centers" component={fleetOnly(FleetCentersPage)} />
         <Route path="/fleet/settings" component={fleetOnly(FleetSettingsPage)} />
+        <Route path="/fleet/safety" component={fleetOnly(FleetSafetyPage)} />
         <Route path="/register-fleet" component={RegisterFleet} />
 
         {/* Admin Routes */}

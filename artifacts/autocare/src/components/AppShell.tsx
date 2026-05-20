@@ -135,8 +135,16 @@ const FLEET_NAV: NavSection[] = [
       { href: "/fleet/vehicles", label: "Vehicles", icon: Car },
       { href: "/fleet/drivers", label: "Team & Drivers", icon: Users },
       { href: "/fleet/centers", label: "Preferred Centers", icon: Store },
+      { href: "/fleet/safety", label: "Safety & Tracking", icon: ShieldAlert },
       { href: "/bookings", label: "Bookings", icon: CalendarDays },
       { href: "/fleet/settings", label: "Settings", icon: Settings },
+    ],
+  },
+  {
+    label: "Parts",
+    items: [
+      { href: "/marketplace", label: "Marketplace", icon: ShoppingBag },
+      { href: "/orders", label: "Orders", icon: Package },
     ],
   },
 ];

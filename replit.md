@@ -34,7 +34,8 @@ Connected automotive service platform that pairs vehicle owners with service cen
 - `lib/db/src/schema/organizations.ts` — fleet `organizations`, `organization_members` (admin|driver), `organization_preferred_centers` (M2M); `vehicles.organizationId` + `vehicles.assignedDriverPhone` attach a vehicle to a fleet
 - `artifacts/api-server/src/routes/organizations.ts` — fleet endpoints (signup, CRUD, members, preferred-centers PUT, fleet vehicles, dashboard, parts-spend); guarded by `requireOrgMember`; intentionally outside OpenAPI (single client, plain Express + Zod)
 - `artifacts/autocare/src/lib/fleet-api.ts` — React Query hooks for fleet endpoints (plain fetch, not codegen)
-- `artifacts/autocare/src/pages/fleet/{Dashboard,Vehicles,Drivers,Centers,Settings}.tsx` — fleet-role UI
+- `artifacts/autocare/src/pages/fleet/{Dashboard,Vehicles,Drivers,Centers,Settings,Safety}.tsx` — fleet-role UI
+- `lib/db/src/schema/fleetTracking.ts` — `fleet_trip_locations` (vehicle-scoped GPS pings) and `fleet_incidents` (vehicle-scoped safety events); both distinct from the rental-booking-scoped `tripLocations`/`rentalIncidents` tables
 - `artifacts/autocare/src/pages/RegisterFleet.tsx` — public "Register your fleet" signup
 - `artifacts/autocare/src/pages/rentals/Drivers.tsx` — owner-facing driver CRUD
 - `artifacts/autocare/src/pages/admin/Renters.tsx` — admin renter directory + KYC approve/reject
@@ -69,7 +70,7 @@ Connected automotive service platform that pairs vehicle owners with service cen
 - **Shared**: bookings list with status filters, booking detail with role-aware actions, invoice detail.
 - **Admin rentals safety**: Renters page (KYC queue + history) and Safety & Tracking page (live trip list with freshness badges, SVG trip trail viewer, incident triage with one-tap "Open in Google Maps" deep links — no Leaflet dependency).
 - **Renter incident reporting**: MyRentals exposes "Report incident" on confirmed/active bookings; dialog captures browser geolocation (opt-in) and posts it alongside the report so admins see a fresh `lastKnown` ping.
-- **Fleet experience** (`role = "fleet"`): org admins manage their fleet from a dedicated dashboard (KPIs + reminders + parts-spend chart when on Fleet Pro), Vehicles page (add/assign drivers), Drivers page (invite by phone, role admin|driver), Preferred Centers (multi-select from the global directory), and Settings (org profile). Public signup at `/register-fleet`. Demo seed: "MTN Ghana" with 4 vehicles, 1 admin + 2 drivers, 2 preferred centers, subscribed to Fleet Pro.
+- **Fleet experience** (`role = "fleet"`): org admins manage their fleet from a dedicated dashboard (KPIs + reminders + parts-spend chart when on Fleet Pro), Vehicles page (add/assign drivers), Drivers page (invite by phone, role admin|driver), Preferred Centers (multi-select from the global directory), Safety & Tracking (live last-known positions + incident triage with Google Maps deep links), and Settings (org profile). Fleet users also access the shared Parts Marketplace (via `buyersOnly` which now allows `fleet`). Public signup at `/register-fleet`. Demo seed: "MTN Ghana" with 4 vehicles, 1 admin + 2 drivers, 2 preferred centers, subscribed to Fleet Pro.
 
 ## User preferences
 

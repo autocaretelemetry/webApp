@@ -247,6 +247,113 @@ export function useCreateFleetVehicle(orgId: string | null) {
   });
 }
 
+// ───── Safety & Tracking ─────
+
+export type FleetTripPing = {
+  id: string;
+  vehicleId: string;
+  lat: number;
+  lng: number;
+  speedKph: number | null;
+  accuracyMeters: number | null;
+  source: string;
+  note: string | null;
+  recordedAt: string;
+};
+
+export type FleetIncident = {
+  id: string;
+  vehicleId: string;
+  organizationId: string;
+  kind: "accident" | "breakdown" | "theft" | "sos";
+  status: "open" | "investigating" | "resolved";
+  reportedBy: "driver" | "admin";
+  reporterPhone: string | null;
+  notes: string | null;
+  adminNotes: string | null;
+  lastKnownLat: number | null;
+  lastKnownLng: number | null;
+  lastKnownAt: string | null;
+  reportedAt: string;
+  resolvedAt: string | null;
+};
+
+export type FleetSafetySnapshot = {
+  vehicles: Array<{
+    id: string;
+    brand: string;
+    model: string;
+    year: number;
+    plateNumber: string;
+    assignedDriverPhone: string | null;
+    lastPing: FleetTripPing | null;
+  }>;
+  incidents: FleetIncident[];
+};
+
+export function useFleetSafety(orgId: string | null) {
+  return useQuery({
+    queryKey: ["fleet", "safety", orgId],
+    queryFn: () => request<FleetSafetySnapshot>(`/organizations/${orgId}/safety`),
+    enabled: !!orgId,
+    retry: false,
+  });
+}
+
+export function useReportFleetIncident(orgId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      vehicleId,
+      body,
+    }: {
+      vehicleId: string;
+      body: { kind: FleetIncident["kind"]; notes?: string; lat?: number; lng?: number };
+    }) =>
+      request<FleetIncident>(
+        `/organizations/${orgId}/vehicles/${vehicleId}/incidents`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["fleet", "safety", orgId] }),
+  });
+}
+
+export function usePostFleetLocation(orgId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      vehicleId,
+      body,
+    }: {
+      vehicleId: string;
+      body: { lat: number; lng: number; speedKph?: number; accuracyMeters?: number; note?: string };
+    }) =>
+      request<FleetTripPing>(
+        `/organizations/${orgId}/vehicles/${vehicleId}/locations`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["fleet", "safety", orgId] }),
+  });
+}
+
+export function useUpdateFleetIncident(orgId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      incidentId,
+      body,
+    }: {
+      incidentId: string;
+      body: { status?: FleetIncident["status"]; adminNotes?: string };
+    }) =>
+      request<FleetIncident>(`/organizations/${orgId}/incidents/${incidentId}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["fleet", "safety", orgId] }),
+  });
+}
+
 export function useUpdateFleetVehicle(orgId: string | null) {
   const qc = useQueryClient();
   return useMutation({

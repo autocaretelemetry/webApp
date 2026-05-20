@@ -10,6 +10,8 @@ import {
   serviceCentersTable,
   bookingsTable,
   invoicesTable,
+  fleetTripLocationsTable,
+  fleetIncidentsTable,
   type Organization,
   type OrganizationMember,
 } from "@workspace/db";
@@ -605,6 +607,244 @@ router.get(
       }
     }
     res.json({ totalParts, totalLabour, lines });
+  },
+);
+
+// ───────── Safety & Tracking ─────────
+
+/**
+ * Resolve a vehicle inside the org and confirm the caller may act on it.
+ * Platform admins and org admins always pass; drivers only pass for the
+ * vehicle they're assigned to. Mirrors the rentals `authorizeBookingAccess`
+ * pattern so we never accidentally expose another driver's data.
+ */
+async function requireOrgVehicle(
+  req: Request,
+  res: Response,
+  orgId: string,
+  vehicleId: string,
+) {
+  const m = await requireOrgMember(req, res, orgId);
+  if (!m) return null;
+  const [vehicle] = await db
+    .select()
+    .from(vehiclesTable)
+    .where(eq(vehiclesTable.id, vehicleId));
+  if (!vehicle || vehicle.organizationId !== orgId) {
+    res.status(404).json({ error: "Vehicle not found in this fleet" });
+    return null;
+  }
+  const isAdminLevel = m.isPlatform || m.member?.role === "admin";
+  if (!isAdminLevel) {
+    // Driver — must be the assigned driver for this vehicle.
+    if (vehicle.assignedDriverPhone !== m.member?.phone) {
+      res.status(403).json({ error: "Not authorised for this vehicle" });
+      return null;
+    }
+  }
+  return { m, vehicle, isAdminLevel };
+}
+
+const locationInput = z.object({
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+  speedKph: z.number().nonnegative().optional(),
+  accuracyMeters: z.number().int().nonnegative().optional(),
+  note: z.string().max(500).optional(),
+});
+
+router.post(
+  "/organizations/:orgId/vehicles/:vehicleId/locations",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    const ctx = await requireOrgVehicle(
+      req,
+      res,
+      String(req.params.orgId),
+      String(req.params.vehicleId),
+    );
+    if (!ctx) return;
+    const parsed = locationInput.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid location", issues: parsed.error.issues });
+      return;
+    }
+    const [ping] = await db
+      .insert(fleetTripLocationsTable)
+      .values({
+        vehicleId: ctx.vehicle.id,
+        lat: parsed.data.lat,
+        lng: parsed.data.lng,
+        speedKph: parsed.data.speedKph,
+        accuracyMeters: parsed.data.accuracyMeters,
+        note: parsed.data.note,
+        source: ctx.isAdminLevel ? "admin" : "driver",
+      })
+      .returning();
+    res.status(201).json(ping);
+  },
+);
+
+const incidentInput = z.object({
+  kind: z.enum(["accident", "breakdown", "theft", "sos"]),
+  notes: z.string().max(2000).optional(),
+  lat: z.number().min(-90).max(90).optional(),
+  lng: z.number().min(-180).max(180).optional(),
+});
+
+router.post(
+  "/organizations/:orgId/vehicles/:vehicleId/incidents",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    const ctx = await requireOrgVehicle(
+      req,
+      res,
+      String(req.params.orgId),
+      String(req.params.vehicleId),
+    );
+    if (!ctx) return;
+    const parsed = incidentInput.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid incident", issues: parsed.error.issues });
+      return;
+    }
+
+    // If caller shipped coordinates, also drop a fresh ping so the
+    // safety dashboard shows the most accurate last-known position.
+    let lastKnownLat: number | null = null;
+    let lastKnownLng: number | null = null;
+    let lastKnownAt: Date | null = null;
+    if (parsed.data.lat !== undefined && parsed.data.lng !== undefined) {
+      const [ping] = await db
+        .insert(fleetTripLocationsTable)
+        .values({
+          vehicleId: ctx.vehicle.id,
+          lat: parsed.data.lat,
+          lng: parsed.data.lng,
+          source: ctx.isAdminLevel ? "admin" : "driver",
+          note: `incident:${parsed.data.kind}`,
+        })
+        .returning();
+      lastKnownLat = ping.lat;
+      lastKnownLng = ping.lng;
+      lastKnownAt = ping.recordedAt;
+    } else {
+      const [latest] = await db
+        .select()
+        .from(fleetTripLocationsTable)
+        .where(eq(fleetTripLocationsTable.vehicleId, ctx.vehicle.id))
+        .orderBy(desc(fleetTripLocationsTable.recordedAt))
+        .limit(1);
+      if (latest) {
+        lastKnownLat = latest.lat;
+        lastKnownLng = latest.lng;
+        lastKnownAt = latest.recordedAt;
+      }
+    }
+
+    const [inc] = await db
+      .insert(fleetIncidentsTable)
+      .values({
+        vehicleId: ctx.vehicle.id,
+        organizationId: ctx.m.org.id,
+        kind: parsed.data.kind,
+        // reportedBy is derived from the verified relationship — never
+        // trust a client-supplied value here.
+        reportedBy: ctx.isAdminLevel ? "admin" : "driver",
+        reporterPhone: ctx.m.member?.phone ?? null,
+        notes: parsed.data.notes,
+        lastKnownLat,
+        lastKnownLng,
+        lastKnownAt,
+      })
+      .returning();
+    res.status(201).json(inc);
+  },
+);
+
+router.get(
+  "/organizations/:orgId/safety",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    // Org-wide safety triage is admin-only — drivers don't need to see
+    // other drivers' incidents or locations.
+    const m = await requireOrgMember(req, res, String(req.params.orgId), "admin");
+    if (!m) return;
+    const vehicles = await db
+      .select()
+      .from(vehiclesTable)
+      .where(eq(vehiclesTable.organizationId, m.org.id));
+    const vehicleIds = vehicles.map((v) => v.id);
+
+    let latestByVehicle: Record<string, typeof fleetTripLocationsTable.$inferSelect> = {};
+    let incidents: (typeof fleetIncidentsTable.$inferSelect)[] = [];
+    if (vehicleIds.length > 0) {
+      const pings = await db
+        .select()
+        .from(fleetTripLocationsTable)
+        .where(inArray(fleetTripLocationsTable.vehicleId, vehicleIds))
+        .orderBy(desc(fleetTripLocationsTable.recordedAt));
+      for (const p of pings) {
+        if (!latestByVehicle[p.vehicleId]) latestByVehicle[p.vehicleId] = p;
+      }
+      incidents = await db
+        .select()
+        .from(fleetIncidentsTable)
+        .where(eq(fleetIncidentsTable.organizationId, m.org.id))
+        .orderBy(desc(fleetIncidentsTable.reportedAt));
+    }
+
+    res.json({
+      vehicles: vehicles.map((v) => ({
+        id: v.id,
+        brand: v.brand,
+        model: v.model,
+        year: v.year,
+        plateNumber: v.plateNumber,
+        assignedDriverPhone: v.assignedDriverPhone,
+        lastPing: latestByVehicle[v.id] ?? null,
+      })),
+      incidents,
+    });
+  },
+);
+
+const incidentPatch = z.object({
+  status: z.enum(["open", "investigating", "resolved"]).optional(),
+  adminNotes: z.string().max(2000).optional(),
+});
+
+router.patch(
+  "/organizations/:orgId/incidents/:incidentId",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    const m = await requireOrgMember(req, res, String(req.params.orgId), "admin");
+    if (!m) return;
+    const parsed = incidentPatch.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid update", issues: parsed.error.issues });
+      return;
+    }
+    const [existing] = await db
+      .select()
+      .from(fleetIncidentsTable)
+      .where(eq(fleetIncidentsTable.id, String(req.params.incidentId)));
+    if (!existing || existing.organizationId !== m.org.id) {
+      res.status(404).json({ error: "Incident not found" });
+      return;
+    }
+    const patch: Partial<typeof fleetIncidentsTable.$inferInsert> = {};
+    if (parsed.data.status) {
+      patch.status = parsed.data.status;
+      if (parsed.data.status === "resolved") patch.resolvedAt = new Date();
+    }
+    if (parsed.data.adminNotes !== undefined) patch.adminNotes = parsed.data.adminNotes;
+    const [updated] = await db
+      .update(fleetIncidentsTable)
+      .set(patch)
+      .where(eq(fleetIncidentsTable.id, existing.id))
+      .returning();
+    res.json(updated);
   },
 );
 
