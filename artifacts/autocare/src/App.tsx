@@ -214,6 +214,15 @@ function AppRouter() {
         <Route path="/rentals" component={RentalsBrowse} />
         <Route path="/rentals/list-yours" component={ownerOnly(ListYourCar)} />
         <Route path="/rentals/my-listings" component={ownerOnly(MyListings)} />
+        {/*
+          /rentals/my-bookings and /rentals/profile are intentionally
+          renterOrOwner: car owners can also rent cars on the platform
+          (their renter identity is keyed by phone, not role), so we
+          deliberately keep these pages reachable by both personas.
+          Server-side authorization in routes/rentals.ts is the source
+          of truth for which rows each caller may see — see follow-up
+          task #32 for the planned hardening.
+        */}
         <Route path="/rentals/my-bookings" component={renterOrOwner(MyRentals)} />
         <Route path="/rentals/profile" component={renterOrOwner(RenterProfilePage)} />
         <Route path="/rentals/drivers" component={ownerOnly(DriversPage)} />

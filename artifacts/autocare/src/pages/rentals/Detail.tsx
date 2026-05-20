@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { recordRecentlyViewedCar } from "@/lib/recentCars";
 import { Link, useParams, useSearch, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -59,6 +60,19 @@ export default function RentalDetail() {
   const { data: car, isLoading } = useGetRentalCar(id, {
     query: { enabled: !!id, queryKey: getGetRentalCarQueryKey(id) },
   });
+
+  // Track recently-viewed cars in localStorage so the renter dashboard
+  // can surface them. Purely UX state — no server round-trip needed.
+  useEffect(() => {
+    if (!car?.id) return;
+    recordRecentlyViewedCar({
+      id: car.id,
+      label: `${car.brand} ${car.model} ${car.year}`,
+      imageUrl: car.imageUrl ?? car.imageUrls?.[0] ?? null,
+      city: car.city ?? null,
+      dailyRate: car.dailyRate ?? null,
+    });
+  }, [car?.id, car?.brand, car?.model, car?.year, car?.imageUrl, car?.city, car?.dailyRate]);
 
   const { data: renter, isLoading: renterLoading } = useGetRenterProfileByPhone(local.phone, {
     query: {
