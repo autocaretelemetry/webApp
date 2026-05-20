@@ -27,6 +27,9 @@ import FleetOrdersPage from "@/pages/fleet/Orders";
 
 // Owner Pages
 import OwnerDashboard from "@/pages/owner/Dashboard";
+
+// Renter Pages
+import RenterDashboard from "@/pages/renter/Dashboard";
 import Vehicles from "@/pages/owner/Vehicles";
 import NewVehicle from "@/pages/owner/NewVehicle";
 import VehicleDetail from "@/pages/owner/VehicleDetail";
@@ -106,6 +109,7 @@ const queryClient = new QueryClient({
 function HomeRoute() {
   const { role } = useRole();
   if (role === "owner") return <OwnerDashboard />;
+  if (role === "renter") return <RenterDashboard />;
   if (role === "center") return <CenterDashboard />;
   if (role === "vendor") return <VendorDashboard />;
   if (role === "fleet") return <FleetDashboard />;
@@ -138,6 +142,7 @@ function RoleGuard({
 }
 
 const ownerOnly = (c: ComponentType) => () => <RoleGuard allow={["owner"]} component={c} />;
+const renterOrOwner = (c: ComponentType) => () => <RoleGuard allow={["owner", "renter"]} component={c} />;
 const centerOnly = (c: ComponentType) => () => <RoleGuard allow={["center"]} component={c} />;
 const vendorOnly = (c: ComponentType) => () => <RoleGuard allow={["vendor"]} component={c} />;
 const buyersOnly = (c: ComponentType) => () => <RoleGuard allow={["owner", "center", "fleet"]} component={c} />;
@@ -209,8 +214,8 @@ function AppRouter() {
         <Route path="/rentals" component={RentalsBrowse} />
         <Route path="/rentals/list-yours" component={ownerOnly(ListYourCar)} />
         <Route path="/rentals/my-listings" component={ownerOnly(MyListings)} />
-        <Route path="/rentals/my-bookings" component={ownerOnly(MyRentals)} />
-        <Route path="/rentals/profile" component={ownerOnly(RenterProfilePage)} />
+        <Route path="/rentals/my-bookings" component={renterOrOwner(MyRentals)} />
+        <Route path="/rentals/profile" component={renterOrOwner(RenterProfilePage)} />
         <Route path="/rentals/drivers" component={ownerOnly(DriversPage)} />
         <Route path="/rentals/listing-requests" component={ownerOnly(ListingRequests)} />
         <Route path="/rentals/:id" component={RentalDetail} />

@@ -210,11 +210,11 @@ router.post("/auth/signup", async (req, res): Promise<void> => {
   }
   // For an application, the user has no usable role yet — store a neutral
   // placeholder until approval (we never let `pending` users sign in anyway).
-  const insertRole = isApplication
-    ? requestedRole === "renter"
-      ? "owner"
-      : requestedRole
-    : "owner";
+  // Use the requested role directly — `renter` is now a first-class role
+  // (its own dashboard + sidebar) rather than aliased to `owner`. Legacy
+  // signups with no requested role still default to owner so the existing
+  // "Sign up to rent" flow keeps working.
+  const insertRole = isApplication ? requestedRole : "owner";
   const phone = parsed.data.phone?.trim() || null;
   // Generate one-time verification codes for every selected channel that
   // has a corresponding contact value on file. Legacy callers (no

@@ -30,6 +30,7 @@ Connected automotive service platform that pairs vehicle owners with service cen
 - `lib/db/src/schema/users.ts` — adds `approvalStatus`, `approvalNote`, `kycStatus`, `kycNote`, `kycDocuments` (jsonb), `requestedRole`, `applicantData` (jsonb) for self-signup + KYC onboarding
 - `artifacts/api-server/src/routes/onboarding.ts` — `POST /me/kyc`, `GET /admin/approvals?state=`, `PATCH /admin/approvals/:userId`, `PATCH /admin/kyc/:userId`, and the `requireKycVerified` middleware
 - `artifacts/autocare/src/pages/Signup.tsx` — public role-picker signup form
+- `artifacts/autocare/src/pages/renter/Dashboard.tsx` — renter home (active/upcoming trips, KYC status, lifetime spend); rendered by `HomeRoute` when `role === "renter"`
 - `artifacts/autocare/src/pages/onboarding/{Kyc,Rejected}.tsx` — KYC upload + rejection screens
 - `artifacts/autocare/src/pages/super_admin/Approvals.tsx` — super-admin applications / KYC / rejected tabs
 - `artifacts/api-server/src/lib/entitlements.ts` — `getEntitlements(kind,id)`, `getOwnerEntitlementsForVehicle(vehicleId)`, `featuredSubscriberIds(kind, ids)`; every plan-gated server action goes through here
@@ -84,6 +85,7 @@ Connected automotive service platform that pairs vehicle owners with service cen
 
 ## Onboarding & approvals
 
+- `renter` is a first-class `users.role` value with its own dashboard (`pages/renter/Dashboard.tsx`) and trimmed sidebar (`RENTER_NAV` in `AppShell.tsx`: Dashboard, Browse Cars, My Rentals, Renter Profile). `POST /auth/signup` writes `role = requestedRole` directly (no longer aliases renter to owner), and `scripts/src/seedUsers.ts` backfills any legacy `requestedRole='renter' AND role='owner'` rows on every run. Rental routes that were previously `ownerOnly` (`/rentals/my-bookings`, `/rentals/profile`) are now `renterOrOwner` so both personas reach them. Demo renter account: `renter@autocare.test / renter1234`.
 - Self-signup at `/signup` lets anyone apply as one of: car owner, renter, service center, parts vendor, delivery agent, or fleet/institution. The form is two-step (role picker → role-specific details) and posts to `POST /auth/signup` with `requestedRole` + `applicantData`.
 - Applicants are inserted with `approvalStatus=pending` + `kycStatus=not_submitted` and DO NOT receive a session cookie. They cannot sign in until a super admin approves them.
 - Super admin reviews queues at `/super-admin/approvals` with tabs for Applications, KYC submissions, and Rejected. Approve provisions the matching directory row (service-center / vendor / delivery-agent / organisation with the applicant as `admin` member / renter-profile shell) keyed by phone; reject stores `approvalNote` shown back to the applicant on next login attempt.

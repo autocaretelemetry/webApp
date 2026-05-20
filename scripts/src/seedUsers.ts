@@ -9,6 +9,7 @@ import {
   randomBytes,
   scryptSync,
 } from "node:crypto";
+import { and, eq } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 
 function hashPassword(password: string): string {
@@ -46,6 +47,13 @@ const SEEDS: Seed[] = [
     name: "PartsPro Lagos",
     role: "vendor",
     phone: "+234 807 654 0011",
+  },
+  {
+    email: "renter@autocare.test",
+    password: "renter1234",
+    name: "Tunde Bakare",
+    role: "renter",
+    phone: "+234 803 545 8821",
   },
   {
     email: "delivery@autocare.test",
@@ -125,6 +133,22 @@ async function main() {
         },
       });
     console.log(`Seeded ${s.role} -> ${s.email}`);
+  }
+  // Backfill: before `renter` became a first-class role, applicants who
+  // applied as renters were stored as `role=owner`. Promote any such rows
+  // to `role=renter` so they land on the renter dashboard after sign-in.
+  const promoted = await db
+    .update(usersTable)
+    .set({ role: "renter" })
+    .where(
+      and(
+        eq(usersTable.requestedRole, "renter"),
+        eq(usersTable.role, "owner"),
+      ),
+    )
+    .returning({ id: usersTable.id });
+  if (promoted.length > 0) {
+    console.log(`Promoted ${promoted.length} renter applicant(s) from owner -> renter`);
   }
   process.exit(0);
 }

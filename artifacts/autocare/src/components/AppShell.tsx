@@ -59,6 +59,18 @@ type NavSection = {
   items: NavItem[];
 };
 
+const RENTER_NAV: NavSection[] = [
+  {
+    label: "Rentals",
+    items: [
+      { href: "/", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/rentals", label: "Browse Cars", icon: KeyRound },
+      { href: "/rentals/my-bookings", label: "My Rentals", icon: CalendarDays },
+      { href: "/rentals/profile", label: "Renter Profile", icon: UserCircle2 },
+    ],
+  },
+];
+
 const OWNER_NAV: NavSection[] = [
   {
     label: "Workshop",
@@ -237,6 +249,7 @@ function navFor(
 ): NavSection[] {
   const base = (() => {
     if (role === "owner") return OWNER_NAV;
+    if (role === "renter") return RENTER_NAV;
     if (role === "center") return CENTER_NAV;
     if (role === "vendor") return VENDOR_NAV;
     if (role === "fleet") return fleetNavFor(fleetRole);
@@ -301,6 +314,7 @@ function RoleTabs({
 }) {
   const tabs: { value: Role; label: string; icon?: LucideIcon }[] = [
     { value: "owner", label: "Owner" },
+    { value: "renter", label: "Renter", icon: KeyRound },
     { value: "center", label: "Center" },
     { value: "vendor", label: "Vendor" },
     { value: "delivery", label: "Delivery" },
@@ -310,7 +324,7 @@ function RoleTabs({
   if (showSuperAdmin) {
     tabs.push({ value: "super_admin", label: "Super", icon: Paintbrush });
   }
-  const cols = showSuperAdmin ? "grid-cols-7" : "grid-cols-6";
+  const cols = showSuperAdmin ? "grid-cols-8" : "grid-cols-7";
   return (
     <Tabs value={role} onValueChange={(v) => setRole(v as Role)} className={className}>
       <TabsList className={cn("grid w-full", cols)}>
@@ -336,6 +350,7 @@ function RoleTabs({
 
 const ROLE_LABEL: Record<Role, string> = {
   owner: "Vehicle owner",
+  renter: "Renter",
   center: "Service center",
   vendor: "Parts vendor",
   delivery: "Delivery agent",

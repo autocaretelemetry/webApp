@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 
 export type Role =
   | "owner"
+  | "renter"
   | "center"
   | "vendor"
   | "delivery"
@@ -17,6 +18,7 @@ export function getRole(): Role {
   const stored = localStorage.getItem(ROLE_KEY);
   if (
     stored === "owner" ||
+    stored === "renter" ||
     stored === "center" ||
     stored === "vendor" ||
     stored === "delivery" ||

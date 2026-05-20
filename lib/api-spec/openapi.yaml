@@ -2238,7 +2238,7 @@ components:
         name: { type: string }
         role:
           type: string
-          enum: [owner, center, vendor, delivery, fleet, admin, super_admin]
+          enum: [owner, renter, center, vendor, delivery, fleet, admin, super_admin]
         phone: { type: string, nullable: true }
         avatarUrl: { type: string, nullable: true }
         active: { type: boolean }

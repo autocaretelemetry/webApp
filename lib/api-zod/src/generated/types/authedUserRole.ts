@@ -11,6 +11,7 @@ export type AuthedUserRole = typeof AuthedUserRole[keyof typeof AuthedUserRole];
 
 export const AuthedUserRole = {
   owner: 'owner',
+  renter: 'renter',
   center: 'center',
   vendor: 'vendor',
   delivery: 'delivery',
