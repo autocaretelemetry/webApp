@@ -10,7 +10,8 @@ import { toast } from "sonner";
 import { ApiError } from "@workspace/api-client-react";
 
 const DEMO = [
-  { label: "Owner / Renter", email: "owner@autocare.test", password: "owner1234" },
+  { label: "Owner", email: "owner@autocare.test", password: "owner1234" },
+  { label: "Renter", email: "renter@autocare.test", password: "renter1234" },
   { label: "Service center", email: "center@autocare.test", password: "center1234" },
   { label: "Vendor", email: "vendor@autocare.test", password: "vendor1234" },
   { label: "Delivery", email: "delivery@autocare.test", password: "delivery1234" },

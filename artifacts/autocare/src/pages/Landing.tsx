@@ -182,7 +182,8 @@ export default function Landing() {
               </p>
               <div className="divide-y rounded-md border bg-card">
                 {[
-                  ["Owner / Renter", "owner@autocare.test", "owner1234"],
+                  ["Owner", "owner@autocare.test", "owner1234"],
+                  ["Renter", "renter@autocare.test", "renter1234"],
                   ["Service center", "center@autocare.test", "center1234"],
                   ["Vendor", "vendor@autocare.test", "vendor1234"],
                   ["Delivery agent", "delivery@autocare.test", "delivery1234"],
