@@ -2890,7 +2890,15 @@ components:
 
     PlanLimits:
       type: object
-      required: [maxBookingsPerMonth, maxPartsListed, featuredPlacement, canExportHistory, priorityBooking]
+      required:
+        - maxBookingsPerMonth
+        - maxPartsListed
+        - featuredPlacement
+        - canExportHistory
+        - priorityBooking
+        - maxFleetVehicles
+        - partsCostTransparency
+        - dedicatedSupport
       description: >
         Concrete, machine-enforceable entitlements. Numeric limits use `null`
         to mean "unlimited". `features` (separately) is free-form marketing
@@ -2901,6 +2909,9 @@ components:
         featuredPlacement: { type: boolean }
         canExportHistory: { type: boolean }
         priorityBooking: { type: boolean }
+        maxFleetVehicles: { type: integer, nullable: true, minimum: 0 }
+        partsCostTransparency: { type: boolean }
+        dedicatedSupport: { type: boolean }
 
     SubscriptionPlan:
       type: object
@@ -2908,7 +2919,7 @@ components:
       properties:
         id: { type: string }
         name: { type: string }
-        audience: { type: string, enum: [center, vendor, owner] }
+        audience: { type: string, enum: [center, vendor, owner, organization] }
         priceMonthly: { type: number }
         features:
           type: array
@@ -2922,7 +2933,7 @@ components:
       required: [name, audience, priceMonthly]
       properties:
         name: { type: string, minLength: 1 }
-        audience: { type: string, enum: [center, vendor, owner] }
+        audience: { type: string, enum: [center, vendor, owner, organization] }
         priceMonthly: { type: number, minimum: 0 }
         features:
           type: array

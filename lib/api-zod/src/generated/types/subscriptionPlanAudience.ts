@@ -13,4 +13,5 @@ export const SubscriptionPlanAudience = {
   center: 'center',
   vendor: 'vendor',
   owner: 'owner',
+  organization: 'organization',
 } as const;

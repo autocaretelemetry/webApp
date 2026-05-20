@@ -37,12 +37,13 @@ import { Layers, Plus, Check, Star } from "lucide-react";
 import { toast } from "sonner";
 
 type Audience = "all" | "center" | "vendor" | "owner";
-type PlanAudience = "center" | "vendor" | "owner";
+type PlanAudience = "center" | "vendor" | "owner" | "organization";
 
 const AUDIENCE_LABEL: Record<PlanAudience, string> = {
   center: "Service Centers",
   vendor: "Vendors",
   owner: "Vehicle Owners",
+  organization: "Fleet Organisations",
 };
 
 const EMPTY_LIMITS: PlanLimits = {
@@ -51,6 +52,9 @@ const EMPTY_LIMITS: PlanLimits = {
   featuredPlacement: false,
   canExportHistory: false,
   priorityBooking: false,
+  maxFleetVehicles: null,
+  partsCostTransparency: false,
+  dedicatedSupport: false,
 };
 
 type EditState = {
@@ -72,6 +76,14 @@ function applicableLimitKeys(audience: PlanAudience): (keyof PlanLimits)[] {
       return ["maxPartsListed", "featuredPlacement"];
     case "owner":
       return ["canExportHistory", "priorityBooking"];
+    case "organization":
+      return [
+        "maxFleetVehicles",
+        "partsCostTransparency",
+        "dedicatedSupport",
+        "priorityBooking",
+        "canExportHistory",
+      ];
   }
 }
 
@@ -81,6 +93,9 @@ const LIMIT_LABEL: Record<keyof PlanLimits, string> = {
   featuredPlacement: "Featured placement",
   canExportHistory: "Export maintenance history",
   priorityBooking: "Priority booking",
+  maxFleetVehicles: "Max fleet vehicles",
+  partsCostTransparency: "Parts-cost transparency",
+  dedicatedSupport: "Dedicated support",
 };
 
 function limitBadges(audience: PlanAudience, limits: PlanLimits): string[] {

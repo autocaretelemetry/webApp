@@ -961,6 +961,10 @@ export interface PlanLimits {
   featuredPlacement: boolean;
   canExportHistory: boolean;
   priorityBooking: boolean;
+  /** @minimum 0 */
+  maxFleetVehicles: number | null;
+  partsCostTransparency: boolean;
+  dedicatedSupport: boolean;
 }
 
 export type SubscriptionPlanAudience = typeof SubscriptionPlanAudience[keyof typeof SubscriptionPlanAudience];
@@ -970,6 +974,7 @@ export const SubscriptionPlanAudience = {
   center: 'center',
   vendor: 'vendor',
   owner: 'owner',
+  organization: 'organization',
 } as const;
 
 export interface SubscriptionPlan {
@@ -990,6 +995,7 @@ export const CreateSubscriptionPlanInputAudience = {
   center: 'center',
   vendor: 'vendor',
   owner: 'owner',
+  organization: 'organization',
 } as const;
 
 export interface CreateSubscriptionPlanInput {

@@ -127,6 +127,20 @@ const VENDOR_NAV: NavSection[] = [
   },
 ];
 
+const FLEET_NAV: NavSection[] = [
+  {
+    label: "Fleet",
+    items: [
+      { href: "/", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/fleet/vehicles", label: "Vehicles", icon: Car },
+      { href: "/fleet/drivers", label: "Team & Drivers", icon: Users },
+      { href: "/fleet/centers", label: "Preferred Centers", icon: Store },
+      { href: "/bookings", label: "Bookings", icon: CalendarDays },
+      { href: "/fleet/settings", label: "Settings", icon: Settings },
+    ],
+  },
+];
+
 const DELIVERY_NAV: NavSection[] = [
   {
     label: "On the road",
@@ -190,6 +204,7 @@ function navFor(role: Role, isSuperAdmin: boolean): NavSection[] {
     if (role === "owner") return OWNER_NAV;
     if (role === "center") return CENTER_NAV;
     if (role === "vendor") return VENDOR_NAV;
+    if (role === "fleet") return FLEET_NAV;
     if (role === "admin") return ADMIN_NAV;
     if (role === "super_admin") return SUPER_ADMIN_NAV;
     return DELIVERY_NAV;
@@ -254,14 +269,16 @@ function RoleTabs({
     { value: "center", label: "Center" },
     { value: "vendor", label: "Vendor" },
     { value: "delivery", label: "Delivery" },
+    { value: "fleet", label: "Fleet", icon: Building2 },
     { value: "admin", label: "Admin", icon: ShieldCheck },
   ];
   if (showSuperAdmin) {
     tabs.push({ value: "super_admin", label: "Super", icon: Paintbrush });
   }
+  const cols = showSuperAdmin ? "grid-cols-7" : "grid-cols-6";
   return (
     <Tabs value={role} onValueChange={(v) => setRole(v as Role)} className={className}>
-      <TabsList className={cn("grid w-full", showSuperAdmin ? "grid-cols-6" : "grid-cols-5")}>
+      <TabsList className={cn("grid w-full", cols)}>
         {tabs.map((t) => {
           const Icon = t.icon;
           return (
@@ -287,6 +304,7 @@ const ROLE_LABEL: Record<Role, string> = {
   center: "Service center",
   vendor: "Parts vendor",
   delivery: "Delivery agent",
+  fleet: "Fleet manager",
   admin: "Platform admin",
   super_admin: "Super admin",
 };

@@ -10,7 +10,15 @@ import { AuthProvider, useAuth } from "@/lib/auth";
 import Landing from "@/pages/Landing";
 import LoginPage from "@/pages/Login";
 import RentalsSignup from "@/pages/rentals/Signup";
+import RegisterFleet from "@/pages/RegisterFleet";
 import NotFound from "@/pages/not-found";
+
+// Fleet Pages
+import FleetDashboard from "@/pages/fleet/Dashboard";
+import FleetVehiclesPage from "@/pages/fleet/Vehicles";
+import FleetDriversPage from "@/pages/fleet/Drivers";
+import FleetCentersPage from "@/pages/fleet/Centers";
+import FleetSettingsPage from "@/pages/fleet/Settings";
 
 // Owner Pages
 import OwnerDashboard from "@/pages/owner/Dashboard";
@@ -94,6 +102,7 @@ function HomeRoute() {
   if (role === "owner") return <OwnerDashboard />;
   if (role === "center") return <CenterDashboard />;
   if (role === "vendor") return <VendorDashboard />;
+  if (role === "fleet") return <FleetDashboard />;
   if (role === "admin" || role === "super_admin") return <AdminDashboard />;
   return <DeliveryDashboard />;
 }
@@ -127,6 +136,7 @@ const centerOnly = (c: ComponentType) => () => <RoleGuard allow={["center"]} com
 const vendorOnly = (c: ComponentType) => () => <RoleGuard allow={["vendor"]} component={c} />;
 const buyersOnly = (c: ComponentType) => () => <RoleGuard allow={["owner", "center"]} component={c} />;
 const deliveryOnly = (c: ComponentType) => () => <RoleGuard allow={["delivery"]} component={c} />;
+const fleetOnly = (c: ComponentType) => () => <RoleGuard allow={["fleet"]} component={c} />;
 const adminOnly = (c: ComponentType) => () => <RoleGuard allow={["admin", "super_admin"]} component={c} />;
 const superAdminOnly = (c: ComponentType) => () => <RoleGuard allow={["super_admin"]} component={c} />;
 
@@ -162,6 +172,13 @@ function AppRouter() {
         {/* Delivery Routes */}
         <Route path="/delivery/register" component={deliveryOnly(DeliveryRegister)} />
         <Route path="/delivery/orders" component={deliveryOnly(DeliveryOrders)} />
+
+        {/* Fleet Routes */}
+        <Route path="/fleet/vehicles" component={fleetOnly(FleetVehiclesPage)} />
+        <Route path="/fleet/drivers" component={fleetOnly(FleetDriversPage)} />
+        <Route path="/fleet/centers" component={fleetOnly(FleetCentersPage)} />
+        <Route path="/fleet/settings" component={fleetOnly(FleetSettingsPage)} />
+        <Route path="/register-fleet" component={RegisterFleet} />
 
         {/* Admin Routes */}
         <Route path="/admin/centers" component={adminOnly(AdminServiceCenters)} />
@@ -222,6 +239,7 @@ function Router() {
 
       <Route path="/login" component={LoginPage} />
       <Route path="/rentals/signup" component={RentalsSignup} />
+      <Route path="/register-fleet" component={RegisterFleet} />
 
       {loading ? (
         <Route>

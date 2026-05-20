@@ -15,7 +15,7 @@ export type { PlanLimits };
  * Tuned so that an unsubscribed account can still try the product but feels
  * the squeeze quickly enough to convert. Tweak here — never inline.
  */
-const FREE_LIMITS: Record<"center" | "vendor" | "owner", PlanLimits> = {
+const FREE_LIMITS: Record<"center" | "vendor" | "owner" | "organization", PlanLimits> = {
   center: {
     ...DEFAULT_PLAN_LIMITS,
     maxBookingsPerMonth: 10,
@@ -27,9 +27,15 @@ const FREE_LIMITS: Record<"center" | "vendor" | "owner", PlanLimits> = {
   owner: {
     ...DEFAULT_PLAN_LIMITS,
   },
+  // Free tier for fleet orgs lets them try with a tiny fleet so the cap
+  // is felt quickly and conversion to a Fleet plan is obvious.
+  organization: {
+    ...DEFAULT_PLAN_LIMITS,
+    maxFleetVehicles: 3,
+  },
 };
 
-export type SubscriberKind = "center" | "vendor" | "owner";
+export type SubscriberKind = "center" | "vendor" | "owner" | "organization";
 
 /**
  * Resolve the active plan limits for a subscriber. Falls back to the free

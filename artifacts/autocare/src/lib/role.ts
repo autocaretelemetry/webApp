@@ -5,11 +5,13 @@ export type Role =
   | "center"
   | "vendor"
   | "delivery"
+  | "fleet"
   | "admin"
   | "super_admin";
 
 const ROLE_KEY = "autocare_role";
 const DELIVERY_AGENT_ID_KEY = "autocare_delivery_agent_id";
+const FLEET_ORG_ID_KEY = "autocare_fleet_org_id";
 
 export function getRole(): Role {
   const stored = localStorage.getItem(ROLE_KEY);
@@ -18,12 +20,37 @@ export function getRole(): Role {
     stored === "center" ||
     stored === "vendor" ||
     stored === "delivery" ||
+    stored === "fleet" ||
     stored === "admin" ||
     stored === "super_admin"
   ) {
     return stored;
   }
   return "owner";
+}
+
+export function getFleetOrgId(): string | null {
+  return localStorage.getItem(FLEET_ORG_ID_KEY);
+}
+
+export function setFleetOrgId(id: string | null) {
+  if (id) localStorage.setItem(FLEET_ORG_ID_KEY, id);
+  else localStorage.removeItem(FLEET_ORG_ID_KEY);
+  window.dispatchEvent(new Event("fleetorgchange"));
+}
+
+export function useFleetOrgId() {
+  const [id, setId] = useState<string | null>(getFleetOrgId());
+  useEffect(() => {
+    const onChange = () => setId(getFleetOrgId());
+    window.addEventListener("fleetorgchange", onChange);
+    window.addEventListener("storage", onChange);
+    return () => {
+      window.removeEventListener("fleetorgchange", onChange);
+      window.removeEventListener("storage", onChange);
+    };
+  }, []);
+  return id;
 }
 
 export function setRole(role: Role) {

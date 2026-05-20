@@ -18,4 +18,8 @@ export interface PlanLimits {
   featuredPlacement: boolean;
   canExportHistory: boolean;
   priorityBooking: boolean;
+  /** @minimum 0 */
+  maxFleetVehicles: number | null;
+  partsCostTransparency: boolean;
+  dedicatedSupport: boolean;
 }

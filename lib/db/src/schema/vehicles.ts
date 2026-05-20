@@ -19,6 +19,12 @@ export const vehiclesTable = pgTable("vehicles", {
   lastServicedMileage: integer("last_serviced_mileage"),
   serviceIntervalDays: integer("service_interval_days").notNull().default(90),
   serviceIntervalKm: integer("service_interval_km").notNull().default(5000),
+  // Fleet linkage. When set, the vehicle belongs to an organization and
+  // fleet-admin authorization (plus maxFleetVehicles enforcement) applies
+  // alongside the standard owner-phone checks. `assignedDriverPhone`
+  // scopes which driver-role member sees the vehicle in their portal.
+  organizationId: uuid("organization_id"),
+  assignedDriverPhone: text("assigned_driver_phone"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

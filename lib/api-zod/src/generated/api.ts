@@ -2299,12 +2299,14 @@ export const listSubscriptionPlansResponseLimitsMaxBookingsPerMonthMin = 0;
 
 export const listSubscriptionPlansResponseLimitsMaxPartsListedMin = 0;
 
+export const listSubscriptionPlansResponseLimitsMaxFleetVehiclesMin = 0;
+
 
 
 export const ListSubscriptionPlansResponseItem = zod.object({
   "id": zod.string(),
   "name": zod.string(),
-  "audience": zod.enum(['center', 'vendor', 'owner']),
+  "audience": zod.enum(['center', 'vendor', 'owner', 'organization']),
   "priceMonthly": zod.number(),
   "features": zod.array(zod.string()),
   "limits": zod.object({
@@ -2312,7 +2314,10 @@ export const ListSubscriptionPlansResponseItem = zod.object({
   "maxPartsListed": zod.number().min(listSubscriptionPlansResponseLimitsMaxPartsListedMin).nullable(),
   "featuredPlacement": zod.boolean(),
   "canExportHistory": zod.boolean(),
-  "priorityBooking": zod.boolean()
+  "priorityBooking": zod.boolean(),
+  "maxFleetVehicles": zod.number().min(listSubscriptionPlansResponseLimitsMaxFleetVehiclesMin).nullable(),
+  "partsCostTransparency": zod.boolean(),
+  "dedicatedSupport": zod.boolean()
 }).describe('Concrete, machine-enforceable entitlements. Numeric limits use `null` to mean \"unlimited\". `features` (separately) is free-form marketing copy on the plan card — `limits` is what the server actually checks.\n'),
   "active": zod.boolean(),
   "createdAt": zod.coerce.date()
@@ -2327,11 +2332,13 @@ export const createSubscriptionPlanBodyLimitsMaxBookingsPerMonthMin = 0;
 
 export const createSubscriptionPlanBodyLimitsMaxPartsListedMin = 0;
 
+export const createSubscriptionPlanBodyLimitsMaxFleetVehiclesMin = 0;
+
 
 
 export const CreateSubscriptionPlanBody = zod.object({
   "name": zod.string().min(1),
-  "audience": zod.enum(['center', 'vendor', 'owner']),
+  "audience": zod.enum(['center', 'vendor', 'owner', 'organization']),
   "priceMonthly": zod.number().min(createSubscriptionPlanBodyPriceMonthlyMin),
   "features": zod.array(zod.string()).optional(),
   "limits": zod.object({
@@ -2339,7 +2346,10 @@ export const CreateSubscriptionPlanBody = zod.object({
   "maxPartsListed": zod.number().min(createSubscriptionPlanBodyLimitsMaxPartsListedMin).nullable(),
   "featuredPlacement": zod.boolean(),
   "canExportHistory": zod.boolean(),
-  "priorityBooking": zod.boolean()
+  "priorityBooking": zod.boolean(),
+  "maxFleetVehicles": zod.number().min(createSubscriptionPlanBodyLimitsMaxFleetVehiclesMin).nullable(),
+  "partsCostTransparency": zod.boolean(),
+  "dedicatedSupport": zod.boolean()
 }).optional().describe('Concrete, machine-enforceable entitlements. Numeric limits use `null` to mean \"unlimited\". `features` (separately) is free-form marketing copy on the plan card — `limits` is what the server actually checks.\n')
 })
 
@@ -2354,6 +2364,8 @@ export const updateSubscriptionPlanBodyLimitsMaxBookingsPerMonthMin = 0;
 
 export const updateSubscriptionPlanBodyLimitsMaxPartsListedMin = 0;
 
+export const updateSubscriptionPlanBodyLimitsMaxFleetVehiclesMin = 0;
+
 
 
 export const UpdateSubscriptionPlanBody = zod.object({
@@ -2365,7 +2377,10 @@ export const UpdateSubscriptionPlanBody = zod.object({
   "maxPartsListed": zod.number().min(updateSubscriptionPlanBodyLimitsMaxPartsListedMin).nullable(),
   "featuredPlacement": zod.boolean(),
   "canExportHistory": zod.boolean(),
-  "priorityBooking": zod.boolean()
+  "priorityBooking": zod.boolean(),
+  "maxFleetVehicles": zod.number().min(updateSubscriptionPlanBodyLimitsMaxFleetVehiclesMin).nullable(),
+  "partsCostTransparency": zod.boolean(),
+  "dedicatedSupport": zod.boolean()
 }).optional().describe('Concrete, machine-enforceable entitlements. Numeric limits use `null` to mean \"unlimited\". `features` (separately) is free-form marketing copy on the plan card — `limits` is what the server actually checks.\n'),
   "active": zod.boolean().optional()
 })
@@ -2374,12 +2389,14 @@ export const updateSubscriptionPlanResponseLimitsMaxBookingsPerMonthMin = 0;
 
 export const updateSubscriptionPlanResponseLimitsMaxPartsListedMin = 0;
 
+export const updateSubscriptionPlanResponseLimitsMaxFleetVehiclesMin = 0;
+
 
 
 export const UpdateSubscriptionPlanResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),
-  "audience": zod.enum(['center', 'vendor', 'owner']),
+  "audience": zod.enum(['center', 'vendor', 'owner', 'organization']),
   "priceMonthly": zod.number(),
   "features": zod.array(zod.string()),
   "limits": zod.object({
@@ -2387,7 +2404,10 @@ export const UpdateSubscriptionPlanResponse = zod.object({
   "maxPartsListed": zod.number().min(updateSubscriptionPlanResponseLimitsMaxPartsListedMin).nullable(),
   "featuredPlacement": zod.boolean(),
   "canExportHistory": zod.boolean(),
-  "priorityBooking": zod.boolean()
+  "priorityBooking": zod.boolean(),
+  "maxFleetVehicles": zod.number().min(updateSubscriptionPlanResponseLimitsMaxFleetVehiclesMin).nullable(),
+  "partsCostTransparency": zod.boolean(),
+  "dedicatedSupport": zod.boolean()
 }).describe('Concrete, machine-enforceable entitlements. Numeric limits use `null` to mean \"unlimited\". `features` (separately) is free-form marketing copy on the plan card — `limits` is what the server actually checks.\n'),
   "active": zod.boolean(),
   "createdAt": zod.coerce.date()

@@ -15,6 +15,15 @@ export type PlanLimits = {
   featuredPlacement: boolean;
   canExportHistory: boolean;
   priorityBooking: boolean;
+  // Fleet (organization) tier entitlements:
+  // - `maxFleetVehicles` caps how many vehicles an org can attach.
+  // - `partsCostTransparency` unlocks the parts-spend breakdown panel
+  //   on the fleet dashboard.
+  // - `dedicatedSupport` is a marketing surface flag (no server gate,
+  //   but kept here so plans can advertise it consistently).
+  maxFleetVehicles: number | null;
+  partsCostTransparency: boolean;
+  dedicatedSupport: boolean;
 };
 
 export const DEFAULT_PLAN_LIMITS: PlanLimits = {
@@ -23,6 +32,9 @@ export const DEFAULT_PLAN_LIMITS: PlanLimits = {
   featuredPlacement: false,
   canExportHistory: false,
   priorityBooking: false,
+  maxFleetVehicles: null,
+  partsCostTransparency: false,
+  dedicatedSupport: false,
 };
 
 export const subscriptionPlansTable = pgTable("subscription_plans", {

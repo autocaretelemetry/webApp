@@ -7,7 +7,20 @@ import {
   subscriptionPaymentsTable,
   serviceCentersTable,
   vendorsTable,
+  organizationsTable,
+  organizationMembersTable,
+  organizationPreferredCentersTable,
+  vehiclesTable,
 } from "@workspace/db";
+import { eq } from "drizzle-orm";
+
+// Defaults for newly added PlanLimits fields. Most non-org plans don't
+// surface fleet entitlements at all, so they get zeroes.
+const NO_FLEET = {
+  maxFleetVehicles: 0,
+  partsCostTransparency: false,
+  dedicatedSupport: false,
+} as const;
 
 const ALL_PERMS = [
   "manage_vendors",
@@ -70,6 +83,7 @@ async function main() {
           featuredPlacement: false,
           canExportHistory: false,
           priorityBooking: false,
+          ...NO_FLEET,
         },
       },
       {
@@ -83,6 +97,7 @@ async function main() {
           featuredPlacement: true,
           canExportHistory: false,
           priorityBooking: false,
+          ...NO_FLEET,
         },
       },
       {
@@ -96,6 +111,7 @@ async function main() {
           featuredPlacement: false,
           canExportHistory: false,
           priorityBooking: false,
+          ...NO_FLEET,
         },
       },
       {
@@ -109,6 +125,7 @@ async function main() {
           featuredPlacement: true,
           canExportHistory: false,
           priorityBooking: false,
+          ...NO_FLEET,
         },
       },
       {
@@ -122,6 +139,49 @@ async function main() {
           featuredPlacement: false,
           canExportHistory: true,
           priorityBooking: true,
+          ...NO_FLEET,
+        },
+      },
+      {
+        name: "Fleet Starter",
+        audience: "organization",
+        priceMonthly: 80000,
+        features: [
+          "Up to 10 fleet vehicles",
+          "Preferred service centers",
+          "Reminders dashboard",
+          "Email support",
+        ],
+        limits: {
+          maxBookingsPerMonth: null,
+          maxPartsListed: null,
+          featuredPlacement: false,
+          canExportHistory: true,
+          priorityBooking: false,
+          maxFleetVehicles: 10,
+          partsCostTransparency: false,
+          dedicatedSupport: false,
+        },
+      },
+      {
+        name: "Fleet Pro",
+        audience: "organization",
+        priceMonthly: 250000,
+        features: [
+          "Unlimited fleet vehicles",
+          "Parts-cost transparency",
+          "Priority booking at preferred centers",
+          "Dedicated account manager",
+        ],
+        limits: {
+          maxBookingsPerMonth: null,
+          maxPartsListed: null,
+          featuredPlacement: false,
+          canExportHistory: true,
+          priorityBooking: true,
+          maxFleetVehicles: null,
+          partsCostTransparency: true,
+          dedicatedSupport: true,
         },
       },
     ])
@@ -134,7 +194,7 @@ async function main() {
 
   console.log("Seeding subscriptions...");
   type SubSeed = {
-    kind: "center" | "vendor" | "owner";
+    kind: "center" | "vendor" | "owner" | "organization";
     id: string;
     name: string;
     plan: typeof plans[number];
@@ -216,6 +276,150 @@ async function main() {
       await db.insert(subscriptionPaymentsTable).values(payments);
     }
   }
+
+  // ───── Demo fleet: MTN Ghana ─────
+  console.log("Seeding demo fleet organization (MTN Ghana)...");
+  await db.delete(organizationPreferredCentersTable);
+  await db.delete(organizationMembersTable);
+  // Detach any existing fleet vehicles before we drop the parent org rows
+  // so the FK doesn't block deletion on re-seed.
+  await db
+    .update(vehiclesTable)
+    .set({ organizationId: null, assignedDriverPhone: null })
+    .where(eq(vehiclesTable.ownerPhone, "+233 24 100 0001"));
+  await db.delete(organizationsTable);
+
+  const [mtn] = await db
+    .insert(organizationsTable)
+    .values({
+      name: "MTN Ghana",
+      slug: "mtn-ghana",
+      industry: "Telecommunications",
+      contactName: "Akosua Mensah",
+      contactPhone: "+233 24 100 0001",
+      contactEmail: "fleet@mtn.com.gh",
+      billingAddress: "Independence Avenue, Ridge",
+      city: "Accra",
+      region: "Greater Accra",
+      logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/New-mtn-logo.jpg/320px-New-mtn-logo.jpg",
+    })
+    .returning();
+
+  await db.insert(organizationMembersTable).values([
+    {
+      organizationId: mtn.id,
+      phone: "+233 24 100 0001",
+      name: "Akosua Mensah",
+      role: "admin",
+    },
+    {
+      organizationId: mtn.id,
+      phone: "+233 24 100 0002",
+      name: "Kwame Boateng",
+      role: "driver",
+    },
+    {
+      organizationId: mtn.id,
+      phone: "+233 24 100 0003",
+      name: "Yaa Owusu",
+      role: "driver",
+    },
+  ]);
+
+  const allCenters = await db.select().from(serviceCentersTable);
+  if (allCenters.length >= 2) {
+    await db.insert(organizationPreferredCentersTable).values(
+      allCenters.slice(0, 2).map((c) => ({
+        organizationId: mtn.id,
+        serviceCenterId: c.id,
+      })),
+    );
+  }
+
+  await db.insert(vehiclesTable).values([
+    {
+      organizationId: mtn.id,
+      ownerName: mtn.name,
+      ownerPhone: mtn.contactPhone,
+      brand: "Toyota",
+      model: "Hilux",
+      year: 2022,
+      plateNumber: "GR 4421-22",
+      color: "MTN Yellow",
+      mileage: 48500,
+      engineType: "2.4L Diesel",
+      insuranceProvider: "Enterprise Insurance",
+      assignedDriverPhone: "+233 24 100 0002",
+    },
+    {
+      organizationId: mtn.id,
+      ownerName: mtn.name,
+      ownerPhone: mtn.contactPhone,
+      brand: "Toyota",
+      model: "Hilux",
+      year: 2023,
+      plateNumber: "GR 7781-23",
+      color: "MTN Yellow",
+      mileage: 21200,
+      engineType: "2.4L Diesel",
+      insuranceProvider: "Enterprise Insurance",
+      assignedDriverPhone: "+233 24 100 0003",
+    },
+    {
+      organizationId: mtn.id,
+      ownerName: mtn.name,
+      ownerPhone: mtn.contactPhone,
+      brand: "Nissan",
+      model: "NV350 Urvan",
+      year: 2021,
+      plateNumber: "GR 1102-21",
+      color: "White",
+      mileage: 72100,
+      engineType: "2.5L Diesel",
+      insuranceProvider: "Enterprise Insurance",
+    },
+    {
+      organizationId: mtn.id,
+      ownerName: mtn.name,
+      ownerPhone: mtn.contactPhone,
+      brand: "Ford",
+      model: "Ranger",
+      year: 2024,
+      plateNumber: "GR 9981-24",
+      color: "MTN Yellow",
+      mileage: 8500,
+      engineType: "2.0L Diesel",
+      insuranceProvider: "Enterprise Insurance",
+    },
+  ]);
+
+  // Subscribe MTN Ghana to Fleet Pro so the demo unlocks parts-cost
+  // transparency and dedicated support out of the box.
+  const fleetPro = planByName("Fleet Pro");
+  const fpStarted = new Date(now);
+  fpStarted.setMonth(fpStarted.getMonth() - 2);
+  const fpEnd = new Date(now);
+  fpEnd.setMonth(fpEnd.getMonth() + 1);
+  const [mtnSub] = await db
+    .insert(subscriptionsTable)
+    .values({
+      subscriberKind: "organization",
+      subscriberId: mtn.id,
+      subscriberName: mtn.name,
+      planId: fleetPro.id,
+      status: "active",
+      startedAt: fpStarted,
+      currentPeriodEnd: fpEnd,
+    })
+    .returning();
+  await db.insert(subscriptionPaymentsTable).values([
+    { subscriptionId: mtnSub.id, amount: fleetPro.priceMonthly, paidAt: fpStarted },
+    {
+      subscriptionId: mtnSub.id,
+      amount: fleetPro.priceMonthly,
+      paidAt: new Date(fpStarted.getTime() + 30 * 86400000),
+    },
+  ]);
 
   console.log("Done.");
   await pool.end();
