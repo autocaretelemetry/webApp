@@ -415,6 +415,16 @@ function SidebarBody({
   const sections = navFor(role, user?.role === "super_admin", fleetRole);
   const showCart = role === "owner" || role === "center";
   const showBell = role === "owner";
+  const FLEET_ROLE_LABEL: Record<FleetMemberRoleNav, string> = {
+    admin: "Fleet admin",
+    finance: "Fleet finance",
+    manager: "Fleet manager",
+    driver: "Fleet driver",
+  };
+  const displayRoleLabel =
+    role === "fleet" && fleetRole
+      ? FLEET_ROLE_LABEL[fleetRole]
+      : ROLE_LABEL[user?.role as Role];
 
   return (
     <div className="flex h-full flex-col bg-sidebar">
@@ -472,7 +482,7 @@ function SidebarBody({
               <TooltipContent side="right" sideOffset={8}>
                 <div className="text-xs">
                   <div className="font-semibold">{user.name}</div>
-                  <div className="text-muted-foreground">{ROLE_LABEL[user.role as Role]}</div>
+                  <div className="text-muted-foreground">{displayRoleLabel}</div>
                 </div>
               </TooltipContent>
             </Tooltip>
@@ -497,7 +507,7 @@ function SidebarBody({
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold truncate">{user.name}</div>
                   <div className="text-[10px] text-muted-foreground uppercase tracking-wider truncate">
-                    {ROLE_LABEL[user.role as Role]}
+                    {displayRoleLabel}
                   </div>
                 </div>
               </Link>

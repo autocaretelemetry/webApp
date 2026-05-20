@@ -26,6 +26,7 @@ import { useFleetOrgId } from "@/lib/role";
 import {
   useFleetVehicles,
   useFleetMembers,
+  useMyFleetOrgs,
   useCreateFleetVehicle,
   useUpdateFleetVehicle,
   downloadFleetHistory,
@@ -44,7 +45,13 @@ const EMPTY_FORM = {
 export default function FleetVehiclesPage() {
   const orgId = useFleetOrgId();
   const { data, isLoading } = useFleetVehicles(orgId);
-  const { data: members } = useFleetMembers(orgId);
+  const { data: mine } = useMyFleetOrgs();
+  const myRole = mine?.organizations.find((o) => o.id === orgId)?.myRole;
+  // Drivers and finance never edit fleet vehicles; only admin/manager do.
+  // The members endpoint is also gated server-side (drivers get 403), so we
+  // skip the fetch entirely for them to avoid a noisy error toast.
+  const canManage = myRole === "admin" || myRole === "manager";
+  const { data: members } = useFleetMembers(canManage ? orgId : null);
   const create = useCreateFleetVehicle(orgId);
   const update = useUpdateFleetVehicle(orgId);
 
@@ -102,6 +109,7 @@ export default function FleetVehiclesPage() {
         title="Fleet vehicles"
         description="Every vehicle attached to your organisation, and who's driving it."
         actions={
+          canManage ? (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -186,6 +194,7 @@ export default function FleetVehiclesPage() {
               </form>
             </DialogContent>
           </Dialog>
+          ) : null
         }
       />
 
@@ -220,22 +229,24 @@ export default function FleetVehiclesPage() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-2 items-end">
-                    <Select
-                      value={v.assignedDriverPhone ?? "__unassigned"}
-                      onValueChange={(val) => reassign(v.id, val)}
-                    >
-                      <SelectTrigger className="w-40">
-                        <SelectValue placeholder="Assign" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__unassigned">— Unassign —</SelectItem>
-                        {drivers.map((d) => (
-                          <SelectItem key={d.phone} value={d.phone}>
-                            {d.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {canManage && (
+                      <Select
+                        value={v.assignedDriverPhone ?? "__unassigned"}
+                        onValueChange={(val) => reassign(v.id, val)}
+                      >
+                        <SelectTrigger className="w-40">
+                          <SelectValue placeholder="Assign" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__unassigned">— Unassign —</SelectItem>
+                          {drivers.map((d) => (
+                            <SelectItem key={d.phone} value={d.phone}>
+                              {d.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                     <div className="flex gap-1">
                       <Button
                         size="sm"
