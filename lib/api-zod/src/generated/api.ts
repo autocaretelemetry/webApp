@@ -3709,12 +3709,21 @@ export const SubmitKycResponse = zod.object({
  * @summary Super-admin queue of self-signup applications
  */
 export const listApprovalsQueryStateDefault = `pending`;
+export const listApprovalsQueryLimitDefault = 25;
+export const listApprovalsQueryLimitMax = 100;
+
+
 
 export const ListApprovalsQueryParams = zod.object({
-  "state": zod.enum(['pending', 'kyc_pending', 'rejected', 'all']).default(listApprovalsQueryStateDefault)
+  "state": zod.enum(['pending', 'kyc_pending', 'rejected', 'all']).default(listApprovalsQueryStateDefault),
+  "role": zod.enum(['owner', 'center', 'vendor', 'delivery', 'fleet', 'renter']).optional(),
+  "q": zod.coerce.string().optional(),
+  "limit": zod.coerce.number().min(1).max(listApprovalsQueryLimitMax).default(listApprovalsQueryLimitDefault),
+  "cursor": zod.coerce.string().optional()
 })
 
-export const ListApprovalsResponseItem = zod.object({
+export const ListApprovalsResponse = zod.object({
+  "items": zod.array(zod.object({
   "id": zod.string(),
   "email": zod.string(),
   "name": zod.string(),
@@ -3728,8 +3737,9 @@ export const ListApprovalsResponseItem = zod.object({
   "kycStatus": zod.enum(['not_submitted', 'submitted', 'verified', 'rejected']).nullish(),
   "kycNote": zod.string().nullish(),
   "requestedRole": zod.string().nullish()
+})),
+  "nextCursor": zod.string().nullable()
 })
-export const ListApprovalsResponse = zod.array(ListApprovalsResponseItem)
 
 
 /**

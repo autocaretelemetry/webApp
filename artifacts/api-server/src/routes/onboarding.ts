@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { and, desc, eq, inArray, or } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, lt, or, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import {
   db,
@@ -345,35 +345,96 @@ router.post("/me/kyc", requireAuth, async (req, res): Promise<void> => {
  * `pending` (sign-up review queue). Use `kyc_pending` for the KYC tab and
  * `all` for the history view.
  */
+const APPROVAL_ROLES = [
+  "owner",
+  "center",
+  "vendor",
+  "delivery",
+  "fleet",
+  "renter",
+] as const;
+
 router.get("/admin/approvals", requireSuperAdmin, async (req, res): Promise<void> => {
   const state = String(req.query["state"] ?? "pending");
-  let where;
+  const role = typeof req.query["role"] === "string" ? req.query["role"] : "";
+  const q = typeof req.query["q"] === "string" ? req.query["q"].trim() : "";
+  const rawLimit = Number(req.query["limit"] ?? 25);
+  const limit = Math.min(100, Math.max(1, Number.isFinite(rawLimit) ? rawLimit : 25));
+  const cursor = typeof req.query["cursor"] === "string" ? req.query["cursor"] : "";
+
+  const conditions: SQL[] = [];
   if (state === "pending") {
-    where = eq(usersTable.approvalStatus, "pending");
+    conditions.push(eq(usersTable.approvalStatus, "pending"));
   } else if (state === "kyc_pending") {
-    where = and(
-      eq(usersTable.approvalStatus, "approved"),
-      eq(usersTable.kycStatus, "submitted"),
-    );
+    conditions.push(eq(usersTable.approvalStatus, "approved"));
+    conditions.push(eq(usersTable.kycStatus, "submitted"));
   } else if (state === "rejected") {
-    where = or(
+    const r = or(
       eq(usersTable.approvalStatus, "rejected"),
       eq(usersTable.kycStatus, "rejected"),
     );
+    if (r) conditions.push(r);
   } else {
-    where = inArray(usersTable.approvalStatus, ["pending", "approved", "rejected"]);
+    conditions.push(
+      inArray(usersTable.approvalStatus, ["pending", "approved", "rejected"]),
+    );
   }
+  if (role && (APPROVAL_ROLES as readonly string[]).includes(role)) {
+    conditions.push(eq(usersTable.requestedRole, role));
+  }
+  if (q) {
+    const pattern = `%${q.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
+    const search = or(
+      ilike(usersTable.name, pattern),
+      ilike(usersTable.email, pattern),
+      ilike(usersTable.phone, pattern),
+    );
+    if (search) conditions.push(search);
+  }
+  if (cursor) {
+    try {
+      const decoded = Buffer.from(cursor, "base64url").toString("utf8");
+      const [iso, id] = decoded.split("|");
+      if (iso && id) {
+        const ts = new Date(iso);
+        if (!Number.isNaN(ts.getTime())) {
+          const after = or(
+            lt(usersTable.createdAt, ts),
+            and(eq(usersTable.createdAt, ts), lt(usersTable.id, id)),
+          );
+          if (after) conditions.push(after);
+        }
+      }
+    } catch {
+      // ignore malformed cursor — start from top
+    }
+  }
+
+  const where = conditions.length === 1 ? conditions[0] : and(...conditions);
   const rows = await db
     .select()
     .from(usersTable)
     .where(where)
-    .orderBy(desc(usersTable.createdAt));
-  res.json(
-    rows.map((r) => {
+    .orderBy(desc(usersTable.createdAt), desc(usersTable.id))
+    .limit(limit + 1);
+
+  const hasMore = rows.length > limit;
+  const page = hasMore ? rows.slice(0, limit) : rows;
+  const last = page[page.length - 1];
+  const nextCursor =
+    hasMore && last
+      ? Buffer.from(`${last.createdAt.toISOString()}|${last.id}`, "utf8").toString(
+          "base64url",
+        )
+      : null;
+
+  res.json({
+    items: page.map((r) => {
       const { passwordHash: _ph, ...safe } = r;
       return safe;
     }),
-  );
+    nextCursor,
+  });
 });
 
 const ApprovalDecisionBody = z.object({

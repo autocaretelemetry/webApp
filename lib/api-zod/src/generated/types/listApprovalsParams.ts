@@ -5,8 +5,17 @@
  * AutoCare API — vehicle owners book services, service centers fulfill them.
  * OpenAPI spec version: 0.1.0
  */
+import type { ListApprovalsRole } from './listApprovalsRole';
 import type { ListApprovalsState } from './listApprovalsState';
 
 export type ListApprovalsParams = {
 state?: ListApprovalsState;
+role?: ListApprovalsRole;
+q?: string;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+cursor?: string;
 };

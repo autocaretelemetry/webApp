@@ -1,7 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -89,8 +97,34 @@ type AuthedUserRow = {
   createdAt: string;
 };
 
-async function fetchApprovals(state: string): Promise<AuthedUserRow[]> {
-  const res = await fetch(`/api/admin/approvals?state=${state}`, { credentials: "include" });
+type ApprovalsPage = {
+  items: AuthedUserRow[];
+  nextCursor: string | null;
+};
+
+const ROLE_OPTIONS = [
+  { value: "all", label: "All roles" },
+  { value: "owner", label: "Car owner" },
+  { value: "center", label: "Service center" },
+  { value: "vendor", label: "Parts vendor" },
+  { value: "delivery", label: "Delivery agent" },
+  { value: "fleet", label: "Fleet / institution" },
+  { value: "renter", label: "Renter" },
+] as const;
+
+async function fetchApprovals(params: {
+  state: string;
+  role: string;
+  q: string;
+  cursor?: string;
+}): Promise<ApprovalsPage> {
+  const qs = new URLSearchParams({ state: params.state, limit: "25" });
+  if (params.role && params.role !== "all") qs.set("role", params.role);
+  if (params.q.trim()) qs.set("q", params.q.trim());
+  if (params.cursor) qs.set("cursor", params.cursor);
+  const res = await fetch(`/api/admin/approvals?${qs.toString()}`, {
+    credentials: "include",
+  });
   if (!res.ok) throw new Error("Failed to load");
   return res.json();
 }
@@ -124,25 +158,59 @@ export default function ApprovalsPage() {
 
 function ApprovalsList({ kind }: { kind: "applications" | "kyc" | "rejected" }) {
   const [rows, setRows] = useState<AuthedUserRow[] | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [rejectFor, setRejectFor] = useState<AuthedUserRow | null>(null);
   const [reason, setReason] = useState("");
   const [historyFor, setHistoryFor] = useState<AuthedUserRow | null>(null);
 
-  const state = kind === "kyc" ? "kyc_pending" : kind === "rejected" ? "rejected" : "pending";
+  const [role, setRole] = useState<string>("all");
+  const [searchInput, setSearchInput] = useState("");
+  const [q, setQ] = useState("");
+
+  const state = useMemo(
+    () =>
+      kind === "kyc" ? "kyc_pending" : kind === "rejected" ? "rejected" : "pending",
+    [kind],
+  );
+
+  useEffect(() => {
+    const id = window.setTimeout(() => setQ(searchInput), 250);
+    return () => window.clearTimeout(id);
+  }, [searchInput]);
 
   async function reload() {
+    setRows(null);
+    setNextCursor(null);
     try {
-      setRows(await fetchApprovals(state));
+      const page = await fetchApprovals({ state, role, q });
+      setRows(page.items);
+      setNextCursor(page.nextCursor);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to load");
+      setRows([]);
+    }
+  }
+
+  async function loadMore() {
+    if (!nextCursor) return;
+    setLoadingMore(true);
+    try {
+      const page = await fetchApprovals({ state, role, q, cursor: nextCursor });
+      setRows((prev) => (prev ? [...prev, ...page.items] : page.items));
+      setNextCursor(page.nextCursor);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to load");
+    } finally {
+      setLoadingMore(false);
     }
   }
 
   useEffect(() => {
     void reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
+  }, [state, role, q]);
 
   async function decide(row: AuthedUserRow, action: "approve" | "reject" | "verify", note?: string) {
     setBusy(row.id);
@@ -173,26 +241,52 @@ function ApprovalsList({ kind }: { kind: "applications" | "kyc" | "rejected" }) 
     }
   }
 
-  if (!rows) {
-    return <div className="text-sm text-muted-foreground">Loading…</div>;
-  }
-  if (rows.length === 0) {
-    return (
-      <Card>
-        <CardContent className="py-12 text-center text-sm text-muted-foreground">
-          {kind === "kyc"
-            ? "No KYC submissions waiting for review."
-            : kind === "rejected"
-              ? "No rejected applications."
-              : "No pending applications."}
-        </CardContent>
-      </Card>
-    );
-  }
+  const filters = (
+    <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+      <Input
+        value={searchInput}
+        onChange={(e) => setSearchInput(e.target.value)}
+        placeholder="Search by name, email, or phone…"
+        className="sm:max-w-xs"
+      />
+      <Select value={role} onValueChange={setRole}>
+        <SelectTrigger className="sm:w-56">
+          <SelectValue placeholder="All roles" />
+        </SelectTrigger>
+        <SelectContent>
+          {ROLE_OPTIONS.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value}>
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
+  const hasFilters = role !== "all" || q.trim().length > 0;
+  const emptyMessage = hasFilters
+    ? "No applicants match these filters."
+    : kind === "kyc"
+      ? "No KYC submissions waiting for review."
+      : kind === "rejected"
+        ? "No rejected applications."
+        : "No pending applications.";
 
   return (
     <div className="space-y-3">
-      {rows.map((row) => (
+      {filters}
+      {rows === null && (
+        <div className="text-sm text-muted-foreground">Loading…</div>
+      )}
+      {rows !== null && rows.length === 0 && (
+        <Card>
+          <CardContent className="py-12 text-center text-sm text-muted-foreground">
+            {emptyMessage}
+          </CardContent>
+        </Card>
+      )}
+      {rows?.map((row) => (
         <Card key={row.id}>
           <CardContent className="p-4 space-y-3">
             <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -304,6 +398,25 @@ function ApprovalsList({ kind }: { kind: "applications" | "kyc" | "rejected" }) 
           </CardContent>
         </Card>
       ))}
+
+      {rows && rows.length > 0 && nextCursor && (
+        <div className="flex justify-center pt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadMore}
+            disabled={loadingMore}
+          >
+            {loadingMore ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Loading…
+              </>
+            ) : (
+              "Load more"
+            )}
+          </Button>
+        </div>
+      )}
 
       <HistoryDialog
         applicant={historyFor}

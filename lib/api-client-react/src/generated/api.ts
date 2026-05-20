@@ -65,6 +65,7 @@ import type {
   KycSubmissionInput,
   LandingContent,
   ListActivityParams,
+  ListApprovals200,
   ListApprovalsParams,
   ListBookingsParams,
   ListDeliveryAgentsParams,
@@ -9175,9 +9176,9 @@ export const getListApprovalsUrl = (params?: ListApprovalsParams,) => {
 /**
  * @summary Super-admin queue of self-signup applications
  */
-export const listApprovals = async (params?: ListApprovalsParams, options?: RequestInit): Promise<AuthedUser[]> => {
+export const listApprovals = async (params?: ListApprovalsParams, options?: RequestInit): Promise<ListApprovals200> => {
 
-  return customFetch<AuthedUser[]>(getListApprovalsUrl(params),
+  return customFetch<ListApprovals200>(getListApprovalsUrl(params),
   {
     ...options,
     method: 'GET'

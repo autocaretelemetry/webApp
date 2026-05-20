@@ -2278,6 +2278,14 @@ export type GetVapidPublicKey503 = {
 
 export type ListApprovalsParams = {
 state?: ListApprovalsState;
+role?: ListApprovalsRole;
+q?: string;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+cursor?: string;
 };
 
 export type ListApprovalsState = typeof ListApprovalsState[keyof typeof ListApprovalsState];
@@ -2289,4 +2297,21 @@ export const ListApprovalsState = {
   rejected: 'rejected',
   all: 'all',
 } as const;
+
+export type ListApprovalsRole = typeof ListApprovalsRole[keyof typeof ListApprovalsRole];
+
+
+export const ListApprovalsRole = {
+  owner: 'owner',
+  center: 'center',
+  vendor: 'vendor',
+  delivery: 'delivery',
+  fleet: 'fleet',
+  renter: 'renter',
+} as const;
+
+export type ListApprovals200 = {
+  items: AuthedUser[];
+  nextCursor: string | null;
+};
 
