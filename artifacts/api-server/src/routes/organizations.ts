@@ -22,6 +22,7 @@ import {
 import { requireAuth } from "../lib/auth";
 import { getEntitlements } from "../lib/entitlements";
 import { computeReminders } from "../lib/reminders";
+import { createOwnerNotification } from "../lib/notify";
 import PDFDocument from "pdfkit";
 
 const router: IRouter = Router();
@@ -1687,6 +1688,20 @@ router.post(
       })
       .where(eq(fleetPartsOrdersTable.id, order.id))
       .returning();
+    if (updated.requestedByPhone && updated.requestedByPhone !== actorPhone) {
+      try {
+        await createOwnerNotification({
+          ownerPhone: updated.requestedByPhone,
+          kind: "fleet_parts_order_paid",
+          title: "Parts order approved",
+          body: `Your parts order has been approved and paid by ${actorName}.`,
+          dedupeKey: `fleet-parts-order:${updated.id}:paid`,
+          url: `/fleet/parts-orders/${updated.id}`,
+        });
+      } catch (err) {
+        req.log.warn({ err, orderId: updated.id }, "parts-order paid notify failed");
+      }
+    }
     res.json(updated);
   },
 );
@@ -1729,6 +1744,20 @@ router.post(
       })
       .where(eq(fleetPartsOrdersTable.id, order.id))
       .returning();
+    if (updated.requestedByPhone && updated.requestedByPhone !== actorPhone) {
+      try {
+        await createOwnerNotification({
+          ownerPhone: updated.requestedByPhone,
+          kind: "fleet_parts_order_rejected",
+          title: "Parts order rejected",
+          body: `Your parts order was rejected by ${actorName}: ${parsed.data.reason}`,
+          dedupeKey: `fleet-parts-order:${updated.id}:rejected`,
+          url: `/fleet/parts-orders/${updated.id}`,
+        });
+      } catch (err) {
+        req.log.warn({ err, orderId: updated.id }, "parts-order rejected notify failed");
+      }
+    }
     res.json(updated);
   },
 );
