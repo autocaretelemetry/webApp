@@ -1,6 +1,6 @@
 import { db, vehiclesTable, reminderRunsTable, usersTable, type Vehicle, type ReminderRun, type ReminderRunTrigger } from "@workspace/db";
 import { createHash } from "node:crypto";
-import { and, desc, eq, inArray, lt } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
 import { createOwnerNotification } from "./notify";
 import { appPublicUrl } from "./whatsapp";
 import { sendEmail, reminderJobFailureEmail } from "./email";
@@ -388,7 +388,70 @@ export async function pruneOldReminderRuns(
   return deleted.length;
 }
 
+/**
+ * Default age (in ms) after which a row still marked `running` is treated as
+ * a crashed run (server killed mid-tick — deploy, OOM, SIGKILL). The longest
+ * legitimate run iterates every vehicle once and creates a notification per
+ * overdue row, so a one-hour ceiling is comfortably above the worst-case
+ * runtime in practice while still giving a fresh kill enough time to be
+ * obvious in the UI. Overridable via `REMINDER_STALE_RUN_MS`.
+ */
+const DEFAULT_STALE_RUN_MS = 60 * 60 * 1000;
+
+export function staleRunThresholdMs(): number {
+  const raw = process.env["REMINDER_STALE_RUN_MS"];
+  if (!raw) return DEFAULT_STALE_RUN_MS;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return DEFAULT_STALE_RUN_MS;
+  return Math.floor(n);
+}
+
+/**
+ * Sweep `reminder_runs` for rows that were inserted with `status="running"`
+ * but never received a finalising update — almost always because the
+ * server process was killed mid-run (deploy rollout, OOM, hard crash).
+ * Any row older than {@link staleRunThresholdMs} is flipped to
+ * `status="crashed"` with an explanatory `errorMessage` and `finishedAt`
+ * set to now so the admin audit log stops claiming it's still in progress.
+ *
+ * Called on server boot and right before {@link listRecentReminderRuns}
+ * serves the admin panel, so the UI is honest both at startup and on
+ * every read.
+ */
+export async function markStaleReminderRunsAsCrashed(
+  thresholdMs: number = staleRunThresholdMs(),
+): Promise<number> {
+  const cutoff = new Date(Date.now() - thresholdMs);
+  const rows = await db
+    .update(reminderRunsTable)
+    .set({
+      status: "crashed",
+      errorMessage: sql`coalesce(${reminderRunsTable.errorMessage}, ${"Run did not finish; marked as crashed by stale-run sweep"})`,
+      finishedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(reminderRunsTable.status, "running"),
+        lt(reminderRunsTable.startedAt, cutoff),
+      ),
+    )
+    .returning({ id: reminderRunsTable.id });
+  if (rows.length > 0) {
+    logger.warn(
+      { count: rows.length, thresholdMs },
+      "Marked stale reminder runs as crashed",
+    );
+  }
+  return rows.length;
+}
+
 export async function listRecentReminderRuns(limit = 25): Promise<ReminderRun[]> {
+  // Reconcile any abandoned in-flight rows before serving so admins never
+  // see a run frozen as "Running" hours after the server that started it
+  // went away.
+  await markStaleReminderRunsAsCrashed().catch((err) =>
+    logger.warn({ err }, "Failed to sweep stale reminder runs before list"),
+  );
   return db
     .select()
     .from(reminderRunsTable)

@@ -4,7 +4,7 @@ import { and, inArray, eq, desc } from "drizzle-orm";
 import { db, usersTable, notificationsTable, reminderRunsTable } from "@workspace/db";
 import app from "../app";
 import { hashPassword } from "../lib/auth";
-import { runReminderJob } from "../lib/reminders";
+import { runReminderJob, markStaleReminderRunsAsCrashed } from "../lib/reminders";
 
 const TAG = "task61-notif";
 const USER_A_EMAIL = `${TAG}-a@autocare.test`;
@@ -312,5 +312,86 @@ describe("runReminderJob persists run rows", () => {
         new Date((a as unknown as { startedAt: string }).startedAt).getTime(),
     );
     expect(rows.map((r) => r.id)).toEqual(ordered.map((r) => r.id));
+  });
+});
+
+describe("markStaleReminderRunsAsCrashed", () => {
+  it("flips stale running rows to crashed and leaves fresh ones alone", async () => {
+    const now = Date.now();
+    // Stale: started 2 hours ago, still "running" — should be reconciled.
+    const [stale] = await db
+      .insert(reminderRunsTable)
+      .values({
+        trigger: "scheduler",
+        status: "running",
+        startedAt: new Date(now - 2 * 60 * 60 * 1000),
+      })
+      .returning({ id: reminderRunsTable.id });
+    // Fresh: just started, still running — must NOT be touched.
+    const [fresh] = await db
+      .insert(reminderRunsTable)
+      .values({
+        trigger: "scheduler",
+        status: "running",
+        startedAt: new Date(now - 30 * 1000),
+      })
+      .returning({ id: reminderRunsTable.id });
+
+    try {
+      const swept = await markStaleReminderRunsAsCrashed();
+      expect(swept).toBeGreaterThanOrEqual(1);
+
+      const [staleAfter] = await db
+        .select()
+        .from(reminderRunsTable)
+        .where(eq(reminderRunsTable.id, stale!.id));
+      expect(staleAfter!.status).toBe("crashed");
+      expect(staleAfter!.finishedAt).not.toBeNull();
+      expect(staleAfter!.errorMessage).toMatch(/crashed|did not finish/i);
+
+      const [freshAfter] = await db
+        .select()
+        .from(reminderRunsTable)
+        .where(eq(reminderRunsTable.id, fresh!.id));
+      expect(freshAfter!.status).toBe("running");
+      expect(freshAfter!.finishedAt).toBeNull();
+    } finally {
+      await db
+        .delete(reminderRunsTable)
+        .where(inArray(reminderRunsTable.id, [stale!.id, fresh!.id]));
+    }
+  });
+
+  it("reconciles stale running rows when admins read the audit list", async () => {
+    const [stale] = await db
+      .insert(reminderRunsTable)
+      .values({
+        trigger: "external",
+        status: "running",
+        startedAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+      })
+      .returning({ id: reminderRunsTable.id });
+
+    try {
+      const res = await request(app)
+        .get(`/api/notifications/reminder-runs`)
+        .set("Cookie", cookieAdmin);
+      expect(res.status).toBe(200);
+      const rows = res.body as Array<{ id: string; status: string }>;
+      const found = rows.find((r) => r.id === stale!.id);
+      // It may or may not appear in the most-recent 25 depending on test
+      // ordering, but the DB row must have been swept either way.
+      if (found) expect(found.status).toBe("crashed");
+
+      const [row] = await db
+        .select()
+        .from(reminderRunsTable)
+        .where(eq(reminderRunsTable.id, stale!.id));
+      expect(row!.status).toBe("crashed");
+    } finally {
+      await db
+        .delete(reminderRunsTable)
+        .where(eq(reminderRunsTable.id, stale!.id));
+    }
   });
 });

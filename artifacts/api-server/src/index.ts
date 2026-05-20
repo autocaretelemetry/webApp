@@ -36,6 +36,18 @@ app.listen(port, (err) => {
   // Scheduled Deployment that invokes `scripts/runReminders.ts`. Set
   // `DISABLE_REMINDER_SCHEDULER=1` to opt out (e.g. when the external
   // scheduler is the sole source of truth).
+  // Reconcile any reminder_runs rows left as `status="running"` by a
+  // previous process that was killed mid-tick (deploy, OOM, hard crash)
+  // before doing anything else, so the admin audit log is honest from
+  // the moment the new process is up. Runs regardless of whether the
+  // in-process scheduler is enabled — external Scheduled Deployments
+  // can leave stale rows too.
+  void import("./lib/reminders").then(({ markStaleReminderRunsAsCrashed }) => {
+    markStaleReminderRunsAsCrashed().catch((err) =>
+      logger.warn({ err }, "Boot-time stale reminder-run sweep failed"),
+    );
+  });
+
   if (process.env["DISABLE_REMINDER_SCHEDULER"] !== "1") {
     void import("./lib/reminders").then(({ runReminderJob }) => {
       const intervalMs = Number(

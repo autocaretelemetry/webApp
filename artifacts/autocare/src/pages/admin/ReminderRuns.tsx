@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, AlertTriangle, CheckCircle2, RefreshCw, Loader2 } from "lucide-react";
+import { Bell, AlertTriangle, CheckCircle2, RefreshCw, Loader2, Skull } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ type ReminderRun = {
   trigger: "scheduler" | "manual" | "external" | string;
   startedAt: string;
   finishedAt: string | null;
-  status: "running" | "success" | "error" | string;
+  status: "running" | "success" | "error" | "crashed" | string;
   createdCount: number;
   prunedCount: number | null;
   errorMessage: string | null;
@@ -243,6 +243,15 @@ export default function AdminReminderRuns() {
                           <Badge variant="outline" className="text-destructive border-destructive/40">
                             <AlertTriangle className="h-3 w-3 mr-1" />
                             Error
+                          </Badge>
+                        ) : r.status === "crashed" ? (
+                          <Badge
+                            variant="outline"
+                            className="text-amber-700 border-amber-400 bg-amber-50"
+                            title="The server process exited before this run finished. The audit row was reconciled by the stale-run sweep."
+                          >
+                            <Skull className="h-3 w-3 mr-1" />
+                            Crashed
                           </Badge>
                         ) : (
                           <Badge variant="outline">
