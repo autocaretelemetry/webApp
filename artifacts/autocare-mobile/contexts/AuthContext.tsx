@@ -38,6 +38,8 @@ type SignupBody = {
   password: string;
   phone: string;
   notificationChannels?: string[];
+  requestedRole?: string;
+  applicantData?: Record<string, unknown>;
 };
 
 type AuthState = {
@@ -46,6 +48,8 @@ type AuthState = {
   loading: boolean;
   role: Role;
   setRoleOverride: (role: Role | null) => void;
+  currentOrgId: string | null;
+  setCurrentOrgId: (id: string | null) => void;
   login: (email: string, password: string) => Promise<LoginResult>;
   signup: (body: SignupBody) => Promise<LoginResult>;
   logout: () => Promise<void>;
@@ -82,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [roleOverride, setRoleOverrideState] = useState<Role | null>(null);
+  const [currentOrgId, setCurrentOrgIdState] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const persistToken = useCallback(async (t: string | null) => {
@@ -181,6 +186,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await persistToken(null);
     setUser(null);
     setRoleOverrideState(null);
+    setCurrentOrgIdState(null);
     await queryClient.clear();
   }, [token, persistToken, queryClient]);
 
@@ -193,12 +199,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRoleOverrideState(r);
   }, []);
 
+  const setCurrentOrgId = useCallback((id: string | null) => {
+    setCurrentOrgIdState(id);
+  }, []);
+
   const value: AuthState = {
     user,
     token,
     loading,
     role,
     setRoleOverride,
+    currentOrgId,
+    setCurrentOrgId,
     login,
     signup,
     logout,

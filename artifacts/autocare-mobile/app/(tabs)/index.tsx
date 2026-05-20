@@ -3,14 +3,14 @@ import { ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Badge } from "@/components/ui";
-import { RoleDashboard } from "@/components/dashboards";
+import { QuickActions, RoleDashboard } from "@/components/dashboards";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { ROLE_LABEL } from "@/lib/roles";
 
 export default function HomeScreen() {
   const c = useColors();
-  const { user, token, role } = useAuth();
+  const { user, role } = useAuth();
   const insets = useSafeAreaInsets();
   if (!user) return null;
 
@@ -50,7 +50,9 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <RoleDashboard role={role} token={token} phone={user.phone as string | null | undefined} />
+      <QuickActions role={role} />
+
+      <RoleDashboard role={role} phone={user.phone as string | null | undefined} />
     </ScrollView>
   );
 }

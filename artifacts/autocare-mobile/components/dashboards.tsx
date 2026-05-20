@@ -1,5 +1,7 @@
+import { Feather } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React from "react";
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import {
   useGetOwnerDashboard,
@@ -15,10 +17,10 @@ import {
 } from "@workspace/api-client-react";
 
 import { Card, EmptyState, LoadingScreen, Row, Section, StatTile, Badge } from "@/components/ui";
+import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { apiFetch } from "@/lib/api-mobile";
 import { ROLE_TAGLINE, type Role } from "@/lib/roles";
-
-type DashboardProps = { token: string; phone?: string | null };
 
 function StatRow({ children }: { children: React.ReactNode }) {
   return (
@@ -44,6 +46,7 @@ function statusTone(s: string | undefined): "primary" | "muted" | "success" | "w
     case "awaiting_approval":
     case "requested":
     case "pending":
+    case "pending_finance":
       return "warning";
     case "cancelled":
     case "rejected":
@@ -51,6 +54,162 @@ function statusTone(s: string | undefined): "primary" | "muted" | "success" | "w
     default:
       return "muted";
   }
+}
+
+/* -------------------- Quick actions strip (per-role) -------------------- */
+
+type QuickAction = {
+  icon: React.ComponentProps<typeof Feather>["name"];
+  label: string;
+  hint?: string;
+  onPress: () => void;
+  tone?: "primary" | "warning";
+};
+
+export function QuickActions({ role }: { role: Role }) {
+  const c = useColors();
+  const router = useRouter();
+  const { user } = useAuth();
+  const needsKyc = user?.approvalStatus === "approved" && user?.kycStatus !== "verified";
+
+  const actions: QuickAction[] = [];
+  if (needsKyc) {
+    actions.push({
+      icon: "shield",
+      label: "Finish KYC",
+      hint: "Unlock the app",
+      tone: "warning",
+      onPress: () => router.push("/kyc"),
+    });
+  }
+  if (role === "owner") {
+    actions.push({
+      icon: "plus-circle",
+      label: "Book a service",
+      onPress: () => router.push("/bookings/new"),
+    });
+  }
+  if (role === "renter") {
+    actions.push({
+      icon: "search",
+      label: "Browse cars",
+      onPress: () => router.push("/browse"),
+    });
+  }
+  if (role === "fleet") {
+    actions.push({
+      icon: "package",
+      label: "Parts orders",
+      hint: "Approval queue",
+      onPress: () => router.push("/fleet/parts-orders"),
+    });
+    actions.push({
+      icon: "plus-circle",
+      label: "Book a service",
+      onPress: () => router.push("/bookings/new"),
+    });
+  }
+  if (role === "center") {
+    actions.push({
+      icon: "list",
+      label: "Workshop queue",
+      onPress: () => router.push("/work"),
+    });
+  }
+  if (role === "vendor") {
+    actions.push({
+      icon: "shopping-bag",
+      label: "Recent orders",
+      onPress: () => router.push("/work"),
+    });
+  }
+  if (role === "delivery") {
+    actions.push({
+      icon: "truck",
+      label: "My deliveries",
+      onPress: () => router.push("/work"),
+    });
+  }
+  if (role === "admin" || role === "super_admin") {
+    actions.push({
+      icon: "clipboard",
+      label: "Approvals",
+      hint: "Review applicants",
+      onPress: () => router.push("/admin/approvals"),
+    });
+  }
+
+  if (actions.length === 0) return null;
+
+  return (
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+      {actions.map((a) => {
+        const isPrimary = a.tone === "primary" || a.tone === undefined;
+        const isWarning = a.tone === "warning";
+        const bg = isWarning ? c.warning : c.primary;
+        return (
+          <Pressable
+            key={a.label}
+            onPress={a.onPress}
+            style={({ pressed }) => ({
+              flexGrow: 1,
+              flexBasis: "47%",
+              backgroundColor: c.card,
+              borderColor: c.border,
+              borderWidth: 1,
+              borderRadius: c.radius * 1.5,
+              padding: 14,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 12,
+              opacity: pressed ? 0.85 : 1,
+            })}
+          >
+            <View
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 19,
+                backgroundColor: isPrimary ? `${bg}1a` : `${bg}22`,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Feather name={a.icon} size={18} color={bg} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text
+                numberOfLines={1}
+                style={{ color: c.foreground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}
+              >
+                {a.label}
+              </Text>
+              {a.hint ? (
+                <Text
+                  numberOfLines={1}
+                  style={{ color: c.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 2 }}
+                >
+                  {a.hint}
+                </Text>
+              ) : null}
+            </View>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/* -------------------- Org list hook (shared by fleet UIs) -------------------- */
+
+export function useMyOrganizations() {
+  return useQuery({
+    queryKey: ["mobile-my-organizations"],
+    queryFn: async () => {
+      const r = await apiFetch<Array<{ id: string; name: string }>>(`/api/organizations/mine`);
+      return r.ok && r.data ? r.data : [];
+    },
+  });
 }
 
 /* -------------------- Owner -------------------- */
@@ -165,7 +324,7 @@ function CenterDashboard() {
 }
 
 /* -------------------- Vendor -------------------- */
-function VendorDashboard({ token, phone }: DashboardProps) {
+function VendorDashboard({ phone }: { phone?: string | null }) {
   const vendors = useListVendors();
   const vendorList = (vendors.data as Array<{ id: string; contactPhone?: string | null }>) ?? [];
   const vendorId =
@@ -176,7 +335,6 @@ function VendorDashboard({ token, phone }: DashboardProps) {
       queryKey: getGetVendorDashboardQueryKey(vendorId ?? ""),
     },
   });
-  void token;
   const d = data as
     | {
         totalParts?: number;
@@ -226,27 +384,26 @@ function VendorDashboard({ token, phone }: DashboardProps) {
 }
 
 /* -------------------- Renter -------------------- */
-function RenterDashboard({ token }: DashboardProps) {
+function RenterDashboard() {
   const cars = useQuery({
-    queryKey: ["rental-cars-mobile"],
+    queryKey: ["mobile-rental-cars"],
     queryFn: async () => {
-      const r = await fetch(`/api/rental-cars?limit=10`, {
-        headers: { authorization: `Bearer ${token}`, accept: "application/json" },
-      });
-      if (!r.ok) throw new Error("rental cars");
-      return (await r.json()) as Array<{ id: string; year?: number; make?: string; model?: string; dailyRate?: number }>;
+      const r = await apiFetch<Array<{ id: string; year?: number; make?: string; model?: string; dailyRate?: number }>>(
+        `/api/rental-cars?limit=10`,
+      );
+      return r.ok && r.data ? r.data : [];
     },
   });
   const trips = useQuery({
-    queryKey: ["rental-bookings-mine"],
+    queryKey: ["mobile-rental-bookings-mine"],
     queryFn: async () => {
-      const r = await fetch(`/api/rental-bookings?mine=true`, {
-        headers: { authorization: `Bearer ${token}`, accept: "application/json" },
-      });
-      if (!r.ok) return [];
-      return (await r.json()) as Array<{ id: string; status?: string; startsAt?: string; carLabel?: string }>;
+      const r = await apiFetch<Array<{ id: string; status?: string; startsAt?: string; startDate?: string; carLabel?: string }>>(
+        `/api/rental-bookings?mine=true`,
+      );
+      return r.ok && r.data ? r.data : [];
     },
   });
+  if (cars.isLoading || trips.isLoading) return <LoadingScreen />;
   const carList = cars.data ?? [];
   const tripList = trips.data ?? [];
   const active = tripList.filter((t) => t.status === "active" || t.status === "confirmed");
@@ -262,18 +419,21 @@ function RenterDashboard({ token }: DashboardProps) {
           <EmptyState title="No trips yet" body="Browse cars from the Browse tab to book your first rental." />
         ) : (
           <Card padding={0}>
-            {tripList.slice(0, 6).map((t, i) => (
-              <View
-                key={t.id}
-                style={{ paddingHorizontal: 14, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: "#0001" }}
-              >
-                <Row
-                  title={t.carLabel ?? "Trip"}
-                  subtitle={t.startsAt ? new Date(t.startsAt).toLocaleString() : undefined}
-                  badge={{ label: (t.status ?? "").replaceAll("_", " "), tone: statusTone(t.status) }}
-                />
-              </View>
-            ))}
+            {tripList.slice(0, 6).map((t, i) => {
+              const when = t.startsAt ?? t.startDate;
+              return (
+                <View
+                  key={t.id}
+                  style={{ paddingHorizontal: 14, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: "#0001" }}
+                >
+                  <Row
+                    title={t.carLabel ?? "Trip"}
+                    subtitle={when ? new Date(when).toLocaleString() : undefined}
+                    badge={{ label: (t.status ?? "").replaceAll("_", " "), tone: statusTone(t.status) }}
+                  />
+                </View>
+              );
+            })}
           </Card>
         )}
       </Section>
@@ -282,44 +442,73 @@ function RenterDashboard({ token }: DashboardProps) {
 }
 
 /* -------------------- Fleet -------------------- */
-function FleetDashboard({ token }: DashboardProps) {
-  const orgs = useQuery({
-    queryKey: ["my-organizations"],
-    queryFn: async () => {
-      const r = await fetch(`/api/organizations/mine`, {
-        headers: { authorization: `Bearer ${token}`, accept: "application/json" },
-      });
-      if (!r.ok) return [];
-      return (await r.json()) as Array<{ id: string; name: string }>;
-    },
-  });
+function FleetDashboard() {
+  const { currentOrgId, setCurrentOrgId } = useAuth();
+  const orgs = useMyOrganizations();
   const list = orgs.data ?? [];
-  const orgId = list[0]?.id;
+  const orgId = currentOrgId ?? list[0]?.id ?? null;
+  React.useEffect(() => {
+    if (!currentOrgId && list[0]?.id) setCurrentOrgId(list[0].id);
+  }, [currentOrgId, list, setCurrentOrgId]);
+
   const dash = useQuery({
-    queryKey: ["fleet-dashboard", orgId],
+    queryKey: ["mobile-fleet-dashboard", orgId],
     enabled: !!orgId,
     queryFn: async () => {
-      const r = await fetch(`/api/organizations/${orgId}/dashboard`, {
-        headers: { authorization: `Bearer ${token}`, accept: "application/json" },
-      });
-      if (!r.ok) return null;
-      return (await r.json()) as {
+      const r = await apiFetch<{
         vehicleCount?: number;
         activeJobs?: number;
         upcomingReminders?: Array<{ title?: string; dueLabel?: string }>;
         partsSpendCents?: number;
-      };
+      }>(`/api/organizations/${orgId}/dashboard`);
+      return r.ok ? r.data : null;
     },
   });
+
+  if (orgs.isLoading) return <LoadingScreen />;
   if (!list.length) {
-    return <EmptyState title="No fleet found" body="Register a fleet from the web app to get started." />;
+    return (
+      <EmptyState
+        title="No fleet found"
+        body="Register a fleet from the web app or ask an admin to invite you."
+      />
+    );
   }
   const d = dash.data;
+  const currentOrg = list.find((o) => o.id === orgId);
   return (
     <View style={{ gap: 18 }}>
-      <Card>
-        <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 18 }}>{list[0]?.name}</Text>
-      </Card>
+      {list.length > 1 ? (
+        <Card padding={0}>
+          {list.map((o, i) => {
+            const active = o.id === orgId;
+            return (
+              <Pressable
+                key={o.id}
+                onPress={() => setCurrentOrgId(o.id)}
+                style={({ pressed }) => ({
+                  paddingHorizontal: 14,
+                  paddingVertical: 14,
+                  borderTopWidth: i === 0 ? 0 : 1,
+                  borderTopColor: "#0001",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  opacity: pressed ? 0.85 : 1,
+                })}
+              >
+                <View style={{ flex: 1 }}>
+                  <Row title={o.name} subtitle={active ? "Active fleet" : undefined} />
+                </View>
+                {active ? <Badge label="Active" tone="primary" /> : null}
+              </Pressable>
+            );
+          })}
+        </Card>
+      ) : (
+        <Card>
+          <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 18 }}>{currentOrg?.name ?? list[0]?.name}</Text>
+        </Card>
+      )}
       <StatRow>
         <StatTile label="Vehicles" value={d?.vehicleCount ?? "—"} />
         <StatTile label="Active jobs" value={d?.activeJobs ?? "—"} />
@@ -346,17 +535,17 @@ function FleetDashboard({ token }: DashboardProps) {
 }
 
 /* -------------------- Delivery -------------------- */
-function DeliveryDashboard({ token }: DashboardProps) {
+function DeliveryDashboard() {
   const jobs = useQuery({
-    queryKey: ["delivery-jobs"],
+    queryKey: ["mobile-delivery-jobs"],
     queryFn: async () => {
-      const r = await fetch(`/api/orders?mine=true&assigned=true`, {
-        headers: { authorization: `Bearer ${token}`, accept: "application/json" },
-      });
-      if (!r.ok) return [];
-      return (await r.json()) as Array<{ id: string; status?: string; buyerName?: string; shippingAddress?: string }>;
+      const r = await apiFetch<Array<{ id: string; status?: string; buyerName?: string; shippingAddress?: string }>>(
+        `/api/orders?mine=true&assigned=true`,
+      );
+      return r.ok && r.data ? r.data : [];
     },
   });
+  if (jobs.isLoading) return <LoadingScreen />;
   const list = jobs.data ?? [];
   const active = list.filter((o) => o.status === "shipped" || o.status === "ready_for_pickup");
   return (
@@ -426,15 +615,12 @@ function AdminDashboard() {
 /* -------------------- Router -------------------- */
 export function RoleDashboard({
   role,
-  token,
   phone,
 }: {
   role: Role;
-  token: string | null;
   phone?: string | null;
 }) {
   const c = useColors();
-  const safeToken = token ?? "";
   let body: React.ReactNode;
   switch (role) {
     case "owner":
@@ -444,16 +630,16 @@ export function RoleDashboard({
       body = <CenterDashboard />;
       break;
     case "vendor":
-      body = <VendorDashboard token={safeToken} phone={phone} />;
+      body = <VendorDashboard phone={phone} />;
       break;
     case "renter":
-      body = <RenterDashboard token={safeToken} phone={phone} />;
+      body = <RenterDashboard />;
       break;
     case "fleet":
-      body = <FleetDashboard token={safeToken} phone={phone} />;
+      body = <FleetDashboard />;
       break;
     case "delivery":
-      body = <DeliveryDashboard token={safeToken} phone={phone} />;
+      body = <DeliveryDashboard />;
       break;
     case "admin":
     case "super_admin":
@@ -483,8 +669,7 @@ export function RoleDashboard({
 }
 
 /* -------------------- Shared lists for tabs -------------------- */
-export function WorkList({ role, token }: { role: Role; token: string | null }) {
-  const safeToken = token ?? "";
+export function WorkList({ role }: { role: Role }) {
   if (role === "owner" || role === "center" || role === "admin" || role === "super_admin") {
     return <BookingsList />;
   }
@@ -492,13 +677,13 @@ export function WorkList({ role, token }: { role: Role; token: string | null }) 
     return <OrdersList />;
   }
   if (role === "renter") {
-    return <MyTripsList token={safeToken} />;
+    return <MyTripsList />;
   }
   if (role === "delivery") {
-    return <DeliveryJobsList token={safeToken} />;
+    return <DeliveryJobsList />;
   }
   if (role === "fleet") {
-    return <FleetVehiclesList token={safeToken} />;
+    return <FleetVehiclesList />;
   }
   return <EmptyState title="Nothing here yet" />;
 }
@@ -513,7 +698,7 @@ function BookingsList() {
     serviceCenterName?: string;
     scheduledAt?: string;
   }>) ?? [];
-  if (list.length === 0) return <EmptyState title="No service bookings" body="Create one from the web dashboard." />;
+  if (list.length === 0) return <EmptyState title="No service bookings" body="Tap “Book a service” to start one." />;
   return (
     <Card padding={0}>
       {list.slice(0, 30).map((b, i) => (
@@ -551,15 +736,15 @@ function OrdersList() {
   );
 }
 
-function MyTripsList({ token }: { token: string }) {
+function MyTripsList() {
+  const router = useRouter();
   const q = useQuery({
-    queryKey: ["my-trips"],
+    queryKey: ["mobile-my-trips"],
     queryFn: async () => {
-      const r = await fetch(`/api/rental-bookings?mine=true`, {
-        headers: { authorization: `Bearer ${token}`, accept: "application/json" },
-      });
-      if (!r.ok) return [];
-      return (await r.json()) as Array<{ id: string; status?: string; carLabel?: string; startsAt?: string }>;
+      const r = await apiFetch<Array<{ id: string; status?: string; carLabel?: string; startsAt?: string; startDate?: string }>>(
+        `/api/rental-bookings?mine=true`,
+      );
+      return r.ok && r.data ? r.data : [];
     },
   });
   if (q.isLoading) return <LoadingScreen />;
@@ -567,28 +752,31 @@ function MyTripsList({ token }: { token: string }) {
   if (list.length === 0) return <EmptyState title="No trips yet" body="Browse cars to book." />;
   return (
     <Card padding={0}>
-      {list.map((t, i) => (
-        <View key={t.id} style={{ paddingHorizontal: 14, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: "#0001" }}>
-          <Row
-            title={t.carLabel ?? "Trip"}
-            subtitle={t.startsAt ? new Date(t.startsAt).toLocaleString() : undefined}
-            badge={{ label: (t.status ?? "").replaceAll("_", " "), tone: statusTone(t.status) }}
-          />
-        </View>
-      ))}
+      {list.map((t, i) => {
+        const when = t.startsAt ?? t.startDate;
+        return (
+          <View key={t.id} style={{ paddingHorizontal: 14, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: "#0001" }}>
+            <Row
+              title={t.carLabel ?? "Trip"}
+              subtitle={when ? new Date(when).toLocaleString() : undefined}
+              badge={{ label: (t.status ?? "").replaceAll("_", " "), tone: statusTone(t.status) }}
+              onPress={() => router.push(`/trips/${t.id}`)}
+            />
+          </View>
+        );
+      })}
     </Card>
   );
 }
 
-function DeliveryJobsList({ token }: { token: string }) {
+function DeliveryJobsList() {
   const q = useQuery({
-    queryKey: ["delivery-jobs-list"],
+    queryKey: ["mobile-delivery-jobs-list"],
     queryFn: async () => {
-      const r = await fetch(`/api/orders?mine=true&assigned=true`, {
-        headers: { authorization: `Bearer ${token}`, accept: "application/json" },
-      });
-      if (!r.ok) return [];
-      return (await r.json()) as Array<{ id: string; status?: string; buyerName?: string; shippingAddress?: string }>;
+      const r = await apiFetch<Array<{ id: string; status?: string; buyerName?: string; shippingAddress?: string }>>(
+        `/api/orders?mine=true&assigned=true`,
+      );
+      return r.ok && r.data ? r.data : [];
     },
   });
   if (q.isLoading) return <LoadingScreen />;
@@ -609,30 +797,22 @@ function DeliveryJobsList({ token }: { token: string }) {
   );
 }
 
-function FleetVehiclesList({ token }: { token: string }) {
-  const orgs = useQuery({
-    queryKey: ["my-organizations-fleetlist"],
-    queryFn: async () => {
-      const r = await fetch(`/api/organizations/mine`, {
-        headers: { authorization: `Bearer ${token}`, accept: "application/json" },
-      });
-      if (!r.ok) return [];
-      return (await r.json()) as Array<{ id: string }>;
-    },
-  });
-  const orgId = orgs.data?.[0]?.id;
+function FleetVehiclesList() {
+  const { currentOrgId } = useAuth();
+  const orgs = useMyOrganizations();
+  const orgId = currentOrgId ?? orgs.data?.[0]?.id ?? null;
   const vehicles = useQuery({
-    queryKey: ["fleet-vehicles", orgId],
+    queryKey: ["mobile-fleet-vehicles", orgId],
     enabled: !!orgId,
     queryFn: async () => {
-      const r = await fetch(`/api/organizations/${orgId}/vehicles`, {
-        headers: { authorization: `Bearer ${token}`, accept: "application/json" },
-      });
-      if (!r.ok) return [];
-      return (await r.json()) as Array<{ id: string; make?: string; model?: string; plate?: string }>;
+      const r = await apiFetch<Array<{ id: string; make?: string; model?: string; plate?: string }>>(
+        `/api/organizations/${orgId}/vehicles`,
+      );
+      return r.ok && r.data ? r.data : [];
     },
   });
-  if (vehicles.isLoading) return <LoadingScreen />;
+  if (orgs.isLoading || vehicles.isLoading) return <LoadingScreen />;
+  if (!orgId) return <EmptyState title="No fleet" body="You're not a member of any fleet yet." />;
   const list = vehicles.data ?? [];
   if (list.length === 0) return <EmptyState title="No vehicles in fleet" />;
   return (

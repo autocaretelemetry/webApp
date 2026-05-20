@@ -12,6 +12,7 @@ import {
 import { Card, EmptyState, LoadingScreen, Row } from "@/components/ui";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { apiFetch } from "@/lib/api-mobile";
 
 type Tab = "centers" | "cars" | "parts" | "vendors";
 
@@ -20,7 +21,7 @@ const ROLE_TABS: Record<string, Tab[]> = {
   fleet: ["centers", "parts", "vendors"],
   renter: ["cars"],
   center: ["parts", "vendors"],
-  vendor: ["centers"],
+  vendor: ["parts", "vendors"],
   delivery: ["centers"],
   admin: ["centers", "cars", "parts", "vendors"],
   super_admin: ["centers", "cars", "parts", "vendors"],
@@ -35,7 +36,7 @@ const TAB_LABEL: Record<Tab, string> = {
 
 export default function BrowseScreen() {
   const c = useColors();
-  const { role, token } = useAuth();
+  const { role } = useAuth();
   const insets = useSafeAreaInsets();
   const tabs = ROLE_TABS[role] ?? ["centers"];
   const [tab, setTab] = useState<Tab>(tabs[0]!);
@@ -85,7 +86,7 @@ export default function BrowseScreen() {
         contentContainerStyle={{ padding: 18, paddingBottom: insets.bottom + 96, gap: 14 }}
       >
         {tab === "centers" ? <CentersList /> : null}
-        {tab === "cars" ? <CarsList token={token} /> : null}
+        {tab === "cars" ? <CarsList /> : null}
         {tab === "parts" ? <PartsList /> : null}
         {tab === "vendors" ? <VendorsList /> : null}
       </ScrollView>
@@ -149,24 +150,20 @@ function PartsList() {
   );
 }
 
-function CarsList({ token }: { token: string | null }) {
-  const safeToken = token ?? "";
+function CarsList() {
   const router = useRouter();
   const q = useQuery({
-    queryKey: ["browse-cars"],
+    queryKey: ["mobile-browse-cars"],
     queryFn: async () => {
-      const r = await fetch(`/api/rental-cars`, {
-        headers: { authorization: `Bearer ${safeToken}`, accept: "application/json" },
-      });
-      if (!r.ok) return [];
-      return (await r.json()) as Array<{
+      const r = await apiFetch<Array<{
         id: string;
         year?: number;
         make?: string;
         model?: string;
         city?: string;
         dailyRate?: number;
-      }>;
+      }>>(`/api/rental-cars`);
+      return r.ok && r.data ? r.data : [];
     },
   });
   if (q.isLoading) return <LoadingScreen />;

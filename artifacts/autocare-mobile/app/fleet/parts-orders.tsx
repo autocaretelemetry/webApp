@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Badge, Button, Card, EmptyState, Input, LoadingScreen, Section } from "@/components/ui";
+import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { apiFetch } from "@/lib/api-mobile";
 
@@ -23,14 +24,15 @@ export default function FleetPartsOrdersScreen() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
 
+  const { currentOrgId } = useAuth();
   const orgs = useQuery({
-    queryKey: ["mobile-my-orgs"],
+    queryKey: ["mobile-my-organizations"],
     queryFn: async () => {
       const r = await apiFetch<Array<{ id: string; name: string }>>(`/api/organizations/mine`);
       return r.ok && r.data ? r.data : [];
     },
   });
-  const orgId = orgs.data?.[0]?.id;
+  const orgId = currentOrgId ?? orgs.data?.[0]?.id;
 
   const queue = useQuery({
     queryKey: ["mobile-parts-orders", orgId],

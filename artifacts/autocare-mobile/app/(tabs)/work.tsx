@@ -22,9 +22,11 @@ const TITLES: Record<string, string> = {
 export default function WorkScreen() {
   const c = useColors();
   const router = useRouter();
-  const { role, token } = useAuth();
+  const { role } = useAuth();
   const insets = useSafeAreaInsets();
-  const canCreateBooking = role === "owner" || role === "admin" || role === "super_admin";
+  const canCreateBooking =
+    role === "owner" || role === "fleet" || role === "admin" || role === "super_admin";
+  const showFleetParts = role === "fleet";
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: c.background }}
@@ -33,8 +35,11 @@ export default function WorkScreen() {
       {canCreateBooking ? (
         <Button label="Book a service" onPress={() => router.push("/bookings/new")} />
       ) : null}
+      {showFleetParts ? (
+        <Button label="Parts orders" tone="secondary" onPress={() => router.push("/fleet/parts-orders")} />
+      ) : null}
       <Section title={TITLES[role] ?? "Activity"}>
-        <WorkList role={role} token={token} />
+        <WorkList role={role} />
       </Section>
     </ScrollView>
   );

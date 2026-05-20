@@ -1,9 +1,10 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Linking, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useMyOrganizations } from "@/components/dashboards";
 import { Badge, Button, Card, Section } from "@/components/ui";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
@@ -12,13 +13,17 @@ import { ALL_ROLES, ROLE_LABEL, type Role } from "@/lib/roles";
 export default function ProfileScreen() {
   const c = useColors();
   const router = useRouter();
-  const { user, role, logout, setRoleOverride } = useAuth();
+  const { user, role, logout, setRoleOverride, currentOrgId, setCurrentOrgId } = useAuth();
+  const orgs = useMyOrganizations();
   const insets = useSafeAreaInsets();
   if (!user) return null;
   const canImpersonate = user.role === "super_admin";
   const needsKyc = user.approvalStatus === "approved" && user.kycStatus !== "verified";
   const showFleetQueue = role === "fleet";
   const showApprovals = role === "super_admin";
+  const orgList = orgs.data ?? [];
+  const showOrgPicker = role === "fleet" && orgList.length > 1;
+  const webDomain = (process.env as Record<string, string | undefined>)["EXPO_PUBLIC_DOMAIN"] ?? "";
 
   const kycLabel =
     user.kycStatus === "verified"
@@ -116,6 +121,36 @@ export default function ProfileScreen() {
         </Section>
       ) : null}
 
+      {showOrgPicker ? (
+        <Section title="Active fleet">
+          <Card padding={8}>
+            {orgList.map((o) => {
+              const active = (currentOrgId ?? orgList[0]?.id) === o.id;
+              return (
+                <Pressable
+                  key={o.id}
+                  onPress={() => setCurrentOrgId(o.id)}
+                  style={({ pressed }) => ({
+                    flexDirection: "row",
+                    alignItems: "center",
+                    paddingVertical: 12,
+                    paddingHorizontal: 10,
+                    borderRadius: c.radius,
+                    backgroundColor: active ? c.accent : "transparent",
+                    opacity: pressed ? 0.7 : 1,
+                  })}
+                >
+                  <Text style={{ color: c.foreground, fontFamily: "Inter_500Medium", fontSize: 14, flex: 1 }}>
+                    {o.name}
+                  </Text>
+                  {active ? <Feather name="check" size={18} color={c.primary} /> : null}
+                </Pressable>
+              );
+            })}
+          </Card>
+        </Section>
+      ) : null}
+
       <Section title="Quick actions">
         <Card padding={0}>
           <ActionRow
@@ -145,8 +180,20 @@ export default function ProfileScreen() {
 
       <Section title="Account">
         <Card padding={0}>
-          <ActionRow icon="external-link" label="Open full web app" hint={(process.env as Record<string, string | undefined>)["EXPO_PUBLIC_DOMAIN"] ?? ""} />
-          <ActionRow icon="help-circle" label="Help & support" hint="Contact AutoCare" />
+          {webDomain ? (
+            <ActionRow
+              icon="external-link"
+              label="Open full web app"
+              hint={webDomain}
+              onPress={() => void Linking.openURL(webDomain)}
+            />
+          ) : null}
+          <ActionRow
+            icon="mail"
+            label="Help & support"
+            hint="support@autocare.test"
+            onPress={() => void Linking.openURL("mailto:support@autocare.test")}
+          />
         </Card>
       </Section>
 
