@@ -16,6 +16,7 @@ import {
   Clock,
 } from "lucide-react";
 import { toast } from "sonner";
+import { MyApprovalTimeline } from "./MyApprovalTimeline";
 
 type DocSpec = { key: string; label: string; required: boolean };
 
@@ -154,6 +155,8 @@ export default function OnboardingKyc() {
           </Button>
         </div>
       </form>
+
+      <MyApprovalTimeline />
     </div>
   );
 }

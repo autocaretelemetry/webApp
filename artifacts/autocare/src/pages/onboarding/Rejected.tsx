@@ -2,6 +2,7 @@ import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { XCircle } from "lucide-react";
+import { MyApprovalTimeline } from "./MyApprovalTimeline";
 
 export default function OnboardingRejected({ note }: { note?: string | null }) {
   const { logout, user } = useAuth();
@@ -28,6 +29,7 @@ export default function OnboardingRejected({ note }: { note?: string | null }) {
           <Button onClick={() => void logout()} variant="outline" className="w-full">
             Sign out
           </Button>
+          <MyApprovalTimeline />
         </CardContent>
       </Card>
     </div>

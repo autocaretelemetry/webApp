@@ -343,6 +343,25 @@ router.patch(
 );
 
 /**
+ * GET /me/approval-events — the signed-in user's own audit trail with
+ * internal staff notes filtered out. Powers the timeline on the onboarding
+ * KYC + rejected screens so applicants can see their own decision history.
+ */
+router.get("/me/approval-events", requireAuth, async (req, res): Promise<void> => {
+  const rows = await db
+    .select()
+    .from(approvalEventsTable)
+    .where(
+      and(
+        eq(approvalEventsTable.userId, req.user!.id),
+        eq(approvalEventsTable.internal, false),
+      ),
+    )
+    .orderBy(approvalEventsTable.createdAt);
+  res.json(rows);
+});
+
+/**
  * GET /admin/approvals/:userId/events — full chronological audit trail for an
  * applicant. Returns both the public state transitions and any internal-only
  * notes left by staff.
