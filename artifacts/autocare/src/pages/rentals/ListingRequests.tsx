@@ -8,7 +8,7 @@ import {
 } from "@workspace/api-client-react";
 import { getListRentalBookingsQueryKey } from "@/lib/queryKeys";
 import { describeMutationError } from "@/lib/adminErrors";
-import { useRenterProfile } from "@/lib/profile";
+import { useAuth } from "@/lib/auth";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -55,11 +55,16 @@ const STATUS_META: Record<string, { label: string; cls: string }> = {
 
 export default function ListingRequests() {
   const queryClient = useQueryClient();
-  const { profile } = useRenterProfile();
+  const { user } = useAuth();
+  const ownerPhone = user?.phone ?? "";
+  const ownerName = user?.name ?? "";
 
-  const params = { ownerPhone: profile.phone };
+  const params = { ownerPhone };
   const { data: bookings, isLoading } = useListRentalBookings(params, {
-    query: { queryKey: getListRentalBookingsQueryKey(params) },
+    query: {
+      enabled: !!ownerPhone,
+      queryKey: getListRentalBookingsQueryKey(params),
+    },
   });
   const update = useUpdateRentalBooking();
 
@@ -121,7 +126,11 @@ export default function ListingRequests() {
     <div className="space-y-6 animate-in fade-in-50 duration-500">
       <PageHeader
         title="Requests on my cars"
-        description={`Booking requests on cars listed under ${profile.phone}. Review each renter's KYC, approve, and co-sign the contract.`}
+        description={
+          ownerPhone
+            ? `Booking requests on cars listed under ${ownerPhone}. Review each renter's KYC, approve, and co-sign the contract.`
+            : "Sign in to see requests on your cars."
+        }
         actions={
           <Link href="/rentals/my-listings">
             <Button variant="outline" className="gap-2"><KeyRound className="h-4 w-4" /> My listings</Button>
@@ -155,7 +164,7 @@ export default function ListingRequests() {
           <RequestRow
             key={b.id}
             booking={b}
-            ownerName={profile.name}
+            ownerName={ownerName}
             pending={update.isPending}
             onReview={(decision, notes) => review(b.id, decision, notes)}
             onSign={(name) => sign(b.id, name)}

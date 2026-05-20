@@ -1,64 +1,56 @@
 import { useEffect, useState } from "react";
 
-const KEY = "autocare_renter_profile";
-
-export type RenterProfile = {
-  name: string;
-  phone: string;
-  email: string;
-};
-
-const DEFAULT: RenterProfile = {
-  name: "Marcus Hale",
-  phone: "+234 802 201 1932",
-  email: "marcus.hale@example.com",
-};
-
 /**
- * True only when the user has explicitly saved their own renter profile in
- * this browser. Public share-link visitors who have never interacted with
- * AutoCare must be treated as anonymous — otherwise the hardcoded DEFAULT
- * identity below would cause them to look up a real renter by phone and
- * skip the signup/KYC step.
+ * Renter "draft" store. Used only for UX scratch state (e.g. a preferred
+ * pickup address the renter typed into the search bar) that we want to
+ * persist across page loads. Identity (name / phone / email / KYC) is
+ * always sourced from `useAuth()` and the server's renter-profile-by-phone
+ * endpoint — never from this store. Historically this hook held a hardcoded
+ * "Marcus Hale" persona; that behaviour caused signed-in renters to file
+ * bookings and incident reports under the wrong identity, so it was
+ * removed.
  */
-export function hasStoredRenterProfile(): boolean {
-  try {
-    return !!localStorage.getItem(KEY);
-  } catch {
-    return false;
-  }
-}
 
-export function getRenterProfile(): RenterProfile {
+const KEY = "autocare_renter_draft";
+
+export type RenterDraft = {
+  preferredPickupAddress: string;
+};
+
+const EMPTY: RenterDraft = { preferredPickupAddress: "" };
+
+export function getRenterDraft(): RenterDraft {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return DEFAULT;
-    const parsed = JSON.parse(raw) as Partial<RenterProfile>;
+    if (!raw) return EMPTY;
+    const parsed = JSON.parse(raw) as Partial<RenterDraft>;
     return {
-      name: parsed.name?.trim() || DEFAULT.name,
-      phone: parsed.phone?.trim() || DEFAULT.phone,
-      email: parsed.email?.trim() || DEFAULT.email,
+      preferredPickupAddress: parsed.preferredPickupAddress?.trim() ?? "",
     };
   } catch {
-    return DEFAULT;
+    return EMPTY;
   }
 }
 
-export function setRenterProfile(p: RenterProfile) {
-  localStorage.setItem(KEY, JSON.stringify(p));
-  window.dispatchEvent(new Event("renterprofilechange"));
+export function setRenterDraft(d: RenterDraft) {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(d));
+    window.dispatchEvent(new Event("renterdraftchange"));
+  } catch {
+    /* ignore quota / disabled storage */
+  }
 }
 
-export function useRenterProfile() {
-  const [profile, setProfile] = useState<RenterProfile>(getRenterProfile());
+export function useRenterDraft() {
+  const [draft, setDraft] = useState<RenterDraft>(getRenterDraft());
   useEffect(() => {
-    const onChange = () => setProfile(getRenterProfile());
-    window.addEventListener("renterprofilechange", onChange);
+    const onChange = () => setDraft(getRenterDraft());
+    window.addEventListener("renterdraftchange", onChange);
     window.addEventListener("storage", onChange);
     return () => {
-      window.removeEventListener("renterprofilechange", onChange);
+      window.removeEventListener("renterdraftchange", onChange);
       window.removeEventListener("storage", onChange);
     };
   }, []);
-  return { profile, setProfile: setRenterProfile };
+  return { draft, setDraft: setRenterDraft };
 }

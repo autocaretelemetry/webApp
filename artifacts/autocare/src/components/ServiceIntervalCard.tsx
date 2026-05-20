@@ -13,14 +13,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Wrench } from "lucide-react";
 import { toast } from "sonner";
-import { useRenterProfile } from "@/lib/profile";
+import { useAuth } from "@/lib/auth";
 
 /**
  * Edits the service window for one vehicle. Reminders fire when the time
  * interval OR the mileage interval is crossed — whichever happens first.
  */
 export function ServiceIntervalCard({ vehicle }: { vehicle: Vehicle }) {
-  const { profile } = useRenterProfile();
+  const { user } = useAuth();
+  const ownerPhone = user?.phone ?? "";
   const [intervalDays, setIntervalDays] = useState(
     String(vehicle.serviceIntervalDays ?? 90),
   );
@@ -46,7 +47,7 @@ export function ServiceIntervalCard({ vehicle }: { vehicle: Vehicle }) {
           queryKey: getGetVehicleRemindersQueryKey(vehicle.id),
         });
         queryClient.invalidateQueries({
-          queryKey: getListNotificationsQueryKey({ ownerPhone: profile.phone }),
+          queryKey: getListNotificationsQueryKey({ ownerPhone }),
         });
         toast.success("Service window updated");
       },

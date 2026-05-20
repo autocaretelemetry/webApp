@@ -5,7 +5,7 @@ import {
   getListRentalCarsQueryKey,
   getListRentalBookingsQueryKey,
 } from "@/lib/queryKeys";
-import { useRenterProfile } from "@/lib/profile";
+import { useAuth } from "@/lib/auth";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -67,7 +67,9 @@ function ShareRow({ carId, disabled }: { carId: string; disabled: boolean }) {
 }
 
 export default function MyListings() {
-  const { profile } = useRenterProfile();
+  const { user } = useAuth();
+  const ownerPhone = user?.phone ?? "";
+  const ownerName = user?.name ?? "";
   const params = { includeInactive: true };
   const { data: allCars, isLoading } = useListRentalCars(params, {
     query: { queryKey: getListRentalCarsQueryKey(params) },
@@ -76,9 +78,9 @@ export default function MyListings() {
   const myCars = useMemo(
     () =>
       (allCars ?? []).filter(
-        (c) => c.ownerKind === "user" && c.ownerPhone === profile.phone,
+        (c) => c.ownerKind === "user" && c.ownerPhone === ownerPhone,
       ),
-    [allCars, profile.phone],
+    [allCars, ownerPhone],
   );
 
   const carIds = useMemo(() => new Set(myCars.map((c) => c.id)), [myCars]);
@@ -98,7 +100,11 @@ export default function MyListings() {
     <div className="space-y-6 animate-in fade-in-50 duration-500">
       <PageHeader
         title="My rental listings"
-        description={`Cars listed by ${profile.name}. AutoCare reviews every listing before it goes live.`}
+        description={
+          ownerName
+            ? `Cars listed by ${ownerName}. AutoCare reviews every listing before it goes live.`
+            : "Sign in to manage your listings."
+        }
         actions={
           <Link href="/rentals/list-yours">
             <Button className="gap-2">

@@ -5,7 +5,7 @@ import {
   getGetPublicRentalCarQueryKey,
   getGetRenterProfileByPhoneQueryKey,
 } from "@/lib/queryKeys";
-import { useRenterProfile, hasStoredRenterProfile } from "@/lib/profile";
+import { useAuth } from "@/lib/auth";
 import { isProfileReadyForBooking } from "@/pages/rentals/Profile";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,21 +34,22 @@ function shareUrlForCar(id: string): string {
 
 export default function SharedCar() {
   const { id } = useParams<{ id: string }>();
-  const { profile: local } = useRenterProfile();
-  // Only consult the renter-profile-by-phone endpoint when the visitor
-  // actually has a saved profile in this browser. Otherwise a brand-new
-  // visitor would be matched against the hardcoded default identity and
-  // skip the signup/KYC step.
-  const hasProfile = hasStoredRenterProfile();
+  const { user } = useAuth();
+  // Only consult the renter-profile-by-phone endpoint when there's a
+  // signed-in user with a phone — anonymous share-link visitors should
+  // be routed through signup/KYC, not matched against someone else's
+  // profile.
+  const authPhone = user?.phone ?? "";
+  const hasProfile = !!authPhone;
 
   const { data: car, isLoading } = useGetPublicRentalCar(id, {
     query: { enabled: !!id, queryKey: getGetPublicRentalCarQueryKey(id), retry: false },
   });
 
-  const { data: renter } = useGetRenterProfileByPhone(local.phone, {
+  const { data: renter } = useGetRenterProfileByPhone(authPhone, {
     query: {
-      enabled: hasProfile && !!local.phone,
-      queryKey: getGetRenterProfileByPhoneQueryKey(local.phone),
+      enabled: hasProfile,
+      queryKey: getGetRenterProfileByPhoneQueryKey(authPhone),
       retry: false,
     },
   });

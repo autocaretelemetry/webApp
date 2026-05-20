@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getListRentalBookingsQueryKey } from "@/lib/queryKeys";
 import { describeMutationError } from "@/lib/adminErrors";
-import { useRenterProfile } from "@/lib/profile";
+import { useAuth } from "@/lib/auth";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -55,10 +55,14 @@ const STATUS_META: Record<string, { label: string; cls: string; icon: typeof Clo
 
 export default function MyRentals() {
   const queryClient = useQueryClient();
-  const { profile } = useRenterProfile();
-  const params = { renterPhone: profile.phone };
+  const { user } = useAuth();
+  const renterPhone = user?.phone ?? "";
+  const params = { renterPhone };
   const { data: bookings, isLoading } = useListRentalBookings(params, {
-    query: { queryKey: getListRentalBookingsQueryKey(params) },
+    query: {
+      enabled: !!renterPhone,
+      queryKey: getListRentalBookingsQueryKey(params),
+    },
   });
   const update = useUpdateRentalBooking();
 
@@ -112,7 +116,11 @@ export default function MyRentals() {
     <div className="space-y-6 animate-in fade-in-50 duration-500">
       <PageHeader
         title="My rentals"
-        description={`Rentals booked under ${profile.phone}. Track approvals, sign contracts, and pay here.`}
+        description={
+          renterPhone
+            ? `Rentals booked under ${renterPhone}. Track approvals, sign contracts, and pay here.`
+            : "Sign in to see your rentals."
+        }
         actions={
           <Link href="/rentals">
             <Button variant="outline" className="gap-2"><Car className="h-4 w-4" /> Browse rentals</Button>

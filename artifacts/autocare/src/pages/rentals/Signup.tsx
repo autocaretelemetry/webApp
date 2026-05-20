@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { signup as signupApi } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
-import { setRenterProfile } from "@/lib/profile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -63,13 +62,9 @@ export default function RentalsSignup() {
         password: form.password,
         phone: form.phone.trim(),
       });
-      // Seed local renter profile so the KYC page's phone-keyed lookup and
-      // the prefilled fields match what they just signed up with.
-      setRenterProfile({
-        name: form.name.trim(),
-        phone: form.phone.trim(),
-        email: form.email.trim(),
-      });
+      // Refresh auth so the KYC page sees the freshly created user — the
+      // page's phone-keyed lookup and prefilled fields read straight from
+      // `useAuth()` now, no local mirror needed.
       await refresh();
       toast.success("Account created. Let's finish your renter profile.");
       setLocation(profileNext, { replace: true });

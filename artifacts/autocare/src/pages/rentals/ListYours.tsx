@@ -5,7 +5,7 @@ import { Link } from "wouter";
 import { useCreateRentalCar, useListDrivers } from "@workspace/api-client-react";
 import { getListRentalCarsQueryKey, getListDriversQueryKey } from "@/lib/queryKeys";
 import { describeMutationError } from "@/lib/adminErrors";
-import { useRenterProfile, setRenterProfile } from "@/lib/profile";
+import { useAuth } from "@/lib/auth";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,12 +40,12 @@ export default function ListYourCar() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const create = useCreateRentalCar();
-  const { profile } = useRenterProfile();
+  const { user } = useAuth();
 
   const [form, setForm] = useState({
-    ownerName: profile.name,
-    ownerPhone: profile.phone,
-    ownerEmail: profile.email,
+    ownerName: user?.name ?? "",
+    ownerPhone: user?.phone ?? "",
+    ownerEmail: user?.email ?? "",
     brand: "",
     model: "",
     year: new Date().getFullYear() - 2,
@@ -123,11 +123,6 @@ export default function ListYourCar() {
               : undefined,
           driverId: form.withDriver ? form.driverId : undefined,
         },
-      });
-      setRenterProfile({
-        name: form.ownerName,
-        phone: form.ownerPhone,
-        email: form.ownerEmail,
       });
       await queryClient.invalidateQueries({ queryKey: getListRentalCarsQueryKey() });
       toast.success("Listing submitted! AutoCare will review and approve shortly.");

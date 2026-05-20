@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Bell, BellOff, BellRing, Check, CheckCheck } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { useRenterProfile } from "@/lib/profile";
+import { useAuth } from "@/lib/auth";
 import {
   useListNotifications,
   useMarkNotificationRead,
@@ -34,8 +34,8 @@ function bookingUrl(bookingId: string | null | undefined) {
 }
 
 export function NotificationBell() {
-  const { profile } = useRenterProfile();
-  const ownerPhone = profile.phone;
+  const { user } = useAuth();
+  const ownerPhone = user?.phone ?? "";
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [permState, setPermState] = useState(pushPermission());

@@ -13,7 +13,7 @@ import {
   getListRentalBookingsQueryKey,
 } from "@/lib/queryKeys";
 import { describeMutationError } from "@/lib/adminErrors";
-import { useRenterProfile } from "@/lib/profile";
+import { useAuth } from "@/lib/auth";
 import { isProfileReadyForBooking, isProfileReadyForMode } from "@/pages/rentals/Profile";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,7 +53,8 @@ export default function RentalDetail() {
   const search = useSearch();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
-  const { profile: local } = useRenterProfile();
+  const { user } = useAuth();
+  const authPhone = user?.phone ?? "";
 
   const loanerFor = useMemo(() => new URLSearchParams(search).get("loaner"), [search]);
 
@@ -74,10 +75,10 @@ export default function RentalDetail() {
     });
   }, [car?.id, car?.brand, car?.model, car?.year, car?.imageUrl, car?.city, car?.dailyRate]);
 
-  const { data: renter, isLoading: renterLoading } = useGetRenterProfileByPhone(local.phone, {
+  const { data: renter, isLoading: renterLoading } = useGetRenterProfileByPhone(authPhone, {
     query: {
-      enabled: !!local.phone,
-      queryKey: getGetRenterProfileByPhoneQueryKey(local.phone),
+      enabled: !!authPhone,
+      queryKey: getGetRenterProfileByPhoneQueryKey(authPhone),
       retry: false,
     },
   });

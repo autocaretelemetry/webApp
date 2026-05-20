@@ -9,7 +9,7 @@ import {
 } from "@workspace/api-client-react";
 import { getListDriversQueryKey } from "@/lib/queryKeys";
 import { describeMutationError } from "@/lib/adminErrors";
-import { useRenterProfile } from "@/lib/profile";
+import { useAuth } from "@/lib/auth";
 import { useUpload } from "@workspace/object-storage-web";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,8 +53,8 @@ const blankForm: FormState = {
 
 export default function DriversPage() {
   const queryClient = useQueryClient();
-  const { profile } = useRenterProfile();
-  const ownerPhone = profile.phone;
+  const { user } = useAuth();
+  const ownerPhone = user?.phone ?? "";
 
   const { data: drivers, isLoading } = useListDrivers(
     { ownerPhone },

@@ -6,7 +6,7 @@ import {
   useUpsertRenterProfile,
 } from "@workspace/api-client-react";
 import { getGetRenterProfileByPhoneQueryKey } from "@/lib/queryKeys";
-import { useRenterProfile, setRenterProfile } from "@/lib/profile";
+import { useAuth } from "@/lib/auth";
 import { describeMutationError } from "@/lib/adminErrors";
 import { useUpload } from "@workspace/object-storage-web";
 import { PageHeader } from "@/components/PageHeader";
@@ -54,14 +54,15 @@ export default function RenterProfilePage() {
   const search = useSearch();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
-  const { profile: local } = useRenterProfile();
+  const { user } = useAuth();
+  const authPhone = user?.phone ?? "";
 
   const nextUrl = new URLSearchParams(search).get("next");
 
-  const { data: server } = useGetRenterProfileByPhone(local.phone, {
+  const { data: server } = useGetRenterProfileByPhone(authPhone, {
     query: {
-      enabled: !!local.phone,
-      queryKey: getGetRenterProfileByPhoneQueryKey(local.phone),
+      enabled: !!authPhone,
+      queryKey: getGetRenterProfileByPhoneQueryKey(authPhone),
       retry: false,
     },
   });
@@ -69,9 +70,9 @@ export default function RenterProfilePage() {
   const upsert = useUpsertRenterProfile();
 
   const [form, setForm] = useState({
-    name: local.name,
-    phone: local.phone,
-    email: local.email,
+    name: user?.name ?? "",
+    phone: authPhone,
+    email: user?.email ?? "",
     address: "",
     dateOfBirth: "",
     driverLicenseNumber: "",
@@ -107,7 +108,11 @@ export default function RenterProfilePage() {
       const saved = await upsert.mutateAsync({
         data: {
           name: form.name,
-          phone: form.phone,
+          // Phone is bound to the signed-in account; the server still
+          // expects it in the body but the form keeps it read-only so
+          // the renter can't accidentally write a profile under a
+          // different phone number than the one they log in with.
+          phone: authPhone,
           email: form.email || undefined,
           address: form.address || undefined,
           dateOfBirth: form.dateOfBirth || undefined,
@@ -118,7 +123,6 @@ export default function RenterProfilePage() {
           selfieUrl: form.selfieUrl || undefined,
         },
       });
-      setRenterProfile({ name: saved.name, phone: saved.phone, email: saved.email ?? "" });
       await queryClient.invalidateQueries({
         queryKey: getGetRenterProfileByPhoneQueryKey(saved.phone),
       });
@@ -159,8 +163,8 @@ export default function RenterProfilePage() {
             <Field label="Full name" required>
               <Input value={form.name} onChange={(e) => update("name", e.target.value)} required />
             </Field>
-            <Field label="Phone (used as your unique ID)" required>
-              <Input value={form.phone} onChange={(e) => update("phone", e.target.value)} required />
+            <Field label="Phone (your sign-in number)" required>
+              <Input value={authPhone} readOnly disabled />
             </Field>
             <Field label="Email">
               <Input type="email" value={form.email} onChange={(e) => update("email", e.target.value)} />
