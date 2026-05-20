@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, real } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, real, boolean } from "drizzle-orm/pg-core";
 import { vehiclesTable } from "./vehicles";
 import { serviceCentersTable } from "./serviceCenters";
 import { mechanicsTable } from "./mechanics";
@@ -22,6 +22,10 @@ export const bookingsTable = pgTable("bookings", {
   completedAt: timestamp("completed_at", { withTimezone: true }),
   estimatedDurationHours: real("estimated_duration_hours"),
   invoiceId: uuid("invoice_id"),
+  // Set by the server at creation time when the booking's vehicle owner has
+  // an active subscription whose plan grants `priorityBooking`. The center's
+  // job queue surfaces priority bookings at the top regardless of age.
+  priority: boolean("priority").notNull().default(false),
 });
 
 export const bookingEventsTable = pgTable("booking_events", {

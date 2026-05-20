@@ -22,6 +22,8 @@ export interface Booking {
   scheduledAt?: Date | null;
   completedAt?: Date | null;
   estimatedDurationHours?: number | null;
+  /** True when the owner's active subscription grants priorityBooking. The center queue surfaces priority bookings at the top. */
+  priority: boolean;
   vehicle?: Vehicle;
   serviceCenter?: ServiceCenter;
   mechanic?: Mechanic | null;

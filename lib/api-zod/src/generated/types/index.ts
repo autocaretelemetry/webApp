@@ -116,6 +116,7 @@ export * from './orderLineSnapshot';
 export * from './orderStatus';
 export * from './ownerDashboard';
 export * from './part';
+export * from './planLimits';
 export * from './platformStaff';
 export * from './platformStaffRole';
 export * from './publicDriver';

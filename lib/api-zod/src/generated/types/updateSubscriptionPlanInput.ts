@@ -5,11 +5,13 @@
  * AutoCare API — vehicle owners book services, service centers fulfill them.
  * OpenAPI spec version: 0.1.0
  */
+import type { PlanLimits } from './planLimits';
 
 export interface UpdateSubscriptionPlanInput {
   name?: string;
   /** @minimum 0 */
   priceMonthly?: number;
   features?: string[];
+  limits?: PlanLimits;
   active?: boolean;
 }

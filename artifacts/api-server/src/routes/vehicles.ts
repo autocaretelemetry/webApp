@@ -18,6 +18,8 @@ import {
   GetVehicleRemindersParams,
 } from "@workspace/api-zod";
 import { computeReminders } from "../lib/reminders";
+import { getEntitlements } from "../lib/entitlements";
+import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
 
@@ -168,6 +170,106 @@ router.get("/vehicles/:vehicleId/history", async (req, res): Promise<void> => {
 
   res.json(records);
 });
+
+// CSV export of completed-service history. Gated by the owner's plan
+// (`canExportHistory`) and authorized to the owner (matched on the
+// session user's phone) or an admin. Returned as a plain text/csv body
+// so the client can stream the download via a regular anchor — kept out
+// of OpenAPI/Orval because their binary handling is awkward and the
+// route is auth-only anyway.
+router.get(
+  "/vehicles/:vehicleId/maintenance-history.csv",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    const params = GetVehicleHistoryParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+    const [vehicle] = await db
+      .select()
+      .from(vehiclesTable)
+      .where(eq(vehiclesTable.id, params.data.vehicleId));
+    if (!vehicle) {
+      res.status(404).json({ error: "Vehicle not found" });
+      return;
+    }
+    const user = req.user!;
+    const isAdmin = user.role === "admin" || user.role === "super_admin";
+    const isOwner = !!vehicle.ownerPhone && user.phone === vehicle.ownerPhone;
+    if (!isAdmin && !isOwner) {
+      res.status(403).json({ error: "Not authorized for this vehicle" });
+      return;
+    }
+    if (!isAdmin) {
+      const limits = await getEntitlements("owner", vehicle.ownerPhone!);
+      if (!limits.canExportHistory) {
+        res.status(402).json({
+          error: "Maintenance history export requires the Owner Premium plan.",
+          reason: "entitlement_required",
+        });
+        return;
+      }
+    }
+    const completed = await db
+      .select()
+      .from(bookingsTable)
+      .where(
+        and(
+          eq(bookingsTable.vehicleId, vehicle.id),
+          eq(bookingsTable.status, "completed"),
+        ),
+      )
+      .orderBy(desc(bookingsTable.completedAt));
+    const centerIds = [...new Set(completed.map((b) => b.serviceCenterId))];
+    const invoiceIds = completed
+      .map((b) => b.invoiceId)
+      .filter((id): id is string => !!id);
+    const centers = centerIds.length
+      ? await db
+          .select()
+          .from(serviceCentersTable)
+          .where(inArray(serviceCentersTable.id, centerIds))
+      : [];
+    const invoices = invoiceIds.length
+      ? await db
+          .select()
+          .from(invoicesTable)
+          .where(inArray(invoicesTable.id, invoiceIds))
+      : [];
+    const centerMap = new Map(centers.map((c) => [c.id, c]));
+    const invoiceMap = new Map(invoices.map((i) => [i.id, i]));
+    // Minimal CSV escaper — wrap any field with comma/quote/newline in
+    // quotes and double internal quotes. Avoids pulling in a dependency.
+    const esc = (v: unknown): string => {
+      if (v == null) return "";
+      const s = String(v);
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const header = [
+      "completed_at",
+      "service_type",
+      "description",
+      "service_center",
+      "invoice_total",
+    ].join(",");
+    const lines = completed.map((b) => {
+      const center = centerMap.get(b.serviceCenterId);
+      const invoice = b.invoiceId ? invoiceMap.get(b.invoiceId) : null;
+      return [
+        b.completedAt?.toISOString() ?? "",
+        b.serviceType,
+        b.description,
+        center?.name ?? "",
+        invoice?.total ?? 0,
+      ].map(esc).join(",");
+    });
+    const filename = `${vehicle.plateNumber.replace(/[^A-Za-z0-9_-]/g, "_")}-history.csv`;
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send([header, ...lines].join("\n"));
+  },
+);
 
 router.get(
   "/vehicles/:vehicleId/reminders",

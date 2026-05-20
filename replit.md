@@ -26,6 +26,8 @@ Connected automotive service platform that pairs vehicle owners with service cen
 - `lib/api-spec/openapi.yaml` — single source of truth for the API contract
 - `lib/api-client-react/src/generated/` — generated hooks (`useGetBooking`, `getGetBookingQueryKey`, etc.) and Zod schemas
 - `lib/db/src/schema.ts` — Drizzle schema for vehicles, service_centers, mechanics, bookings, booking_events, invoices
+- `lib/db/src/schema/subscriptionPlans.ts` — `PlanLimits` type + `DEFAULT_PLAN_LIMITS`; `subscription_plans.limits` jsonb is the source of truth for enforced entitlements
+- `artifacts/api-server/src/lib/entitlements.ts` — `getEntitlements(kind,id)`, `getOwnerEntitlementsForVehicle(vehicleId)`, `featuredSubscriberIds(kind, ids)`; every plan-gated server action goes through here
 - `lib/db/src/schema/drivers.ts` — chauffeur profiles attached to with-driver listings (scoped by ownerPhone)
 - `lib/db/src/schema/tripLocations.ts` — append-only GPS pings for live rental tracking (source: device/owner/admin/sim)
 - `lib/db/src/schema/rentalIncidents.ts` — theft/accident/breakdown/SOS reports tied to a rental booking
@@ -51,6 +53,8 @@ Connected automotive service platform that pairs vehicle owners with service cen
 - KYC approval is admin-only: `PATCH /renter-profiles/:id` returns **403** when a non-admin includes `kycStatus` in the body. The renter `UpsertRenterProfileInput` doesn't expose the field at all.
 - All rental tracking + incident endpoints are guarded server-side. `authorizeBookingAccess` in `routes/rentals.ts` lets through (1) admin/super_admin, (2) the booking's renter (matched by `req.user.phone`), or (3) the car owner (matched by `rentalCarsTable.ownerPhone`). Use it for any new endpoint that touches a single booking's tracking, incident, or signature data — don't add new IDOR-prone routes without it.
 - Incidents derive `reportedBy` from the verified relationship, not the request body — the client cannot spoof it. When the renter ships GPS in the body, the server inserts a `trip_locations` ping and uses those coords as `lastKnown*`; otherwise it falls back to the most recent ping.
+- Subscription plans carry both free-form `features` (marketing copy on the plan card) and `limits` (machine-enforced `PlanLimits`). Server gates only ever read `limits` — never parse `features`. Quotas enforced today: center `maxBookingsPerMonth` on `POST /bookings` (402 quota_exceeded), vendor `maxPartsListed` on `POST /vendors/:vendorId/parts`, owner `priorityBooking` materialised onto `bookings.priority` at create time, owner `canExportHistory` gating the CSV export. `featuredPlacement` floats centers/vendors to the top of their directories. Free-tier defaults live in `FREE_LIMITS` inside `entitlements.ts`. `getEntitlements` orders by `subscriptions.startedAt DESC` so multiple active subs resolve deterministically to the newest plan.
+- CSV maintenance-history export lives outside OpenAPI by design: `GET /vehicles/:vehicleId/maintenance-history.csv` is a plain Express route requiring auth, allowing only the matched owner (by `req.user.phone === vehicle.ownerPhone`) or admin, and 402s when the owner's plan lacks `canExportHistory`. The owner UI hits it with `fetch(..., { credentials: "include" })` and triggers a Blob download.
 
 ## Product
 

@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { CreateSubscriptionPlanInputAudience } from './createSubscriptionPlanInputAudience';
+import type { PlanLimits } from './planLimits';
 
 export interface CreateSubscriptionPlanInput {
   /** @minLength 1 */
@@ -14,4 +15,5 @@ export interface CreateSubscriptionPlanInput {
   /** @minimum 0 */
   priceMonthly: number;
   features?: string[];
+  limits?: PlanLimits;
 }

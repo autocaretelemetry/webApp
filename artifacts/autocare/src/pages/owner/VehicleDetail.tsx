@@ -4,7 +4,8 @@ import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Car, Settings, Hash, Calendar, AlertCircle } from "lucide-react";
+import { Car, Settings, Hash, Calendar, AlertCircle, Download } from "lucide-react";
+import { toast } from "sonner";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { ServiceIntervalCard } from "@/components/ServiceIntervalCard";
@@ -19,6 +20,36 @@ export default function VehicleDetail() {
 
   if (isLoadingVehicle) return <div className="p-8">Loading vehicle...</div>;
   if (!vehicle) return <div className="p-8">Vehicle not found</div>;
+
+  // CSV download via plain fetch (cookie-authenticated). The server
+  // returns 402 if the owner's plan doesn't include canExportHistory.
+  const downloadHistoryCsv = async () => {
+    try {
+      const res = await fetch(
+        `/api/vehicles/${vehicle.id}/maintenance-history.csv`,
+        { credentials: "include" },
+      );
+      if (res.status === 402) {
+        toast.error("Maintenance history export requires the Owner Premium plan.");
+        return;
+      }
+      if (!res.ok) {
+        toast.error("Couldn't download history.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${vehicle.plateNumber}-history.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Couldn't download history.");
+    }
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in-50 duration-500">
@@ -73,6 +104,13 @@ export default function VehicleDetail() {
             </TabsList>
             
             <TabsContent value="history" className="mt-6 space-y-4">
+              {history && history.length > 0 && (
+                <div className="flex justify-end">
+                  <Button size="sm" variant="outline" className="gap-2" onClick={downloadHistoryCsv}>
+                    <Download className="h-4 w-4" /> Export CSV
+                  </Button>
+                </div>
+              )}
               {isLoadingHistory ? (
                 <div>Loading history...</div>
               ) : history && history.length > 0 ? (

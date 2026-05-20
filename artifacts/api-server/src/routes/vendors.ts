@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, count, inArray, and } from "drizzle-orm";
 import { db, vendorsTable, partsTable, ordersTable } from "@workspace/db";
+import { featuredSubscriberIds } from "../lib/entitlements";
 import {
   GetVendorParams,
   ListVendorsQueryParams,
@@ -39,16 +40,22 @@ router.get("/vendors", async (req, res): Promise<void> => {
     .from(vendorsTable)
     .where(includeInactive ? undefined : eq(vendorsTable.active, true))
     .orderBy(vendorsTable.name);
-  // Proximity sort: same city first, then same region, then everywhere else; stable by name within each tier.
+  // Featured placement first (subscription entitlement), then proximity:
+  // same city, then same region, then everywhere else; stable by name
+  // within each tier.
+  const featured = await featuredSubscriberIds("vendor", rows.map((r) => r.id));
   const tiered = rows
     .map((v, idx) => {
       const sameCity = nearCity && v.city.toLowerCase() === nearCity;
       const sameRegion = nearRegion && v.region.toLowerCase() === nearRegion;
       const tier = sameCity ? 0 : sameRegion ? 1 : 2;
-      return { v, tier, idx };
+      return { v, tier, idx, featured: featured.has(v.id) };
     })
-    .sort((a, b) => a.tier - b.tier || a.idx - b.idx)
-    .map((x) => x.v);
+    .sort((a, b) => {
+      if (a.featured !== b.featured) return a.featured ? -1 : 1;
+      return a.tier - b.tier || a.idx - b.idx;
+    })
+    .map((x) => ({ ...x.v, featured: x.featured }));
   res.json(await hydrate(tiered));
 });
 

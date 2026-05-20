@@ -6,6 +6,7 @@ import {
   mechanicsTable,
   bookingsTable,
 } from "@workspace/db";
+import { featuredSubscriberIds } from "../lib/entitlements";
 import {
   ListServiceCentersQueryParams,
   GetServiceCenterParams,
@@ -73,7 +74,15 @@ router.get("/service-centers", async (req, res): Promise<void> => {
         .orderBy(desc(serviceCentersTable.rating));
 
   const openMap = await openJobsByCenter(rows.map((r) => r.id));
-  res.json(rows.map((r) => ({ ...r, openJobs: openMap.get(r.id) ?? 0 })));
+  // Featured placement: centers whose active plan grants featuredPlacement
+  // float to the top of the directory, preserving rating order within tiers.
+  const featured = await featuredSubscriberIds("center", rows.map((r) => r.id));
+  const sorted = [...rows].sort((a, b) => {
+    const af = featured.has(a.id) ? 0 : 1;
+    const bf = featured.has(b.id) ? 0 : 1;
+    return af - bf;
+  });
+  res.json(sorted.map((r) => ({ ...r, openJobs: openMap.get(r.id) ?? 0, featured: featured.has(r.id) })));
 });
 
 router.get("/service-centers/:centerId", async (req, res): Promise<void> => {

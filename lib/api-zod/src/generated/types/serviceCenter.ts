@@ -21,4 +21,6 @@ export interface ServiceCenter {
   bio?: string | null;
   active?: boolean;
   whatsappOptIn?: boolean;
+  /** Subscription-driven featured placement (sorted to top of directory). */
+  featured?: boolean;
 }

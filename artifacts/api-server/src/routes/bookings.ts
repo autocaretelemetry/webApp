@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, asc, count, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, ne } from "drizzle-orm";
 import {
   db,
   vehiclesTable,
@@ -9,6 +9,7 @@ import {
   bookingEventsTable,
   invoicesTable,
 } from "@workspace/db";
+import { getEntitlements, getOwnerEntitlementsForVehicle } from "../lib/entitlements";
 import {
   CreateBookingBody,
   ListBookingsQueryParams,
@@ -93,17 +94,19 @@ router.get("/bookings", async (req, res): Promise<void> => {
   }
   const conditions = [];
   if (q.data.status) conditions.push(eq(bookingsTable.status, q.data.status));
+  // Priority bookings (granted by the owner's plan) always surface above
+  // non-priority within the same status filter, then newest first.
   const rows =
     conditions.length > 0
       ? await db
           .select()
           .from(bookingsTable)
           .where(and(...conditions))
-          .orderBy(desc(bookingsTable.requestedAt))
+          .orderBy(desc(bookingsTable.priority), desc(bookingsTable.requestedAt))
       : await db
           .select()
           .from(bookingsTable)
-          .orderBy(desc(bookingsTable.requestedAt));
+          .orderBy(desc(bookingsTable.priority), desc(bookingsTable.requestedAt));
 
   const hydrated = await hydrateBookings(rows);
   res.json(hydrated);
@@ -133,6 +136,36 @@ router.post("/bookings", async (req, res): Promise<void> => {
     return;
   }
 
+  // Quota gate: the receiving center's plan caps how many bookings it can
+  // take per calendar month. Free tier defaults apply when no active sub.
+  const centerLimits = await getEntitlements("center", center.id);
+  if (centerLimits.maxBookingsPerMonth != null) {
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+    const [{ n }] = await db
+      .select({ n: count(bookingsTable.id) })
+      .from(bookingsTable)
+      .where(
+        and(
+          eq(bookingsTable.serviceCenterId, center.id),
+          gte(bookingsTable.requestedAt, monthStart),
+        ),
+      );
+    if (Number(n) >= centerLimits.maxBookingsPerMonth) {
+      res.status(402).json({
+        error: `${center.name} has reached its monthly booking cap (${centerLimits.maxBookingsPerMonth}). Ask them to upgrade their plan.`,
+        reason: "quota_exceeded",
+      });
+      return;
+    }
+  }
+
+  // Priority flag: owner's plan grants it. Cheap one-query lookup; safe to
+  // miss (defaults to false) if the vehicle has no ownerPhone yet.
+  const ownerEntitlements = await getOwnerEntitlementsForVehicle(vehicle.id);
+  const priority = ownerEntitlements.limits.priorityBooking;
+
   const [row] = await db
     .insert(bookingsTable)
     .values({
@@ -142,6 +175,7 @@ router.post("/bookings", async (req, res): Promise<void> => {
       description: parsed.data.description,
       scheduledAt: parsed.data.scheduledAt ?? null,
       status: "requested",
+      priority,
     })
     .returning();
 

@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
-import { and, asc, eq, inArray, ilike, or } from "drizzle-orm";
+import { and, asc, count, eq, inArray, ilike, or } from "drizzle-orm";
 import { db, partsTable, vendorsTable } from "@workspace/db";
+import { getEntitlements } from "../lib/entitlements";
 import {
   ListPartsForVendorParams,
   CreatePartParams,
@@ -124,6 +125,21 @@ router.post("/vendors/:vendorId/parts", async (req, res): Promise<void> => {
   if (!vendor) {
     res.status(404).json({ error: "Vendor not found" });
     return;
+  }
+  // Quota gate: vendor's plan caps how many parts they can list.
+  const vendorLimits = await getEntitlements("vendor", vendor.id);
+  if (vendorLimits.maxPartsListed != null) {
+    const [{ n }] = await db
+      .select({ n: count(partsTable.id) })
+      .from(partsTable)
+      .where(eq(partsTable.vendorId, vendor.id));
+    if (Number(n) >= vendorLimits.maxPartsListed) {
+      res.status(402).json({
+        error: `Vendor has reached the parts-listing cap (${vendorLimits.maxPartsListed}) for their current plan.`,
+        reason: "quota_exceeded",
+      });
+      return;
+    }
   }
   const [row] = await db
     .insert(partsTable)

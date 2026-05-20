@@ -279,7 +279,8 @@ export const ListServiceCentersResponseItem = zod.object({
   "imageUrl": zod.string().nullish(),
   "bio": zod.string().nullish(),
   "active": zod.boolean().optional(),
-  "whatsappOptIn": zod.boolean().optional()
+  "whatsappOptIn": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).')
 })
 export const ListServiceCentersResponse = zod.array(ListServiceCentersResponseItem)
 
@@ -302,7 +303,8 @@ export const GetServiceCenterResponse = zod.object({
   "imageUrl": zod.string().nullish(),
   "bio": zod.string().nullish(),
   "active": zod.boolean().optional(),
-  "whatsappOptIn": zod.boolean().optional()
+  "whatsappOptIn": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).')
 })
 
 
@@ -331,7 +333,8 @@ export const UpdateServiceCenterResponse = zod.object({
   "imageUrl": zod.string().nullish(),
   "bio": zod.string().nullish(),
   "active": zod.boolean().optional(),
-  "whatsappOptIn": zod.boolean().optional()
+  "whatsappOptIn": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).')
 })
 
 
@@ -576,6 +579,7 @@ export const ListBookingsResponseItem = zod.object({
   "scheduledAt": zod.coerce.date().nullish(),
   "completedAt": zod.coerce.date().nullish(),
   "estimatedDurationHours": zod.number().nullish(),
+  "priority": zod.boolean().describe('True when the owner\'s active subscription grants priorityBooking. The center queue surfaces priority bookings at the top.'),
   "vehicle": zod.object({
   "id": zod.string(),
   "ownerName": zod.string(),
@@ -611,7 +615,8 @@ export const ListBookingsResponseItem = zod.object({
   "imageUrl": zod.string().nullish(),
   "bio": zod.string().nullish(),
   "active": zod.boolean().optional(),
-  "whatsappOptIn": zod.boolean().optional()
+  "whatsappOptIn": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).')
 }).optional(),
   "mechanic": zod.union([zod.object({
   "id": zod.string(),
@@ -662,6 +667,7 @@ export const GetBookingResponse = zod.object({
   "scheduledAt": zod.coerce.date().nullish(),
   "completedAt": zod.coerce.date().nullish(),
   "estimatedDurationHours": zod.number().nullish(),
+  "priority": zod.boolean().describe('True when the owner\'s active subscription grants priorityBooking. The center queue surfaces priority bookings at the top.'),
   "vehicle": zod.object({
   "id": zod.string(),
   "ownerName": zod.string(),
@@ -697,7 +703,8 @@ export const GetBookingResponse = zod.object({
   "imageUrl": zod.string().nullish(),
   "bio": zod.string().nullish(),
   "active": zod.boolean().optional(),
-  "whatsappOptIn": zod.boolean().optional()
+  "whatsappOptIn": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).')
 }).optional(),
   "mechanic": zod.union([zod.object({
   "id": zod.string(),
@@ -769,6 +776,7 @@ export const UpdateBookingStatusResponse = zod.object({
   "scheduledAt": zod.coerce.date().nullish(),
   "completedAt": zod.coerce.date().nullish(),
   "estimatedDurationHours": zod.number().nullish(),
+  "priority": zod.boolean().describe('True when the owner\'s active subscription grants priorityBooking. The center queue surfaces priority bookings at the top.'),
   "vehicle": zod.object({
   "id": zod.string(),
   "ownerName": zod.string(),
@@ -804,7 +812,8 @@ export const UpdateBookingStatusResponse = zod.object({
   "imageUrl": zod.string().nullish(),
   "bio": zod.string().nullish(),
   "active": zod.boolean().optional(),
-  "whatsappOptIn": zod.boolean().optional()
+  "whatsappOptIn": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).')
 }).optional(),
   "mechanic": zod.union([zod.object({
   "id": zod.string(),
@@ -849,6 +858,7 @@ export const AssignMechanicResponse = zod.object({
   "scheduledAt": zod.coerce.date().nullish(),
   "completedAt": zod.coerce.date().nullish(),
   "estimatedDurationHours": zod.number().nullish(),
+  "priority": zod.boolean().describe('True when the owner\'s active subscription grants priorityBooking. The center queue surfaces priority bookings at the top.'),
   "vehicle": zod.object({
   "id": zod.string(),
   "ownerName": zod.string(),
@@ -884,7 +894,8 @@ export const AssignMechanicResponse = zod.object({
   "imageUrl": zod.string().nullish(),
   "bio": zod.string().nullish(),
   "active": zod.boolean().optional(),
-  "whatsappOptIn": zod.boolean().optional()
+  "whatsappOptIn": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).')
 }).optional(),
   "mechanic": zod.union([zod.object({
   "id": zod.string(),
@@ -1100,6 +1111,7 @@ export const ListVendorsResponseItem = zod.object({
   "logoUrl": zod.string().nullish(),
   "partsCount": zod.number().optional(),
   "active": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).'),
   "createdAt": zod.coerce.date()
 })
 export const ListVendorsResponse = zod.array(ListVendorsResponseItem)
@@ -1125,6 +1137,7 @@ export const GetVendorResponse = zod.object({
   "logoUrl": zod.string().nullish(),
   "partsCount": zod.number().optional(),
   "active": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).'),
   "createdAt": zod.coerce.date()
 })
 
@@ -1153,6 +1166,7 @@ export const UpdateVendorResponse = zod.object({
   "logoUrl": zod.string().nullish(),
   "partsCount": zod.number().optional(),
   "active": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).'),
   "createdAt": zod.coerce.date()
 })
 
@@ -1199,6 +1213,7 @@ export const ListPartsForVendorResponseItem = zod.object({
   "logoUrl": zod.string().nullish(),
   "partsCount": zod.number().optional(),
   "active": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).'),
   "createdAt": zod.coerce.date()
 }),zod.null()]).optional()
 })
@@ -1432,6 +1447,7 @@ export const ListPartsResponseItem = zod.object({
   "logoUrl": zod.string().nullish(),
   "partsCount": zod.number().optional(),
   "active": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).'),
   "createdAt": zod.coerce.date()
 }),zod.null()]).optional()
 })
@@ -1472,6 +1488,7 @@ export const GetPartResponse = zod.object({
   "logoUrl": zod.string().nullish(),
   "partsCount": zod.number().optional(),
   "active": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).'),
   "createdAt": zod.coerce.date()
 }),zod.null()]).optional()
 })
@@ -1530,6 +1547,7 @@ export const UpdatePartResponse = zod.object({
   "logoUrl": zod.string().nullish(),
   "partsCount": zod.number().optional(),
   "active": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).'),
   "createdAt": zod.coerce.date()
 }),zod.null()]).optional()
 })
@@ -1597,6 +1615,7 @@ export const ListOrdersResponseItem = zod.object({
   "logoUrl": zod.string().nullish(),
   "partsCount": zod.number().optional(),
   "active": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).'),
   "createdAt": zod.coerce.date()
 }),zod.null()]).optional(),
   "mechanic": zod.union([zod.object({
@@ -1715,6 +1734,7 @@ export const GetOrderResponse = zod.object({
   "logoUrl": zod.string().nullish(),
   "partsCount": zod.number().optional(),
   "active": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).'),
   "createdAt": zod.coerce.date()
 }),zod.null()]).optional(),
   "mechanic": zod.union([zod.object({
@@ -1827,6 +1847,7 @@ export const UpdateOrderStatusResponse = zod.object({
   "logoUrl": zod.string().nullish(),
   "partsCount": zod.number().optional(),
   "active": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).'),
   "createdAt": zod.coerce.date()
 }),zod.null()]).optional(),
   "mechanic": zod.union([zod.object({
@@ -1933,6 +1954,7 @@ export const GetAdminOverviewResponse = zod.object({
   "scheduledAt": zod.coerce.date().nullish(),
   "completedAt": zod.coerce.date().nullish(),
   "estimatedDurationHours": zod.number().nullish(),
+  "priority": zod.boolean().describe('True when the owner\'s active subscription grants priorityBooking. The center queue surfaces priority bookings at the top.'),
   "vehicle": zod.object({
   "id": zod.string(),
   "ownerName": zod.string(),
@@ -1968,7 +1990,8 @@ export const GetAdminOverviewResponse = zod.object({
   "imageUrl": zod.string().nullish(),
   "bio": zod.string().nullish(),
   "active": zod.boolean().optional(),
-  "whatsappOptIn": zod.boolean().optional()
+  "whatsappOptIn": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).')
 }).optional(),
   "mechanic": zod.union([zod.object({
   "id": zod.string(),
@@ -2024,6 +2047,7 @@ export const GetAdminOverviewResponse = zod.object({
   "logoUrl": zod.string().nullish(),
   "partsCount": zod.number().optional(),
   "active": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).'),
   "createdAt": zod.coerce.date()
 }),zod.null()]).optional(),
   "mechanic": zod.union([zod.object({
@@ -2271,12 +2295,25 @@ export const ListSubscriptionPlansQueryParams = zod.object({
   "includeInactive": zod.coerce.boolean().optional()
 })
 
+export const listSubscriptionPlansResponseLimitsMaxBookingsPerMonthMin = 0;
+
+export const listSubscriptionPlansResponseLimitsMaxPartsListedMin = 0;
+
+
+
 export const ListSubscriptionPlansResponseItem = zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "audience": zod.enum(['center', 'vendor', 'owner']),
   "priceMonthly": zod.number(),
   "features": zod.array(zod.string()),
+  "limits": zod.object({
+  "maxBookingsPerMonth": zod.number().min(listSubscriptionPlansResponseLimitsMaxBookingsPerMonthMin).nullable(),
+  "maxPartsListed": zod.number().min(listSubscriptionPlansResponseLimitsMaxPartsListedMin).nullable(),
+  "featuredPlacement": zod.boolean(),
+  "canExportHistory": zod.boolean(),
+  "priorityBooking": zod.boolean()
+}).describe('Concrete, machine-enforceable entitlements. Numeric limits use `null` to mean \"unlimited\". `features` (separately) is free-form marketing copy on the plan card — `limits` is what the server actually checks.\n'),
   "active": zod.boolean(),
   "createdAt": zod.coerce.date()
 })
@@ -2286,13 +2323,24 @@ export const ListSubscriptionPlansResponse = zod.array(ListSubscriptionPlansResp
 
 export const createSubscriptionPlanBodyPriceMonthlyMin = 0;
 
+export const createSubscriptionPlanBodyLimitsMaxBookingsPerMonthMin = 0;
+
+export const createSubscriptionPlanBodyLimitsMaxPartsListedMin = 0;
+
 
 
 export const CreateSubscriptionPlanBody = zod.object({
   "name": zod.string().min(1),
   "audience": zod.enum(['center', 'vendor', 'owner']),
   "priceMonthly": zod.number().min(createSubscriptionPlanBodyPriceMonthlyMin),
-  "features": zod.array(zod.string()).optional()
+  "features": zod.array(zod.string()).optional(),
+  "limits": zod.object({
+  "maxBookingsPerMonth": zod.number().min(createSubscriptionPlanBodyLimitsMaxBookingsPerMonthMin).nullable(),
+  "maxPartsListed": zod.number().min(createSubscriptionPlanBodyLimitsMaxPartsListedMin).nullable(),
+  "featuredPlacement": zod.boolean(),
+  "canExportHistory": zod.boolean(),
+  "priorityBooking": zod.boolean()
+}).optional().describe('Concrete, machine-enforceable entitlements. Numeric limits use `null` to mean \"unlimited\". `features` (separately) is free-form marketing copy on the plan card — `limits` is what the server actually checks.\n')
 })
 
 
@@ -2302,14 +2350,31 @@ export const UpdateSubscriptionPlanParams = zod.object({
 
 export const updateSubscriptionPlanBodyPriceMonthlyMin = 0;
 
+export const updateSubscriptionPlanBodyLimitsMaxBookingsPerMonthMin = 0;
+
+export const updateSubscriptionPlanBodyLimitsMaxPartsListedMin = 0;
+
 
 
 export const UpdateSubscriptionPlanBody = zod.object({
   "name": zod.string().optional(),
   "priceMonthly": zod.number().min(updateSubscriptionPlanBodyPriceMonthlyMin).optional(),
   "features": zod.array(zod.string()).optional(),
+  "limits": zod.object({
+  "maxBookingsPerMonth": zod.number().min(updateSubscriptionPlanBodyLimitsMaxBookingsPerMonthMin).nullable(),
+  "maxPartsListed": zod.number().min(updateSubscriptionPlanBodyLimitsMaxPartsListedMin).nullable(),
+  "featuredPlacement": zod.boolean(),
+  "canExportHistory": zod.boolean(),
+  "priorityBooking": zod.boolean()
+}).optional().describe('Concrete, machine-enforceable entitlements. Numeric limits use `null` to mean \"unlimited\". `features` (separately) is free-form marketing copy on the plan card — `limits` is what the server actually checks.\n'),
   "active": zod.boolean().optional()
 })
+
+export const updateSubscriptionPlanResponseLimitsMaxBookingsPerMonthMin = 0;
+
+export const updateSubscriptionPlanResponseLimitsMaxPartsListedMin = 0;
+
+
 
 export const UpdateSubscriptionPlanResponse = zod.object({
   "id": zod.string(),
@@ -2317,6 +2382,13 @@ export const UpdateSubscriptionPlanResponse = zod.object({
   "audience": zod.enum(['center', 'vendor', 'owner']),
   "priceMonthly": zod.number(),
   "features": zod.array(zod.string()),
+  "limits": zod.object({
+  "maxBookingsPerMonth": zod.number().min(updateSubscriptionPlanResponseLimitsMaxBookingsPerMonthMin).nullable(),
+  "maxPartsListed": zod.number().min(updateSubscriptionPlanResponseLimitsMaxPartsListedMin).nullable(),
+  "featuredPlacement": zod.boolean(),
+  "canExportHistory": zod.boolean(),
+  "priorityBooking": zod.boolean()
+}).describe('Concrete, machine-enforceable entitlements. Numeric limits use `null` to mean \"unlimited\". `features` (separately) is free-form marketing copy on the plan card — `limits` is what the server actually checks.\n'),
   "active": zod.boolean(),
   "createdAt": zod.coerce.date()
 })
@@ -3407,7 +3479,8 @@ export const UpdateServiceCenterSettingsResponse = zod.object({
   "imageUrl": zod.string().nullish(),
   "bio": zod.string().nullish(),
   "active": zod.boolean().optional(),
-  "whatsappOptIn": zod.boolean().optional()
+  "whatsappOptIn": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).')
 })
 
 

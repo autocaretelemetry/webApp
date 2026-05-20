@@ -2118,6 +2118,7 @@ components:
         bio: { type: string, nullable: true }
         active: { type: boolean }
         whatsappOptIn: { type: boolean }
+        featured: { type: boolean, description: "Subscription-driven featured placement (sorted to top of directory)." }
 
     Mechanic:
       type: object
@@ -2226,7 +2227,7 @@ components:
 
     Booking:
       type: object
-      required: [id, vehicleId, serviceCenterId, serviceType, description, status, requestedAt]
+      required: [id, vehicleId, serviceCenterId, serviceType, description, status, requestedAt, priority]
       properties:
         id: { type: string }
         vehicleId: { type: string }
@@ -2241,6 +2242,7 @@ components:
         scheduledAt: { type: string, format: date-time, nullable: true }
         completedAt: { type: string, format: date-time, nullable: true }
         estimatedDurationHours: { type: number, nullable: true }
+        priority: { type: boolean, description: "True when the owner's active subscription grants priorityBooking. The center queue surfaces priority bookings at the top." }
         vehicle: { $ref: "#/components/schemas/Vehicle" }
         serviceCenter: { $ref: "#/components/schemas/ServiceCenter" }
         mechanic:
@@ -2442,6 +2444,7 @@ components:
         logoUrl: { type: string, nullable: true }
         partsCount: { type: integer }
         active: { type: boolean }
+        featured: { type: boolean, description: "Subscription-driven featured placement (sorted to top of directory)." }
         createdAt: { type: string, format: date-time }
 
     Part:
@@ -2885,9 +2888,23 @@ components:
           items: { type: string }
         active: { type: boolean }
 
+    PlanLimits:
+      type: object
+      required: [maxBookingsPerMonth, maxPartsListed, featuredPlacement, canExportHistory, priorityBooking]
+      description: >
+        Concrete, machine-enforceable entitlements. Numeric limits use `null`
+        to mean "unlimited". `features` (separately) is free-form marketing
+        copy on the plan card — `limits` is what the server actually checks.
+      properties:
+        maxBookingsPerMonth: { type: integer, nullable: true, minimum: 0 }
+        maxPartsListed: { type: integer, nullable: true, minimum: 0 }
+        featuredPlacement: { type: boolean }
+        canExportHistory: { type: boolean }
+        priorityBooking: { type: boolean }
+
     SubscriptionPlan:
       type: object
-      required: [id, name, audience, priceMonthly, features, active, createdAt]
+      required: [id, name, audience, priceMonthly, features, limits, active, createdAt]
       properties:
         id: { type: string }
         name: { type: string }
@@ -2896,6 +2913,7 @@ components:
         features:
           type: array
           items: { type: string }
+        limits: { $ref: "#/components/schemas/PlanLimits" }
         active: { type: boolean }
         createdAt: { type: string, format: date-time }
 
@@ -2909,6 +2927,7 @@ components:
         features:
           type: array
           items: { type: string }
+        limits: { $ref: "#/components/schemas/PlanLimits" }
 
     UpdateSubscriptionPlanInput:
       type: object
@@ -2918,6 +2937,7 @@ components:
         features:
           type: array
           items: { type: string }
+        limits: { $ref: "#/components/schemas/PlanLimits" }
         active: { type: boolean }
 
     Subscription:

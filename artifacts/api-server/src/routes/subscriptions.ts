@@ -53,6 +53,7 @@ router.post("/subscription-plans", async (req, res): Promise<void> => {
       audience: body.data.audience,
       priceMonthly: body.data.priceMonthly,
       features: body.data.features ?? [],
+      ...(body.data.limits ? { limits: body.data.limits } : {}),
     })
     .returning();
   res.status(201).json(row);

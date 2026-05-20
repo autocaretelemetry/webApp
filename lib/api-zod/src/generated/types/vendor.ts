@@ -19,5 +19,7 @@ export interface Vendor {
   logoUrl?: string | null;
   partsCount?: number;
   active?: boolean;
+  /** Subscription-driven featured placement (sorted to top of directory). */
+  featured?: boolean;
   createdAt: Date;
 }

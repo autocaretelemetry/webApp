@@ -154,6 +154,8 @@ export interface ServiceCenter {
   bio?: string | null;
   active?: boolean;
   whatsappOptIn?: boolean;
+  /** Subscription-driven featured placement (sorted to top of directory). */
+  featured?: boolean;
 }
 
 export interface Mechanic {
@@ -277,6 +279,8 @@ export interface Booking {
   scheduledAt?: string | null;
   completedAt?: string | null;
   estimatedDurationHours?: number | null;
+  /** True when the owner's active subscription grants priorityBooking. The center queue surfaces priority bookings at the top. */
+  priority: boolean;
   vehicle?: Vehicle;
   serviceCenter?: ServiceCenter;
   mechanic?: Mechanic | null;
@@ -472,6 +476,8 @@ export interface Vendor {
   logoUrl?: string | null;
   partsCount?: number;
   active?: boolean;
+  /** Subscription-driven featured placement (sorted to top of directory). */
+  featured?: boolean;
   createdAt: string;
 }
 
@@ -943,6 +949,20 @@ export interface UpdateCenterStaffInput {
   active?: boolean;
 }
 
+/**
+ * Concrete, machine-enforceable entitlements. Numeric limits use `null` to mean "unlimited". `features` (separately) is free-form marketing copy on the plan card — `limits` is what the server actually checks.
+
+ */
+export interface PlanLimits {
+  /** @minimum 0 */
+  maxBookingsPerMonth: number | null;
+  /** @minimum 0 */
+  maxPartsListed: number | null;
+  featuredPlacement: boolean;
+  canExportHistory: boolean;
+  priorityBooking: boolean;
+}
+
 export type SubscriptionPlanAudience = typeof SubscriptionPlanAudience[keyof typeof SubscriptionPlanAudience];
 
 
@@ -958,6 +978,7 @@ export interface SubscriptionPlan {
   audience: SubscriptionPlanAudience;
   priceMonthly: number;
   features: string[];
+  limits: PlanLimits;
   active: boolean;
   createdAt: string;
 }
@@ -978,6 +999,7 @@ export interface CreateSubscriptionPlanInput {
   /** @minimum 0 */
   priceMonthly: number;
   features?: string[];
+  limits?: PlanLimits;
 }
 
 export interface UpdateSubscriptionPlanInput {
@@ -985,6 +1007,7 @@ export interface UpdateSubscriptionPlanInput {
   /** @minimum 0 */
   priceMonthly?: number;
   features?: string[];
+  limits?: PlanLimits;
   active?: boolean;
 }
 
