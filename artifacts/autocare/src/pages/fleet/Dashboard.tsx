@@ -4,13 +4,15 @@ import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Building2, Car, Wrench, DollarSign, Bell, Lock, Crown, AlertTriangle } from "lucide-react";
+import { Building2, Car, Wrench, DollarSign, Bell, Lock, Crown, AlertTriangle, FileText, FileSpreadsheet } from "lucide-react";
 import { useFleetOrgId, setFleetOrgId } from "@/lib/role";
 import {
   useMyFleetOrgs,
   useFleetDashboard,
   useFleetPartsSpend,
+  downloadFleetHistory,
 } from "@/lib/fleet-api";
+import { toast } from "sonner";
 import { formatCurrency, formatRelative } from "@/lib/format";
 
 export default function FleetDashboard() {
@@ -69,6 +71,40 @@ export default function FleetDashboard() {
         description={dash.organization.industry ?? "Fleet operations"}
         actions={
           <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  await downloadFleetHistory({
+                    orgId: orgId!,
+                    format: "csv",
+                    filename: `${dash.organization.slug}-fleet-history`,
+                  });
+                } catch (e) {
+                  toast.error((e as Error).message);
+                }
+              }}
+            >
+              <FileSpreadsheet className="h-4 w-4 mr-1" /> Export CSV
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  await downloadFleetHistory({
+                    orgId: orgId!,
+                    format: "pdf",
+                    filename: `${dash.organization.slug}-fleet-history`,
+                  });
+                } catch (e) {
+                  toast.error((e as Error).message);
+                }
+              }}
+            >
+              <FileText className="h-4 w-4 mr-1" /> Export PDF
+            </Button>
             <Link href="/fleet/vehicles">
               <Button variant="outline">Manage vehicles</Button>
             </Link>

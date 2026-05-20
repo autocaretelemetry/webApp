@@ -354,6 +354,33 @@ export function useUpdateFleetIncident(orgId: string | null) {
   });
 }
 
+// Trigger a Blob download for a fleet maintenance-history export. Used
+// by per-vehicle and org-wide export buttons. Cookie-authenticated.
+export async function downloadFleetHistory(opts: {
+  orgId: string;
+  vehicleId?: string;
+  format: "csv" | "pdf";
+  filename: string;
+}): Promise<void> {
+  const base = opts.vehicleId
+    ? `/api/organizations/${opts.orgId}/vehicles/${opts.vehicleId}/maintenance-history.${opts.format}`
+    : `/api/organizations/${opts.orgId}/maintenance-history.${opts.format}`;
+  const res = await fetch(base, { credentials: "include" });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || `Download failed (${res.status})`);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${opts.filename}.${opts.format}`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function useUpdateFleetVehicle(orgId: string | null) {
   const qc = useQueryClient();
   return useMutation({

@@ -18,6 +18,7 @@ import {
 import { requireAuth } from "../lib/auth";
 import { getEntitlements } from "../lib/entitlements";
 import { computeReminders } from "../lib/reminders";
+import PDFDocument from "pdfkit";
 
 const router: IRouter = Router();
 
@@ -846,6 +847,257 @@ router.patch(
       .returning();
     res.json(updated);
   },
+);
+
+// ───────── Maintenance history export (CSV + PDF) ─────────
+//
+// Two scopes:
+//   - Org-wide rollup at `/organizations/:orgId/maintenance-history.{csv,pdf}`
+//     — admin only, includes one row/section per completed booking across
+//     every vehicle in the fleet.
+//   - Per-vehicle at `/organizations/:orgId/vehicles/:vehicleId/...` —
+//     admin or the assigned driver (via `requireOrgVehicle`).
+//
+// Kept out of OpenAPI for the same reason as the owner version: binary
+// payloads + CSV are awkward to model in Orval.
+
+type HistoryRow = {
+  completedAt: Date | null;
+  serviceType: string;
+  description: string;
+  centerName: string;
+  vehicleLabel: string;
+  invoiceTotal: number;
+};
+
+// Upper bound on rows per export. Keeps an accidentally massive fleet
+// (or a long-running org) from blowing memory or stalling a worker on
+// a single download. If we ever hit this, the response includes a
+// `truncated` row at the bottom so the caller knows to narrow the
+// scope (date range filtering is a sensible follow-up).
+const HISTORY_ROW_CAP = 5000;
+
+async function buildHistoryRows(
+  vehicles: { id: string; brand: string; model: string; year: number; plateNumber: string }[],
+): Promise<{ rows: HistoryRow[]; truncated: boolean }> {
+  if (vehicles.length === 0) return { rows: [], truncated: false };
+  const vehicleIds = vehicles.map((v) => v.id);
+  const vehicleMap = new Map(vehicles.map((v) => [v.id, v]));
+  const completed = await db
+    .select()
+    .from(bookingsTable)
+    .where(
+      and(
+        inArray(bookingsTable.vehicleId, vehicleIds),
+        eq(bookingsTable.status, "completed"),
+      ),
+    )
+    .orderBy(desc(bookingsTable.completedAt))
+    .limit(HISTORY_ROW_CAP + 1);
+  const truncated = completed.length > HISTORY_ROW_CAP;
+  if (truncated) completed.length = HISTORY_ROW_CAP;
+  const centerIds = [...new Set(completed.map((b) => b.serviceCenterId))];
+  const invoiceIds = completed
+    .map((b) => b.invoiceId)
+    .filter((id): id is string => !!id);
+  const centers = centerIds.length
+    ? await db
+        .select()
+        .from(serviceCentersTable)
+        .where(inArray(serviceCentersTable.id, centerIds))
+    : [];
+  const invoices = invoiceIds.length
+    ? await db
+        .select()
+        .from(invoicesTable)
+        .where(inArray(invoicesTable.id, invoiceIds))
+    : [];
+  const centerMap = new Map(centers.map((c) => [c.id, c]));
+  const invoiceMap = new Map(invoices.map((i) => [i.id, i]));
+  const rows = completed.map((b) => {
+    const v = vehicleMap.get(b.vehicleId);
+    const invoice = b.invoiceId ? invoiceMap.get(b.invoiceId) : null;
+    return {
+      completedAt: b.completedAt ?? null,
+      serviceType: b.serviceType,
+      description: b.description,
+      centerName: centerMap.get(b.serviceCenterId)?.name ?? "",
+      vehicleLabel: v
+        ? `${v.year} ${v.brand} ${v.model} (${v.plateNumber})`
+        : "Unknown vehicle",
+      invoiceTotal: Number(invoice?.total ?? 0),
+    };
+  });
+  return { rows, truncated };
+}
+
+const csvEsc = (v: unknown): string => {
+  if (v == null) return "";
+  const s = String(v);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+
+function sendHistoryCsv(
+  res: Response,
+  rows: HistoryRow[],
+  filename: string,
+  truncated: boolean,
+) {
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}.csv"`);
+  // Stream row-by-row so we never hold the full file in memory.
+  res.write(
+    [
+      "completed_at",
+      "vehicle",
+      "service_type",
+      "description",
+      "service_center",
+      "invoice_total",
+    ].join(",") + "\n",
+  );
+  for (const r of rows) {
+    res.write(
+      [
+        r.completedAt?.toISOString() ?? "",
+        r.vehicleLabel,
+        r.serviceType,
+        r.description,
+        r.centerName,
+        r.invoiceTotal,
+      ]
+        .map(csvEsc)
+        .join(",") + "\n",
+    );
+  }
+  if (truncated) {
+    res.write(
+      `# Truncated at ${HISTORY_ROW_CAP} rows. Narrow the export scope to see older history.\n`,
+    );
+  }
+  res.end();
+}
+
+function sendHistoryPdf(
+  res: Response,
+  rows: HistoryRow[],
+  title: string,
+  subtitle: string,
+  filename: string,
+  truncated: boolean,
+) {
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}.pdf"`);
+  const doc = new PDFDocument({ size: "A4", margin: 50 });
+  doc.pipe(res);
+  doc.fillColor("#1a1a1a").fontSize(20).text(title, { align: "left" });
+  doc.moveDown(0.3);
+  doc.fontSize(12).fillColor("#555").text(subtitle);
+  doc.text(`Generated ${new Date().toISOString().slice(0, 10)}`);
+  doc.moveDown(0.8);
+  doc
+    .strokeColor("#cccccc")
+    .lineWidth(1)
+    .moveTo(doc.x, doc.y)
+    .lineTo(doc.page.width - doc.page.margins.right, doc.y)
+    .stroke();
+  doc.moveDown(0.5);
+  if (rows.length === 0) {
+    doc.fillColor("#555").fontSize(12).text("No completed services on record.");
+  } else {
+    for (const r of rows) {
+      const date = r.completedAt
+        ? r.completedAt.toISOString().slice(0, 10)
+        : "Unknown date";
+      doc
+        .fillColor("#1a1a1a")
+        .fontSize(13)
+        .text(r.serviceType, { continued: true })
+        .fillColor("#888")
+        .text(`   ${date}`);
+      doc.fontSize(10).fillColor("#555").text(`${r.vehicleLabel} — ${r.centerName}`);
+      doc.fontSize(11).fillColor("#1a1a1a").text(r.description, { paragraphGap: 4 });
+      doc.fontSize(11).fillColor("#1a1a1a").text(`Invoice total: ${r.invoiceTotal}`);
+      doc.moveDown(0.8);
+    }
+    if (truncated) {
+      doc.moveDown(0.5);
+      doc
+        .fontSize(10)
+        .fillColor("#a00")
+        .text(`Truncated at ${HISTORY_ROW_CAP} rows. Narrow the export scope to see older history.`);
+    }
+  }
+  doc.end();
+}
+
+const fleetHistoryAllHandler = (format: "csv" | "pdf") =>
+  async (req: Request, res: Response): Promise<void> => {
+    const m = await requireOrgMember(req, res, String(req.params.orgId), "admin");
+    if (!m) return;
+    const vehicles = await db
+      .select()
+      .from(vehiclesTable)
+      .where(eq(vehiclesTable.organizationId, m.org.id));
+    const { rows, truncated } = await buildHistoryRows(vehicles);
+    const safeSlug = m.org.slug.replace(/[^A-Za-z0-9_-]/g, "_");
+    const fname = `${safeSlug}-fleet-history`;
+    if (format === "csv") return sendHistoryCsv(res, rows, fname, truncated);
+    sendHistoryPdf(
+      res,
+      rows,
+      "Fleet Maintenance History",
+      `${m.org.name} · ${vehicles.length} vehicle${vehicles.length === 1 ? "" : "s"}`,
+      fname,
+      truncated,
+    );
+  };
+
+const fleetHistoryVehicleHandler = (format: "csv" | "pdf") =>
+  async (req: Request, res: Response): Promise<void> => {
+    const ctx = await requireOrgVehicle(
+      req,
+      res,
+      String(req.params.orgId),
+      String(req.params.vehicleId),
+    );
+    if (!ctx) return;
+    const v = ctx.vehicle;
+    const { rows, truncated } = await buildHistoryRows([
+      { id: v.id, brand: v.brand, model: v.model, year: v.year, plateNumber: v.plateNumber },
+    ]);
+    const safePlate = v.plateNumber.replace(/[^A-Za-z0-9_-]/g, "_");
+    const fname = `${safePlate}-history`;
+    if (format === "csv") return sendHistoryCsv(res, rows, fname, truncated);
+    sendHistoryPdf(
+      res,
+      rows,
+      "Vehicle Maintenance History",
+      `${v.year} ${v.brand} ${v.model} — Plate ${v.plateNumber}`,
+      fname,
+      truncated,
+    );
+  };
+
+router.get(
+  "/organizations/:orgId/maintenance-history.csv",
+  requireAuth,
+  fleetHistoryAllHandler("csv"),
+);
+router.get(
+  "/organizations/:orgId/maintenance-history.pdf",
+  requireAuth,
+  fleetHistoryAllHandler("pdf"),
+);
+router.get(
+  "/organizations/:orgId/vehicles/:vehicleId/maintenance-history.csv",
+  requireAuth,
+  fleetHistoryVehicleHandler("csv"),
+);
+router.get(
+  "/organizations/:orgId/vehicles/:vehicleId/maintenance-history.pdf",
+  requireAuth,
+  fleetHistoryVehicleHandler("pdf"),
 );
 
 export default router;

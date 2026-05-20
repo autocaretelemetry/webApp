@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Car, Plus, User } from "lucide-react";
+import { Car, Plus, User, FileText, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import { useFleetOrgId } from "@/lib/role";
 import {
@@ -28,6 +28,7 @@ import {
   useFleetMembers,
   useCreateFleetVehicle,
   useUpdateFleetVehicle,
+  downloadFleetHistory,
 } from "@/lib/fleet-api";
 
 const EMPTY_FORM = {
@@ -66,6 +67,15 @@ export default function FleetVehiclesPage() {
       toast.success("Vehicle added to fleet.");
       setForm(EMPTY_FORM);
       setOpen(false);
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  };
+
+  const exportHistory = async (vehicleId: string, plate: string, format: "csv" | "pdf") => {
+    if (!orgId) return;
+    try {
+      await downloadFleetHistory({ orgId, vehicleId, format, filename: `${plate}-history` });
     } catch (err) {
       toast.error((err as Error).message);
     }
@@ -209,22 +219,42 @@ export default function FleetVehiclesPage() {
                       </Badge>
                     </div>
                   </div>
-                  <Select
-                    value={v.assignedDriverPhone ?? "__unassigned"}
-                    onValueChange={(val) => reassign(v.id, val)}
-                  >
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="Assign" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__unassigned">— Unassign —</SelectItem>
-                      {drivers.map((d) => (
-                        <SelectItem key={d.phone} value={d.phone}>
-                          {d.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex flex-col gap-2 items-end">
+                    <Select
+                      value={v.assignedDriverPhone ?? "__unassigned"}
+                      onValueChange={(val) => reassign(v.id, val)}
+                    >
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="Assign" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__unassigned">— Unassign —</SelectItem>
+                        {drivers.map((d) => (
+                          <SelectItem key={d.phone} value={d.phone}>
+                            {d.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => exportHistory(v.id, v.plateNumber, "csv")}
+                        title="Download maintenance history as CSV"
+                      >
+                        <FileSpreadsheet className="h-3 w-3 mr-1" /> CSV
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => exportHistory(v.id, v.plateNumber, "pdf")}
+                        title="Download maintenance history as PDF"
+                      >
+                        <FileText className="h-3 w-3 mr-1" /> PDF
+                      </Button>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             );
