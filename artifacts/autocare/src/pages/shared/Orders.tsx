@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { useListOrders } from "@workspace/api-client-react";
+import { getListOrdersQueryKey } from "@/lib/queryKeys";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,12 +18,17 @@ export default function Orders() {
   const [filter, setFilter] = useState<(typeof STATUSES)[number]>("All");
   // Scope by buyer identity (no auth in MVP — buyerName is the de facto buyer id).
   // Admin and vendor both see every order; owner/center are scoped to their persona.
-  const isAdmin = role === "admin";
-  const buyerName =
-    role === "vendor" || isAdmin ? undefined : getBuyerProfile().name;
-  const { data: orders, isLoading } = useListOrders(
-    buyerName ? { buyerName } : undefined,
-  );
+  const isAdmin = role === "admin" || role === "super_admin";
+  // Admin sees every order; owner/center are scoped to their demo persona.
+  // The route guard already blocks every other role — but if anything else
+  // ever slips through, treat it as "no buyer identity" and short-circuit
+  // the query entirely so we never accidentally fetch the unfiltered list.
+  const buyerProfile = isAdmin ? null : getBuyerProfile();
+  const hasBuyerScope = isAdmin || !!buyerProfile;
+  const params = isAdmin ? undefined : { buyerName: buyerProfile?.name ?? "" };
+  const { data: orders, isLoading } = useListOrders(params, {
+    query: { enabled: hasBuyerScope, queryKey: getListOrdersQueryKey(params) },
+  });
 
   const filtered = useMemo(() => {
     if (!orders) return [];

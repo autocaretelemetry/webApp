@@ -146,6 +146,30 @@ const renterOnly = (c: ComponentType) => () => <RoleGuard allow={["renter"]} com
 const centerOnly = (c: ComponentType) => () => <RoleGuard allow={["center"]} component={c} />;
 const vendorOnly = (c: ComponentType) => () => <RoleGuard allow={["vendor"]} component={c} />;
 const buyersOnly = (c: ComponentType) => () => <RoleGuard allow={["owner", "center", "fleet"]} component={c} />;
+// Orders list: owner/center get their persona-scoped orders, admins see all.
+// Fleet/vendor/delivery each have a role-specific queue (`/fleet/orders`,
+// `/vendor/orders`, `/delivery/orders`) so we redirect them there instead
+// of showing the shared owner/center list. Renters have no order surface
+// at all and go home.
+function OrdersListRoute() {
+  const { role } = useRole();
+  if (role === "fleet") return <Redirect to="/fleet/orders" />;
+  if (role === "vendor") return <Redirect to="/vendor/orders" />;
+  if (role === "delivery") return <Redirect to="/delivery/orders" />;
+  if (role === "renter") return <Redirect to="/" />;
+  return <Orders />;
+}
+
+// Order detail: server-side scoping decides what each role is allowed to see
+// or do on a specific order (vendors fulfil, delivery agents update status,
+// owners/centers act as buyers, admins observe). Renters have no business
+// on this surface — they'd otherwise inherit the demo buyer identity if
+// they navigated by URL — so they get bounced home.
+function OrderDetailRoute() {
+  const { role } = useRole();
+  if (role === "renter") return <Redirect to="/" />;
+  return <OrderDetail />;
+}
 const deliveryOnly = (c: ComponentType) => () => <RoleGuard allow={["delivery"]} component={c} />;
 const fleetOnly = (c: ComponentType) => () => <RoleGuard allow={["fleet"]} component={c} />;
 const adminOnly = (c: ComponentType) => () => <RoleGuard allow={["admin", "super_admin"]} component={c} />;
@@ -232,8 +256,8 @@ function AppRouter() {
         <Route path="/marketplace/:id" component={PartDetail} />
         <Route path="/cart" component={buyersOnly(Cart)} />
         <Route path="/checkout" component={buyersOnly(Checkout)} />
-        <Route path="/orders" component={Orders} />
-        <Route path="/orders/:id" component={OrderDetail} />
+        <Route path="/orders" component={OrdersListRoute} />
+        <Route path="/orders/:id" component={OrderDetailRoute} />
 
         {/* Shared Routes */}
         <Route path="/bookings" component={Bookings} />

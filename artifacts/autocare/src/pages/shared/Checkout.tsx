@@ -30,21 +30,24 @@ export default function Checkout() {
   });
 
   const buyerKind: "owner" | "center" = isProposal ? "owner" : role === "center" ? "center" : "owner";
+  // getBuyerProfile() only returns a persona for owner/center; fleet has its
+  // own org-scoped flow further down, so empty strings are fine as defaults.
   const fallbackProfile = getBuyerProfile();
 
-  const [buyerName, setBuyerName] = useState(fallbackProfile.name);
-  const [buyerPhone, setBuyerPhone] = useState(fallbackProfile.phone);
-  const [shippingAddress, setShippingAddress] = useState(fallbackProfile.address);
+  const [buyerName, setBuyerName] = useState(fallbackProfile?.name ?? "");
+  const [buyerPhone, setBuyerPhone] = useState(fallbackProfile?.phone ?? "");
+  const [shippingAddress, setShippingAddress] = useState(fallbackProfile?.address ?? "");
   const [notes, setNotes] = useState("");
-  const [deliveryCity, setDeliveryCity] = useState(fallbackProfile.city);
-  const [deliveryRegion, setDeliveryRegion] = useState(fallbackProfile.region);
+  const [deliveryCity, setDeliveryCity] = useState(fallbackProfile?.city ?? "");
+  const [deliveryRegion, setDeliveryRegion] = useState(fallbackProfile?.region ?? "");
 
   // When the booking loads in proposal mode, prefill from owner + service center.
   useEffect(() => {
     if (isProposal && scopeBooking) {
-      // Owner contact comes from the vehicle owner; fall back to demo persona.
-      const ownerName = scopeBooking.vehicle?.ownerName ?? fallbackProfile.name;
-      const ownerPhone = scopeBooking.vehicle?.ownerPhone ?? fallbackProfile.phone;
+      // Owner contact comes from the vehicle owner; fall back to demo persona
+      // when available (owner/center roles only).
+      const ownerName = scopeBooking.vehicle?.ownerName ?? fallbackProfile?.name ?? "";
+      const ownerPhone = scopeBooking.vehicle?.ownerPhone ?? fallbackProfile?.phone ?? "";
       setBuyerName(ownerName);
       setBuyerPhone(ownerPhone);
       // Delivery goes to the service center where the mechanic works.
