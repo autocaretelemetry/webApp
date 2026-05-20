@@ -9,12 +9,13 @@ import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 
 const DEMO = [
-  { label: "Owner", email: "owner@autocare.test", password: "owner1234" },
+  { label: "Owner / Renter", email: "owner@autocare.test", password: "owner1234" },
   { label: "Service center", email: "center@autocare.test", password: "center1234" },
   { label: "Vendor", email: "vendor@autocare.test", password: "vendor1234" },
   { label: "Delivery", email: "delivery@autocare.test", password: "delivery1234" },
   { label: "Fleet admin", email: "fleet@autocare.test", password: "fleet1234" },
   { label: "Fleet finance", email: "finance@autocare.test", password: "finance1234" },
+  { label: "Fleet driver", email: "driver@autocare.test", password: "driver1234" },
   { label: "Admin", email: "admin@autocare.test", password: "admin1234" },
   { label: "Super admin", email: "superadmin@autocare.test", password: "super1234" },
 ];
