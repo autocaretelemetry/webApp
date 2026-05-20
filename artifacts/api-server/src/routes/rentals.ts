@@ -202,10 +202,17 @@ router.get("/renter-profiles", requireAdmin, async (req, res): Promise<void> => 
   );
 });
 
-router.post("/renter-profiles", async (req, res): Promise<void> => {
+router.post("/renter-profiles", requireAuth, async (req, res): Promise<void> => {
   const body = UpsertRenterProfileBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
+    return;
+  }
+  const role = req.user?.role;
+  const isAdmin = role === "admin" || role === "super_admin";
+  const callerPhone = (req.user?.phone ?? "").trim();
+  if (!isAdmin && body.data.phone.trim() !== callerPhone) {
+    res.status(403).json({ error: "You can only edit your own renter profile." });
     return;
   }
   const [existing] = await db
@@ -225,10 +232,17 @@ router.post("/renter-profiles", async (req, res): Promise<void> => {
   res.json(row);
 });
 
-router.get("/renter-profiles/by-phone/:phone", async (req, res): Promise<void> => {
+router.get("/renter-profiles/by-phone/:phone", requireAuth, async (req, res): Promise<void> => {
   const params = GetRenterProfileByPhoneParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const role = req.user?.role;
+  const isAdmin = role === "admin" || role === "super_admin";
+  const callerPhone = (req.user?.phone ?? "").trim();
+  if (!isAdmin && params.data.phone.trim() !== callerPhone) {
+    res.status(403).json({ error: "You can only view your own renter profile." });
     return;
   }
   const [row] = await db
@@ -242,7 +256,7 @@ router.get("/renter-profiles/by-phone/:phone", async (req, res): Promise<void> =
   res.json(row);
 });
 
-router.get("/renter-profiles/:renterId", async (req, res): Promise<void> => {
+router.get("/renter-profiles/:renterId", requireAuth, async (req, res): Promise<void> => {
   const params = GetRenterProfileParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -256,14 +270,29 @@ router.get("/renter-profiles/:renterId", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Renter profile not found" });
     return;
   }
+  const role = req.user?.role;
+  const isAdmin = role === "admin" || role === "super_admin";
+  const callerPhone = (req.user?.phone ?? "").trim();
+  if (!isAdmin && row.phone.trim() !== callerPhone) {
+    res.status(403).json({ error: "You can only view your own renter profile." });
+    return;
+  }
   res.json(row);
 });
 
-router.patch("/renter-profiles/:renterId", async (req, res): Promise<void> => {
+router.patch("/renter-profiles/:renterId", requireAuth, async (req, res): Promise<void> => {
   const params = UpdateRenterProfileParams.safeParse(req.params);
   const body = UpdateRenterProfileBody.safeParse(req.body);
   if (!params.success || !body.success) {
     res.status(400).json({ error: (params.error ?? body.error)?.message });
+    return;
+  }
+  const [target] = await db
+    .select()
+    .from(renterProfilesTable)
+    .where(eq(renterProfilesTable.id, params.data.renterId));
+  if (!target) {
+    res.status(404).json({ error: "Renter profile not found" });
     return;
   }
   // Only platform admins/super-admins may set kycStatus; reject with 403 so
@@ -271,6 +300,11 @@ router.patch("/renter-profiles/:renterId", async (req, res): Promise<void> => {
   const patch: Record<string, unknown> = { ...body.data, updatedAt: new Date() };
   const role = req.user?.role;
   const isAdmin = role === "admin" || role === "super_admin";
+  const callerPhone = (req.user?.phone ?? "").trim();
+  if (!isAdmin && target.phone.trim() !== callerPhone) {
+    res.status(403).json({ error: "You can only edit your own renter profile." });
+    return;
+  }
   if (patch.kycStatus !== undefined && !isAdmin) {
     res.status(403).json({ error: "Only admins may change KYC status" });
     return;
@@ -289,7 +323,7 @@ router.patch("/renter-profiles/:renterId", async (req, res): Promise<void> => {
 
 // ---------- Rental cars ----------
 
-router.get("/rental-cars", async (req, res): Promise<void> => {
+router.get("/rental-cars", requireAuth, async (req, res): Promise<void> => {
   const q = ListRentalCarsQueryParams.safeParse(req.query);
   if (!q.success) {
     res.status(400).json({ error: q.error.message });
@@ -366,7 +400,7 @@ router.get("/rental-cars/:carId/public", async (req, res): Promise<void> => {
   });
 });
 
-router.get("/rental-cars/:carId", async (req, res): Promise<void> => {
+router.get("/rental-cars/:carId", requireAuth, async (req, res): Promise<void> => {
   const params = GetRentalCarParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -384,10 +418,19 @@ router.get("/rental-cars/:carId", async (req, res): Promise<void> => {
   res.json(hydrated);
 });
 
-router.post("/rental-cars", async (req, res): Promise<void> => {
+router.post("/rental-cars", requireAuth, async (req, res): Promise<void> => {
   const body = CreateRentalCarBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
+    return;
+  }
+  // Non-admins can only list cars under their own phone — otherwise a renter
+  // could create a fake listing in another owner's name.
+  const role = req.user?.role;
+  const isAdmin = role === "admin" || role === "super_admin";
+  const callerPhone = (req.user?.phone ?? "").trim();
+  if (!isAdmin && body.data.ownerPhone.trim() !== callerPhone) {
+    res.status(403).json({ error: "You can only list cars under your own owner phone." });
     return;
   }
   // Public onboarding endpoint: every listing is treated as user-submitted
@@ -447,11 +490,26 @@ router.post("/rental-cars", async (req, res): Promise<void> => {
   res.status(201).json(hydrated);
 });
 
-router.patch("/rental-cars/:carId", async (req, res): Promise<void> => {
+router.patch("/rental-cars/:carId", requireAuth, async (req, res): Promise<void> => {
   const params = UpdateRentalCarParams.safeParse(req.params);
   const body = UpdateRentalCarBody.safeParse(req.body);
   if (!params.success || !body.success) {
     res.status(400).json({ error: (params.error ?? body.error)?.message });
+    return;
+  }
+  const [carRow] = await db
+    .select()
+    .from(rentalCarsTable)
+    .where(eq(rentalCarsTable.id, params.data.carId));
+  if (!carRow) {
+    res.status(404).json({ error: "Rental car not found" });
+    return;
+  }
+  const role = req.user?.role;
+  const isAdmin = role === "admin" || role === "super_admin";
+  const callerPhone = (req.user?.phone ?? "").trim();
+  if (!isAdmin && carRow.ownerPhone.trim() !== callerPhone) {
+    res.status(403).json({ error: "You don't own this rental car." });
     return;
   }
   // Enforce the cover/gallery invariant on updates too. A caller cannot
@@ -518,10 +576,25 @@ router.patch("/rental-cars/:carId", async (req, res): Promise<void> => {
   res.json(hydrated);
 });
 
-router.delete("/rental-cars/:carId", async (req, res): Promise<void> => {
+router.delete("/rental-cars/:carId", requireAuth, async (req, res): Promise<void> => {
   const params = DeleteRentalCarParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const [carRow] = await db
+    .select()
+    .from(rentalCarsTable)
+    .where(eq(rentalCarsTable.id, params.data.carId));
+  if (!carRow) {
+    res.status(404).json({ error: "Rental car not found" });
+    return;
+  }
+  const role = req.user?.role;
+  const isAdmin = role === "admin" || role === "super_admin";
+  const callerPhone = (req.user?.phone ?? "").trim();
+  if (!isAdmin && carRow.ownerPhone.trim() !== callerPhone) {
+    res.status(403).json({ error: "You don't own this rental car." });
     return;
   }
   const [activeRow] = await db
@@ -585,12 +658,39 @@ async function hydrateRentalBookings(rows: (typeof rentalBookingsTable.$inferSel
   });
 }
 
-router.get("/rental-bookings", async (req, res): Promise<void> => {
+router.get("/rental-bookings", requireAuth, async (req, res): Promise<void> => {
   const q = ListRentalBookingsQueryParams.safeParse(req.query);
   if (!q.success) {
     res.status(400).json({ error: q.error.message });
     return;
   }
+  const role = req.user?.role;
+  const isAdmin = role === "admin" || role === "super_admin";
+  const callerPhone = (req.user?.phone ?? "").trim();
+  // Non-admins cannot ask about anyone else's bookings. Any phone/id filter
+  // they pass must resolve back to themselves; otherwise we refuse rather
+  // than silently rewriting it so the client gets a clear signal.
+  if (!isAdmin) {
+    if (q.data.renterPhone && q.data.renterPhone.trim() !== callerPhone) {
+      res.status(403).json({ error: "You can only list your own rental bookings." });
+      return;
+    }
+    if (q.data.ownerPhone && q.data.ownerPhone.trim() !== callerPhone) {
+      res.status(403).json({ error: "You can only list rentals on cars you own." });
+      return;
+    }
+    if (q.data.renterId) {
+      const [rp] = await db
+        .select({ phone: renterProfilesTable.phone })
+        .from(renterProfilesTable)
+        .where(eq(renterProfilesTable.id, q.data.renterId));
+      if (!rp || rp.phone.trim() !== callerPhone) {
+        res.status(403).json({ error: "You can only list your own rental bookings." });
+        return;
+      }
+    }
+  }
+
   const filters = [];
   if (q.data.carId) filters.push(eq(rentalBookingsTable.carId, q.data.carId));
   if (q.data.renterPhone) filters.push(eq(rentalBookingsTable.renterPhone, q.data.renterPhone));
@@ -612,10 +712,25 @@ router.get("/rental-bookings", async (req, res): Promise<void> => {
     const carIdSet = new Set(myCars.map((c) => c.id));
     rows = rows.filter((r) => carIdSet.has(r.carId));
   }
+
+  // Safety net: if a non-admin reached this point without any identity
+  // filter (e.g. only filtered by status or carId), scope the result set to
+  // bookings that touch them as renter OR owner.
+  if (!isAdmin && !q.data.renterPhone && !q.data.renterId && !q.data.ownerPhone) {
+    const myCars = await db
+      .select({ id: rentalCarsTable.id })
+      .from(rentalCarsTable)
+      .where(eq(rentalCarsTable.ownerPhone, callerPhone));
+    const carIdSet = new Set(myCars.map((c) => c.id));
+    rows = rows.filter(
+      (r) => (r.renterPhone ?? "").trim() === callerPhone || carIdSet.has(r.carId),
+    );
+  }
+
   res.json(await hydrateRentalBookings(rows));
 });
 
-router.post("/rental-bookings", async (req, res): Promise<void> => {
+router.post("/rental-bookings", requireAuth, async (req, res): Promise<void> => {
   const body = CreateRentalBookingBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
@@ -642,6 +757,18 @@ router.post("/rental-bookings", async (req, res): Promise<void> => {
       error: "Renter profile not found. Please complete your profile before booking.",
     });
     return;
+  }
+  // The renter profile in the body must belong to the signed-in user.
+  // Without this gate any renter could book a car under another renter's
+  // identity and stick them with the contract.
+  {
+    const role = req.user?.role;
+    const isAdmin = role === "admin" || role === "super_admin";
+    const callerPhone = (req.user?.phone ?? "").trim();
+    if (!isAdmin && renter.phone.trim() !== callerPhone) {
+      res.status(403).json({ error: "You can only book under your own renter profile." });
+      return;
+    }
   }
   const purpose = body.data.purpose ?? "general";
   if (purpose === "loaner" && !body.data.serviceBookingId) {
@@ -749,19 +876,27 @@ const CANCELLABLE_FROM = new Set([
   "confirmed",
 ]);
 
-router.patch("/rental-bookings/:rentalBookingId", async (req, res): Promise<void> => {
+router.patch("/rental-bookings/:rentalBookingId", requireAuth, async (req, res): Promise<void> => {
   const params = UpdateRentalBookingParams.safeParse(req.params);
   const body = UpdateRentalBookingBody.safeParse(req.body);
   if (!params.success || !body.success) {
     res.status(400).json({ error: (params.error ?? body.error)?.message });
     return;
   }
+  const access = await authorizeBookingAccess(req, res, params.data.rentalBookingId);
+  if (!access) return;
   const [existing] = await db
     .select()
     .from(rentalBookingsTable)
     .where(eq(rentalBookingsTable.id, params.data.rentalBookingId));
   if (!existing) {
     res.status(404).json({ error: "Rental booking not found" });
+    return;
+  }
+  // Owner-only action: approving/rejecting the booking belongs to the owner
+  // (or platform admin). Renters can still sign, pay, cancel, etc.
+  if (body.data.ownerReview && access.relationship === "renter") {
+    res.status(403).json({ error: "Only the car owner can approve or reject this booking." });
     return;
   }
 
