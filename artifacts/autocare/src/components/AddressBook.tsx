@@ -31,7 +31,17 @@ import {
   type SavedAddress,
   type SavedAddressInput,
 } from "@/lib/addresses-api";
-import { GripVertical, Loader2, MapPin, Pencil, Plus, Star, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  GripVertical,
+  Loader2,
+  MapPin,
+  Pencil,
+  Plus,
+  Star,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 
 type FormState = SavedAddressInput;
@@ -79,6 +89,18 @@ export function AddressBook() {
       setLocalOrder(addresses ?? null);
       toast.error(err instanceof Error ? err.message : "Could not save new order.");
     }
+  };
+
+  const moveBy = async (id: string, delta: -1 | 1) => {
+    const current = displayList;
+    const fromIdx = current.findIndex((a) => a.id === id);
+    if (fromIdx < 0) return;
+    const toIdx = fromIdx + delta;
+    if (toIdx < 0 || toIdx >= current.length) return;
+    const next = current.slice();
+    const [moved] = next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, moved!);
+    await commitReorder(next);
   };
 
   const handleDrop = async (targetId: string) => {
@@ -188,11 +210,11 @@ export function AddressBook() {
           <div className="space-y-2">
             {displayList.length > 1 && (
               <p className="text-xs text-muted-foreground">
-                Drag the handle to set your preferred order. The default
-                still floats to the top.
+                Drag the handle or tap the up/down arrows to set your
+                preferred order. The default still floats to the top.
               </p>
             )}
-            {displayList.map((a) => (
+            {displayList.map((a, idx) => (
               <div
                 key={a.id}
                 onDragOver={(e) => {
@@ -212,23 +234,45 @@ export function AddressBook() {
                 } ${dragOverId === a.id && dragId !== a.id ? "border-primary bg-primary/5" : ""}`}
               >
                 {displayList.length > 1 && (
-                  <button
-                    type="button"
-                    aria-label={`Reorder ${a.label}`}
-                    draggable
-                    onDragStart={(e) => {
-                      setDragId(a.id);
-                      e.dataTransfer.effectAllowed = "move";
-                    }}
-                    onDragEnd={() => {
-                      setDragId(null);
-                      setDragOverId(null);
-                    }}
-                    className="shrink-0 mt-0.5 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing"
-                    title="Drag to reorder"
-                  >
-                    <GripVertical className="h-4 w-4" />
-                  </button>
+                  <div className="shrink-0 flex flex-col items-center gap-0.5">
+                    <button
+                      type="button"
+                      aria-label={`Move ${a.label} up`}
+                      onClick={() => moveBy(a.id, -1)}
+                      disabled={idx === 0 || reorder.isPending}
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed h-6 w-6 inline-flex items-center justify-center rounded touch-manipulation"
+                      title="Move up"
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Reorder ${a.label}`}
+                      draggable
+                      onDragStart={(e) => {
+                        setDragId(a.id);
+                        e.dataTransfer.effectAllowed = "move";
+                      }}
+                      onDragEnd={() => {
+                        setDragId(null);
+                        setDragOverId(null);
+                      }}
+                      className="hidden sm:inline-flex text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing h-5 w-6 items-center justify-center"
+                      title="Drag to reorder"
+                    >
+                      <GripVertical className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Move ${a.label} down`}
+                      onClick={() => moveBy(a.id, 1)}
+                      disabled={idx === displayList.length - 1 || reorder.isPending}
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed h-6 w-6 inline-flex items-center justify-center rounded touch-manipulation"
+                      title="Move down"
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </button>
+                  </div>
                 )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
