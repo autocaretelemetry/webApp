@@ -41,6 +41,7 @@ export type SavedAddress = {
   city: string;
   region: string;
   isDefault: boolean;
+  sortOrder: number | null;
   lastUsedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -54,6 +55,7 @@ export type SavedAddressInput = {
   city?: string;
   region?: string;
   isDefault?: boolean;
+  sortOrder?: number | null;
 };
 
 export const myAddressesKey = ["me", "addresses"] as const;
@@ -102,6 +104,23 @@ export function useDeleteAddress() {
       request<void>(`/me/addresses/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: myAddressesKey });
+    },
+  });
+}
+
+// Bulk manual reorder. The server treats the array as the new visible
+// order — index 0 becomes the buyer's top pick. Default still floats
+// above manually-sorted entries, matching the existing precedence.
+export function useReorderAddresses() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) =>
+      request<SavedAddress[]>("/me/addresses/reorder", {
+        method: "POST",
+        body: JSON.stringify({ ids }),
+      }),
+    onSuccess: (rows) => {
+      qc.setQueryData(myAddressesKey, rows);
     },
   });
 }

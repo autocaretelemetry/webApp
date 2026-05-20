@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, boolean, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, boolean, integer, timestamp, index } from "drizzle-orm/pg-core";
 import { usersTable } from "./users";
 
 /**
@@ -23,6 +23,9 @@ export const userAddressesTable = pgTable(
     city: text("city").notNull().default(""),
     region: text("region").notNull().default(""),
     isDefault: boolean("is_default").notNull().default(false),
+    // Buyer-controlled manual sort. Lower = earlier; null = unset (falls
+    // back to the default/recency rules in `listForUser`).
+    sortOrder: integer("sort_order"),
     lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

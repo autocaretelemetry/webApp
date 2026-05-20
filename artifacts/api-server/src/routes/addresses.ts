@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db, userAddressesTable, type UserAddress } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
@@ -23,7 +23,18 @@ const AddressBody = z.object({
   isDefault: z.boolean().optional(),
 });
 
-const AddressPatch = AddressBody.partial();
+// PATCH accepts the create fields plus an optional manual `sortOrder`
+// (or `null` to clear it and fall back to default/recency ordering).
+const AddressPatch = AddressBody.partial().extend({
+  sortOrder: z.number().int().nullable().optional(),
+});
+
+const ReorderBody = z.object({
+  // Ordered list of address ids — index 0 becomes sortOrder 0, etc.
+  // Ids the buyer doesn't own (or that don't exist) are rejected so
+  // we don't silently drop entries on cross-user pokes.
+  ids: z.array(z.string().uuid()).min(1).max(200),
+});
 
 type AddressDto = {
   id: string;
@@ -34,6 +45,7 @@ type AddressDto = {
   city: string;
   region: string;
   isDefault: boolean;
+  sortOrder: number | null;
   lastUsedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -49,14 +61,17 @@ function toDto(row: UserAddress): AddressDto {
     city: row.city,
     region: row.region,
     isDefault: row.isDefault,
+    sortOrder: row.sortOrder,
     lastUsedAt: row.lastUsedAt ? row.lastUsedAt.toISOString() : null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
 }
 
-// Sort: default first, then most-recently-used, then newest. The client
-// uses this order directly in the dropdown.
+// Sort: default first, then the buyer's manual sortOrder (asc, nulls
+// last so unsorted entries fall back to the existing recency rule),
+// then most-recently-used, then newest. The client uses this order
+// directly in the dropdown.
 function listForUser(userId: string) {
   return db
     .select()
@@ -64,6 +79,7 @@ function listForUser(userId: string) {
     .where(eq(userAddressesTable.userId, userId))
     .orderBy(
       desc(userAddressesTable.isDefault),
+      sql`${userAddressesTable.sortOrder} asc nulls last`,
       desc(sql`coalesce(${userAddressesTable.lastUsedAt}, ${userAddressesTable.createdAt})`),
       desc(userAddressesTable.createdAt),
     );
@@ -88,6 +104,63 @@ router.get("/me/addresses", requireAuth, async (req, res): Promise<void> => {
   const rows = await listForUser(req.user!.id);
   res.json(rows.map(toDto));
 });
+
+// Bulk manual reorder: index in `ids` becomes `sortOrder`. Any ids not
+// listed have their sortOrder cleared so they fall back to the
+// default/recency rules. Cross-user ids are rejected as 400 — we never
+// silently drop entries.
+router.post(
+  "/me/addresses/reorder",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    const parsed = ReorderBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+    const ids = parsed.data.ids;
+    const uniqueIds = Array.from(new Set(ids));
+    if (uniqueIds.length !== ids.length) {
+      res.status(400).json({ error: "Duplicate ids in reorder list." });
+      return;
+    }
+    const owned = await db
+      .select({ id: userAddressesTable.id })
+      .from(userAddressesTable)
+      .where(
+        and(
+          eq(userAddressesTable.userId, req.user!.id),
+          inArray(userAddressesTable.id, ids),
+        ),
+      );
+    if (owned.length !== ids.length) {
+      res.status(400).json({ error: "Unknown address id in reorder list." });
+      return;
+    }
+    await db.transaction(async (tx) => {
+      // Clear sortOrder on everything we own first so unlisted rows
+      // fall back to default/recency, and so we can reassign listed
+      // ones without colliding with stale values.
+      await tx
+        .update(userAddressesTable)
+        .set({ sortOrder: null, updatedAt: new Date() })
+        .where(eq(userAddressesTable.userId, req.user!.id));
+      for (let i = 0; i < ids.length; i++) {
+        await tx
+          .update(userAddressesTable)
+          .set({ sortOrder: i, updatedAt: new Date() })
+          .where(
+            and(
+              eq(userAddressesTable.id, ids[i]!),
+              eq(userAddressesTable.userId, req.user!.id),
+            ),
+          );
+      }
+    });
+    const rows = await listForUser(req.user!.id);
+    res.json(rows.map(toDto));
+  },
+);
 
 router.post("/me/addresses", requireAuth, async (req, res): Promise<void> => {
   const parsed = AddressBody.safeParse(req.body);
@@ -161,6 +234,8 @@ router.patch(
     if (parsed.data.city !== undefined) patch.city = parsed.data.city ?? "";
     if (parsed.data.region !== undefined)
       patch.region = parsed.data.region ?? "";
+    if (parsed.data.sortOrder !== undefined)
+      patch.sortOrder = parsed.data.sortOrder;
     const makingDefault = parsed.data.isDefault === true;
     const clearingDefault =
       parsed.data.isDefault === false && current.isDefault;

@@ -350,3 +350,89 @@ describe("Saved addresses — TOUCH bumps lastUsedAt and promotes default", () =
     expect(firstRow?.isDefault).toBe(false);
   });
 });
+
+describe("Saved addresses — manual reorder", () => {
+  it("rejects unknown / cross-user ids and persists the manual order", async () => {
+    await clearAddresses(userAId);
+    await clearAddresses(userBId);
+    const first = await request(app)
+      .post("/api/me/addresses")
+      .set("Cookie", cookieA)
+      .send({ ...SAMPLE, label: "Home" });
+    const second = await request(app)
+      .post("/api/me/addresses")
+      .set("Cookie", cookieA)
+      .send({ ...SAMPLE, label: "Garage", isDefault: false });
+    const third = await request(app)
+      .post("/api/me/addresses")
+      .set("Cookie", cookieA)
+      .send({ ...SAMPLE, label: "Workshop", isDefault: false });
+    const bRow = await request(app)
+      .post("/api/me/addresses")
+      .set("Cookie", cookieB)
+      .send({ ...SAMPLE, label: "B-home" });
+
+    // 401 when unauthenticated
+    const anon = await request(app)
+      .post("/api/me/addresses/reorder")
+      .send({ ids: [first.body.id] });
+    expect(anon.status).toBe(401);
+
+    // Reject other user's id
+    const crossUser = await request(app)
+      .post("/api/me/addresses/reorder")
+      .set("Cookie", cookieA)
+      .send({ ids: [first.body.id, bRow.body.id] });
+    expect(crossUser.status).toBe(400);
+
+    // Reject duplicates
+    const dupes = await request(app)
+      .post("/api/me/addresses/reorder")
+      .set("Cookie", cookieA)
+      .send({ ids: [first.body.id, first.body.id] });
+    expect(dupes.status).toBe(400);
+
+    // Manual order: Workshop, Garage, Home. But `first` is still default
+    // so it stays at index 0 in the listing (default outranks sortOrder).
+    const ok = await request(app)
+      .post("/api/me/addresses/reorder")
+      .set("Cookie", cookieA)
+      .send({ ids: [third.body.id, second.body.id, first.body.id] });
+    expect(ok.status).toBe(200);
+    expect(Array.isArray(ok.body)).toBe(true);
+    expect(ok.body.map((r: { label: string }) => r.label)).toEqual([
+      "Home",
+      "Workshop",
+      "Garage",
+    ]);
+
+    // Drop default from `first` and reorder again — manual order now wins.
+    await request(app)
+      .patch(`/api/me/addresses/${third.body.id}`)
+      .set("Cookie", cookieA)
+      .send({ isDefault: true });
+    const after = await request(app)
+      .post("/api/me/addresses/reorder")
+      .set("Cookie", cookieA)
+      .send({ ids: [second.body.id, first.body.id, third.body.id] });
+    expect(after.status).toBe(200);
+    // third is default → top, then manual order of the rest.
+    expect(after.body.map((r: { label: string }) => r.label)).toEqual([
+      "Workshop",
+      "Garage",
+      "Home",
+    ]);
+
+    // Subsequent reorder that omits an id clears its sortOrder so it
+    // falls back to default/recency below sorted entries.
+    const partial = await request(app)
+      .post("/api/me/addresses/reorder")
+      .set("Cookie", cookieA)
+      .send({ ids: [second.body.id] });
+    expect(partial.status).toBe(200);
+    const labels = partial.body.map((r: { label: string }) => r.label);
+    expect(labels[0]).toBe("Workshop"); // still default
+    expect(labels[1]).toBe("Garage"); // explicitly sorted to top of the rest
+    expect(labels[2]).toBe("Home"); // sortOrder cleared, falls back
+  });
+});

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,10 +27,11 @@ import {
   useCreateAddress,
   useUpdateAddress,
   useDeleteAddress,
+  useReorderAddresses,
   type SavedAddress,
   type SavedAddressInput,
 } from "@/lib/addresses-api";
-import { Loader2, MapPin, Pencil, Plus, Star, Trash2 } from "lucide-react";
+import { GripVertical, Loader2, MapPin, Pencil, Plus, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 type FormState = SavedAddressInput;
@@ -50,11 +51,51 @@ export function AddressBook() {
   const create = useCreateAddress();
   const update = useUpdateAddress();
   const del = useDeleteAddress();
+  const reorder = useReorderAddresses();
 
   const [editing, setEditing] = useState<SavedAddress | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY);
   const [confirmDelete, setConfirmDelete] = useState<SavedAddress | null>(null);
+  // Local mirror of the server order so we can show the dragged
+  // position instantly while the mutation is in flight. Re-syncs
+  // whenever the server list changes (create/edit/delete/touch).
+  const [localOrder, setLocalOrder] = useState<SavedAddress[] | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (addresses) setLocalOrder(addresses);
+  }, [addresses]);
+
+  const displayList = localOrder ?? addresses ?? [];
+
+  const commitReorder = async (next: SavedAddress[]) => {
+    setLocalOrder(next);
+    try {
+      await reorder.mutateAsync(next.map((a) => a.id));
+    } catch (err) {
+      // Roll back to the server's view on failure.
+      setLocalOrder(addresses ?? null);
+      toast.error(err instanceof Error ? err.message : "Could not save new order.");
+    }
+  };
+
+  const handleDrop = async (targetId: string) => {
+    const src = dragId;
+    setDragId(null);
+    setDragOverId(null);
+    if (!src || src === targetId) return;
+    const current = displayList;
+    const fromIdx = current.findIndex((a) => a.id === src);
+    const toIdx = current.findIndex((a) => a.id === targetId);
+    if (fromIdx < 0 || toIdx < 0) return;
+    const next = current.slice();
+    const [moved] = next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, moved!);
+    if (next.every((a, i) => a.id === current[i]?.id)) return;
+    await commitReorder(next);
+  };
 
   const openAdd = () => {
     setEditing(null);
@@ -139,17 +180,56 @@ export function AddressBook() {
           <div className="text-sm text-muted-foreground flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading…
           </div>
-        ) : !addresses || addresses.length === 0 ? (
+        ) : displayList.length === 0 ? (
           <div className="border border-dashed rounded-md p-4 text-sm text-muted-foreground text-center">
             No saved addresses yet.
           </div>
         ) : (
           <div className="space-y-2">
-            {addresses.map((a) => (
+            {displayList.length > 1 && (
+              <p className="text-xs text-muted-foreground">
+                Drag the handle to set your preferred order. The default
+                still floats to the top.
+              </p>
+            )}
+            {displayList.map((a) => (
               <div
                 key={a.id}
-                className="border rounded-md p-3 flex items-start justify-between gap-3"
+                onDragOver={(e) => {
+                  if (!dragId) return;
+                  e.preventDefault();
+                  if (dragOverId !== a.id) setDragOverId(a.id);
+                }}
+                onDragLeave={() => {
+                  if (dragOverId === a.id) setDragOverId(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  handleDrop(a.id);
+                }}
+                className={`border rounded-md p-3 flex items-start justify-between gap-2 transition-colors ${
+                  dragId === a.id ? "opacity-50" : ""
+                } ${dragOverId === a.id && dragId !== a.id ? "border-primary bg-primary/5" : ""}`}
               >
+                {displayList.length > 1 && (
+                  <button
+                    type="button"
+                    aria-label={`Reorder ${a.label}`}
+                    draggable
+                    onDragStart={(e) => {
+                      setDragId(a.id);
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    onDragEnd={() => {
+                      setDragId(null);
+                      setDragOverId(null);
+                    }}
+                    className="shrink-0 mt-0.5 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing"
+                    title="Drag to reorder"
+                  >
+                    <GripVertical className="h-4 w-4" />
+                  </button>
+                )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium text-sm">{a.label}</span>
