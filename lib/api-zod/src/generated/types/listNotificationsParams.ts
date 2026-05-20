@@ -7,7 +7,7 @@
  */
 
 export type ListNotificationsParams = {
-ownerPhone: string;
+ownerPhone?: string;
 unreadOnly?: boolean;
 limit?: number;
 };

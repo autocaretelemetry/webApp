@@ -1770,7 +1770,7 @@ paths:
       operationId: listNotifications
       tags: [notifications]
       parameters:
-        - { name: ownerPhone, in: query, required: true, schema: { type: string } }
+        - { name: ownerPhone, in: query, required: false, schema: { type: string } }
         - { name: unreadOnly, in: query, required: false, schema: { type: boolean } }
         - { name: limit, in: query, required: false, schema: { type: integer } }
       responses:
@@ -3904,7 +3904,6 @@ components:
 
     MarkAllNotificationsReadInput:
       type: object
-      required: [ownerPhone]
       properties:
         ownerPhone: { type: string }
 

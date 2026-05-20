@@ -2160,7 +2160,7 @@ export interface Notification {
 }
 
 export interface MarkAllNotificationsReadInput {
-  ownerPhone: string;
+  ownerPhone?: string;
 }
 
 export interface GenerateReminderNotificationsInput {
@@ -2361,7 +2361,7 @@ status?: string;
 };
 
 export type ListNotificationsParams = {
-ownerPhone: string;
+ownerPhone?: string;
 unreadOnly?: boolean;
 limit?: number;
 };

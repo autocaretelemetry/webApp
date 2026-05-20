@@ -7,5 +7,5 @@
  */
 
 export interface MarkAllNotificationsReadInput {
-  ownerPhone: string;
+  ownerPhone?: string;
 }

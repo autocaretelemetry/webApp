@@ -8275,7 +8275,7 @@ export const useUpdateServiceCenterSettings = <TError = ErrorType<unknown>,
       return useMutation(getUpdateServiceCenterSettingsMutationOptions(options));
     }
 
-export const getListNotificationsUrl = (params: ListNotificationsParams,) => {
+export const getListNotificationsUrl = (params?: ListNotificationsParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -8290,7 +8290,7 @@ export const getListNotificationsUrl = (params: ListNotificationsParams,) => {
   return stringifiedParams.length > 0 ? `/api/notifications?${stringifiedParams}` : `/api/notifications`
 }
 
-export const listNotifications = async (params: ListNotificationsParams, options?: RequestInit): Promise<Notification[]> => {
+export const listNotifications = async (params?: ListNotificationsParams, options?: RequestInit): Promise<Notification[]> => {
 
   return customFetch<Notification[]>(getListNotificationsUrl(params),
   {
@@ -8312,7 +8312,7 @@ export const getListNotificationsQueryKey = (params?: ListNotificationsParams,) 
     }
 
 
-export const getListNotificationsQueryOptions = <TData = Awaited<ReturnType<typeof listNotifications>>, TError = ErrorType<unknown>>(params: ListNotificationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listNotifications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListNotificationsQueryOptions = <TData = Awaited<ReturnType<typeof listNotifications>>, TError = ErrorType<unknown>>(params?: ListNotificationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listNotifications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -8336,7 +8336,7 @@ export type ListNotificationsQueryError = ErrorType<unknown>
 
 
 export function useListNotifications<TData = Awaited<ReturnType<typeof listNotifications>>, TError = ErrorType<unknown>>(
- params: ListNotificationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listNotifications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ListNotificationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listNotifications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 

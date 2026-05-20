@@ -3515,7 +3515,7 @@ export const UpdateServiceCenterSettingsResponse = zod.object({
 
 
 export const ListNotificationsQueryParams = zod.object({
-  "ownerPhone": zod.coerce.string(),
+  "ownerPhone": zod.coerce.string().optional(),
   "unreadOnly": zod.coerce.boolean().optional(),
   "limit": zod.coerce.number().optional()
 })
@@ -3554,7 +3554,7 @@ export const MarkNotificationReadResponse = zod.object({
 
 
 export const MarkAllNotificationsReadBody = zod.object({
-  "ownerPhone": zod.string()
+  "ownerPhone": zod.string().optional()
 })
 
 
