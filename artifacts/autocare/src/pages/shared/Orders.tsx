@@ -8,24 +8,26 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
 import { formatCurrency, formatRelative } from "@/lib/format";
-import { useRole, getBuyerProfile } from "@/lib/role";
+import { useRole } from "@/lib/role";
+import { useAuth } from "@/lib/auth";
 import { ShoppingBag } from "lucide-react";
 
 const STATUSES = ["All", "placed", "confirmed", "shipped", "delivered", "cancelled"] as const;
 
 export default function Orders() {
   const { role } = useRole();
+  const { user } = useAuth();
   const [filter, setFilter] = useState<(typeof STATUSES)[number]>("All");
-  // Scope by buyer identity (no auth in MVP — buyerName is the de facto buyer id).
-  // Admin and vendor both see every order; owner/center are scoped to their persona.
+  // Admin and vendor both see every order; owner/center are scoped to the
+  // signed-in user via the server-side `mine=true` filter (matches on the
+  // session phone, never on a display-name string). The route guard already
+  // blocks every other role — but if anything else ever slips through,
+  // treat it as "no buyer identity" and short-circuit the query so we never
+  // accidentally fetch the unfiltered list.
   const isAdmin = role === "admin" || role === "super_admin";
-  // Admin sees every order; owner/center are scoped to their demo persona.
-  // The route guard already blocks every other role — but if anything else
-  // ever slips through, treat it as "no buyer identity" and short-circuit
-  // the query entirely so we never accidentally fetch the unfiltered list.
-  const buyerProfile = isAdmin ? null : getBuyerProfile();
-  const hasBuyerScope = isAdmin || !!buyerProfile;
-  const params = isAdmin ? undefined : { buyerName: buyerProfile?.name ?? "" };
+  const isAdminOrVendor = isAdmin || role === "vendor";
+  const hasBuyerScope = isAdminOrVendor || !!user;
+  const params = isAdminOrVendor ? undefined : { mine: true };
   const { data: orders, isLoading } = useListOrders(params, {
     query: { enabled: hasBuyerScope, queryKey: getListOrdersQueryKey(params) },
   });

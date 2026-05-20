@@ -865,6 +865,11 @@ paths:
       parameters:
         - { name: vendorId, in: query, required: false, schema: { type: string } }
         - { name: buyerName, in: query, required: false, schema: { type: string } }
+        - name: mine
+          in: query
+          required: false
+          description: When true, restrict to orders placed by the authenticated user (matched by phone). Requires an authenticated session.
+          schema: { type: boolean }
         - { name: bookingId, in: query, required: false, schema: { type: string } }
         - { name: mechanicId, in: query, required: false, schema: { type: string } }
         - { name: deliveryAgentId, in: query, required: false, schema: { type: string } }

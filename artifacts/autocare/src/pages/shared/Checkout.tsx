@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useCart, clearCart, setCartScope } from "@/lib/cart";
-import { getBuyerProfile, useRole, useFleetOrgId } from "@/lib/role";
+import { useRole, useFleetOrgId } from "@/lib/role";
+import { useAuth } from "@/lib/auth";
 import { useCreateFleetPartsOrder, useMyFleetOrgs } from "@/lib/fleet-api";
 import { formatCurrency } from "@/lib/format";
 import { toast } from "sonner";
@@ -30,24 +31,34 @@ export default function Checkout() {
   });
 
   const buyerKind: "owner" | "center" = isProposal ? "owner" : role === "center" ? "center" : "owner";
-  // getBuyerProfile() only returns a persona for owner/center; fleet has its
-  // own org-scoped flow further down, so empty strings are fine as defaults.
-  const fallbackProfile = getBuyerProfile();
+  // Direct-buy prefill comes from the logged-in user (name + phone). We no
+  // longer use a hard-coded persona; address starts blank and the buyer
+  // fills it in. Proposal mode overrides these from the booking + center
+  // in the effect below. Fleet has its own org-scoped branch further down.
+  const { user } = useAuth();
 
-  const [buyerName, setBuyerName] = useState(fallbackProfile?.name ?? "");
-  const [buyerPhone, setBuyerPhone] = useState(fallbackProfile?.phone ?? "");
-  const [shippingAddress, setShippingAddress] = useState(fallbackProfile?.address ?? "");
+  const [buyerName, setBuyerName] = useState(user?.name ?? "");
+  const [buyerPhone, setBuyerPhone] = useState(user?.phone ?? "");
+  const [shippingAddress, setShippingAddress] = useState("");
   const [notes, setNotes] = useState("");
-  const [deliveryCity, setDeliveryCity] = useState(fallbackProfile?.city ?? "");
-  const [deliveryRegion, setDeliveryRegion] = useState(fallbackProfile?.region ?? "");
+  const [deliveryCity, setDeliveryCity] = useState("");
+  const [deliveryRegion, setDeliveryRegion] = useState("");
+
+  // Auth resolves asynchronously — once the user lands, backfill any
+  // contact field the operator hasn't started editing yet.
+  useEffect(() => {
+    if (isProposal) return;
+    if (user?.name) setBuyerName((prev) => (prev ? prev : user.name));
+    if (user?.phone) setBuyerPhone((prev) => (prev ? prev : user.phone ?? ""));
+  }, [isProposal, user?.name, user?.phone]);
 
   // When the booking loads in proposal mode, prefill from owner + service center.
   useEffect(() => {
     if (isProposal && scopeBooking) {
-      // Owner contact comes from the vehicle owner; fall back to demo persona
-      // when available (owner/center roles only).
-      const ownerName = scopeBooking.vehicle?.ownerName ?? fallbackProfile?.name ?? "";
-      const ownerPhone = scopeBooking.vehicle?.ownerPhone ?? fallbackProfile?.phone ?? "";
+      // Owner contact comes from the vehicle owner; fall back to the
+      // logged-in user (e.g. when the owner field is empty for some reason).
+      const ownerName = scopeBooking.vehicle?.ownerName ?? user?.name ?? "";
+      const ownerPhone = scopeBooking.vehicle?.ownerPhone ?? user?.phone ?? "";
       setBuyerName(ownerName);
       setBuyerPhone(ownerPhone);
       // Delivery goes to the service center where the mechanic works.

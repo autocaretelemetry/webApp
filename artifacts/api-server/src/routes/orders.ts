@@ -108,9 +108,27 @@ router.get("/orders", async (req, res): Promise<void> => {
     res.status(400).json({ error: q.error.message });
     return;
   }
+  // `mine=true` is the auth-scoped buyer filter — replaces the legacy
+  // `buyerName` string lookup so two real users with the same display name
+  // never see each other's orders. Identity comes from the session phone,
+  // never the request body.
+  if (q.data.mine) {
+    if (!req.user) {
+      res.status(401).json({ error: "Not authenticated" });
+      return;
+    }
+    if (!req.user.phone) {
+      // No phone on the account => no orders could have been placed under it.
+      res.json([]);
+      return;
+    }
+  }
   const conditions = [];
   if (q.data.vendorId) conditions.push(eq(ordersTable.vendorId, q.data.vendorId));
   if (q.data.buyerName) conditions.push(eq(ordersTable.buyerName, q.data.buyerName));
+  if (q.data.mine && req.user?.phone) {
+    conditions.push(eq(ordersTable.buyerPhone, req.user.phone));
+  }
   if (q.data.bookingId) conditions.push(eq(ordersTable.bookingId, q.data.bookingId));
   if (q.data.mechanicId) conditions.push(eq(ordersTable.mechanicId, q.data.mechanicId));
   if (q.data.deliveryAgentId)

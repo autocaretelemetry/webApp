@@ -2254,6 +2254,10 @@ search?: string;
 export type ListOrdersParams = {
 vendorId?: string;
 buyerName?: string;
+/**
+ * When true, restrict to orders placed by the authenticated user (matched by phone). Requires an authenticated session.
+ */
+mine?: boolean;
 bookingId?: string;
 mechanicId?: string;
 deliveryAgentId?: string;

@@ -1569,6 +1569,7 @@ export const ListPartCategoriesResponse = zod.array(ListPartCategoriesResponseIt
 export const ListOrdersQueryParams = zod.object({
   "vendorId": zod.coerce.string().optional(),
   "buyerName": zod.coerce.string().optional(),
+  "mine": zod.coerce.boolean().optional().describe('When true, restrict to orders placed by the authenticated user (matched by phone). Requires an authenticated session.'),
   "bookingId": zod.coerce.string().optional(),
   "mechanicId": zod.coerce.string().optional(),
   "deliveryAgentId": zod.coerce.string().optional(),

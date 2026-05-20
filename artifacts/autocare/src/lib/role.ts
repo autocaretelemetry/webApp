@@ -79,45 +79,6 @@ export function useRole() {
   return { role, setRole: changeRole };
 }
 
-export type BuyerProfile = {
-  buyerKind: "owner" | "center";
-  name: string;
-  phone: string;
-  address: string;
-  city: string;
-  region: string;
-};
-
-// Marcus Hale / Apex Auto Works represent the demo personas for the two
-// marketplace buyer roles (owner + center). Every other role — renter,
-// vendor, delivery, fleet, admin, super_admin — gets `null` so we never
-// silently hand them owner-scoped order data via a hard-coded persona.
-// Callers MUST handle the null case (e.g. with a role guard upstream).
-export function getBuyerProfile(): BuyerProfile | null {
-  const role = getRole();
-  if (role === "center") {
-    return {
-      buyerKind: "center",
-      name: "Apex Auto Works",
-      phone: "+234 805 410 9920",
-      address: "24 Old Aba Road, Port Harcourt",
-      city: "Port Harcourt",
-      region: "Rivers",
-    };
-  }
-  if (role === "owner") {
-    return {
-      buyerKind: "owner",
-      name: "Marcus Hale",
-      phone: "+234 802 201 1932",
-      address: "412 Birchwood Avenue, Ikoyi, Lagos",
-      city: "Lagos",
-      region: "Lagos",
-    };
-  }
-  return null;
-}
-
 export function getDeliveryAgentId(): string | null {
   return localStorage.getItem(DELIVERY_AGENT_ID_KEY);
 }
