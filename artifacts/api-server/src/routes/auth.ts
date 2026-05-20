@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, approvalEventsTable } from "@workspace/db";
 import {
   LoginBody,
   SignupBody,
@@ -123,6 +123,15 @@ router.post("/auth/signup", async (req, res): Promise<void> => {
   if (!row) {
     res.status(500).json({ error: "Could not create account" });
     return;
+  }
+  if (isApplication) {
+    await db.insert(approvalEventsTable).values({
+      userId: row.id,
+      action: "applied",
+      actorUserId: row.id,
+      actorName: row.name,
+      note: `Applied as ${requestedRole}.`,
+    });
   }
   // Only the legacy auto-approved path issues a cookie. Applications get
   // returned without a session so the client can show "pending" UX.

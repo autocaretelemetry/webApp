@@ -17,7 +17,54 @@ import {
   TabsContent,
 } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { CheckCircle2, XCircle, FileText, Clock } from "lucide-react";
+import {
+  CheckCircle2,
+  XCircle,
+  FileText,
+  Clock,
+  History,
+  StickyNote,
+  Send,
+  Loader2,
+} from "lucide-react";
+
+type ApprovalEvent = {
+  id: string;
+  userId: string;
+  actorUserId: string | null;
+  actorName: string | null;
+  action:
+    | "applied"
+    | "approved"
+    | "rejected"
+    | "kyc_submitted"
+    | "kyc_verified"
+    | "kyc_rejected"
+    | "note";
+  note: string | null;
+  internal: boolean;
+  createdAt: string;
+};
+
+const ACTION_LABEL: Record<ApprovalEvent["action"], string> = {
+  applied: "Applied",
+  approved: "Approved",
+  rejected: "Rejected",
+  kyc_submitted: "KYC submitted",
+  kyc_verified: "KYC verified",
+  kyc_rejected: "KYC rejected",
+  note: "Internal note",
+};
+
+const ACTION_TONE: Record<ApprovalEvent["action"], string> = {
+  applied: "bg-muted text-muted-foreground",
+  approved: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  rejected: "bg-destructive/15 text-destructive",
+  kyc_submitted: "bg-muted text-muted-foreground",
+  kyc_verified: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  kyc_rejected: "bg-destructive/15 text-destructive",
+  note: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+};
 
 type AuthedUserRow = {
   id: string;
@@ -73,6 +120,7 @@ function ApprovalsList({ kind }: { kind: "applications" | "kyc" | "rejected" }) 
   const [busy, setBusy] = useState<string | null>(null);
   const [rejectFor, setRejectFor] = useState<AuthedUserRow | null>(null);
   const [reason, setReason] = useState("");
+  const [historyFor, setHistoryFor] = useState<AuthedUserRow | null>(null);
 
   const state = kind === "kyc" ? "kyc_pending" : kind === "rejected" ? "rejected" : "pending";
 
@@ -155,25 +203,34 @@ function ApprovalsList({ kind }: { kind: "applications" | "kyc" | "rejected" }) 
                   <Clock className="h-3 w-3" /> {new Date(row.createdAt).toLocaleString()}
                 </div>
               </div>
-              {kind !== "rejected" && (
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => decide(row, kind === "kyc" ? "verify" : "approve")}
-                    disabled={busy === row.id}
-                  >
-                    <CheckCircle2 className="h-4 w-4 mr-1" /> {kind === "kyc" ? "Verify" : "Approve"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => setRejectFor(row)}
-                    disabled={busy === row.id}
-                  >
-                    <XCircle className="h-4 w-4 mr-1" /> Reject
-                  </Button>
-                </div>
-              )}
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setHistoryFor(row)}
+                >
+                  <History className="h-4 w-4 mr-1" /> History
+                </Button>
+                {kind !== "rejected" && (
+                  <>
+                    <Button
+                      size="sm"
+                      onClick={() => decide(row, kind === "kyc" ? "verify" : "approve")}
+                      disabled={busy === row.id}
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-1" /> {kind === "kyc" ? "Verify" : "Approve"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => setRejectFor(row)}
+                      disabled={busy === row.id}
+                    >
+                      <XCircle className="h-4 w-4 mr-1" /> Reject
+                    </Button>
+                  </>
+                )}
+              </div>
             </div>
 
             {kind !== "kyc" && row.applicantData && Object.keys(row.applicantData).length > 0 && (
@@ -215,6 +272,11 @@ function ApprovalsList({ kind }: { kind: "applications" | "kyc" | "rejected" }) 
         </Card>
       ))}
 
+      <HistoryDialog
+        applicant={historyFor}
+        onClose={() => setHistoryFor(null)}
+      />
+
       <Dialog open={!!rejectFor} onOpenChange={(o) => !o && setRejectFor(null)}>
         <DialogContent>
           <DialogHeader>
@@ -239,5 +301,148 @@ function ApprovalsList({ kind }: { kind: "applications" | "kyc" | "rejected" }) 
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function HistoryDialog({
+  applicant,
+  onClose,
+}: {
+  applicant: AuthedUserRow | null;
+  onClose: () => void;
+}) {
+  const [events, setEvents] = useState<ApprovalEvent[] | null>(null);
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!applicant) {
+      setEvents(null);
+      setNote("");
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/admin/approvals/${applicant.id}/events`, {
+          credentials: "include",
+        });
+        if (!res.ok) throw new Error("Failed to load history");
+        const data = (await res.json()) as ApprovalEvent[];
+        if (!cancelled) setEvents(data);
+      } catch (err) {
+        if (!cancelled) {
+          toast.error(err instanceof Error ? err.message : "Failed to load history");
+          setEvents([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [applicant]);
+
+  async function addNote() {
+    if (!applicant || !note.trim()) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/admin/approvals/${applicant.id}/notes`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ note: note.trim() }),
+      });
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({ error: "Failed" }));
+        throw new Error(b.error ?? "Failed");
+      }
+      const added = (await res.json()) as ApprovalEvent;
+      setEvents((prev) => (prev ? [...prev, added] : [added]));
+      setNote("");
+      toast.success("Note added.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={!!applicant} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>
+            History · {applicant?.name}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="max-h-80 overflow-y-auto space-y-3 pr-1">
+            {events === null && (
+              <div className="text-sm text-muted-foreground inline-flex items-center gap-2">
+                <Loader2 className="h-3 w-3 animate-spin" /> Loading history…
+              </div>
+            )}
+            {events && events.length === 0 && (
+              <div className="text-sm text-muted-foreground">
+                No events recorded yet.
+              </div>
+            )}
+            {events?.map((ev) => (
+              <div
+                key={ev.id}
+                className="flex gap-3 text-sm border-l-2 border-muted pl-3"
+              >
+                <div className="space-y-1 flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span
+                      className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded ${ACTION_TONE[ev.action]}`}
+                    >
+                      {ACTION_LABEL[ev.action]}
+                    </span>
+                    {ev.internal && (
+                      <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground inline-flex items-center gap-1">
+                        <StickyNote className="h-3 w-3" /> internal
+                      </span>
+                    )}
+                    <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
+                      <Clock className="h-3 w-3" /> {new Date(ev.createdAt).toLocaleString()}
+                    </span>
+                  </div>
+                  {ev.note && (
+                    <div className="text-sm whitespace-pre-wrap break-words">
+                      {ev.note}
+                    </div>
+                  )}
+                  <div className="text-[11px] text-muted-foreground">
+                    by {ev.actorName ?? "system"}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="space-y-2 border-t pt-3">
+            <div className="text-xs font-medium text-muted-foreground inline-flex items-center gap-1">
+              <StickyNote className="h-3 w-3" /> Add an internal note
+            </div>
+            <Textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={3}
+              placeholder="Only visible to staff on this audit trail…"
+            />
+            <div className="flex justify-end">
+              <Button size="sm" onClick={addNote} disabled={!note.trim() || saving}>
+                {saving ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4 mr-1" />
+                )}
+                Save note
+              </Button>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

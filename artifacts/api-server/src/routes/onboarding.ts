@@ -10,6 +10,8 @@ import {
   organizationsTable,
   organizationMembersTable,
   renterProfilesTable,
+  approvalEventsTable,
+  type ApprovalEventAction,
   type KycDocument,
 } from "@workspace/db";
 import { requireAuth, requireSuperAdmin } from "../lib/auth";
@@ -28,6 +30,29 @@ function fireEmail(to: string | null | undefined, msg: Omit<EmailMessage, "to">)
   sendEmail({ to, ...msg }).catch((err) =>
     logger.warn({ err, to }, "onboarding email send threw"),
   );
+}
+
+type EventTx = Tx | typeof db;
+
+async function recordEvent(
+  executor: EventTx,
+  args: {
+    userId: string;
+    action: ApprovalEventAction;
+    actorUserId?: string | null;
+    actorName?: string | null;
+    note?: string | null;
+    internal?: boolean;
+  },
+): Promise<void> {
+  await executor.insert(approvalEventsTable).values({
+    userId: args.userId,
+    action: args.action,
+    actorUserId: args.actorUserId ?? null,
+    actorName: args.actorName ?? null,
+    note: args.note?.trim() || null,
+    internal: args.internal ?? false,
+  });
 }
 
 const router: IRouter = Router();
@@ -116,6 +141,12 @@ router.post("/me/kyc", requireAuth, async (req, res): Promise<void> => {
     res.status(404).json({ error: "User not found" });
     return;
   }
+  await recordEvent(db, {
+    userId: row.id,
+    action: "kyc_submitted",
+    actorUserId: row.id,
+    actorName: row.name,
+  });
   const { passwordHash: _ph, ...safe } = row;
   res.json(safe);
 });
@@ -194,6 +225,13 @@ router.patch(
         })
         .where(eq(usersTable.id, userId))
         .returning();
+      await recordEvent(db, {
+        userId,
+        action: "rejected",
+        actorUserId: req.user!.id,
+        actorName: req.user!.name,
+        note: parsed.data.note ?? null,
+      });
       const { passwordHash: _ph, ...safe } = row!;
       fireEmail(
         row!.email,
@@ -230,6 +268,13 @@ router.patch(
           .where(eq(usersTable.id, userId))
           .returning();
         updated = row;
+        await recordEvent(tx, {
+          userId,
+          action: "approved",
+          actorUserId: req.user!.id,
+          actorName: req.user!.name,
+          note: parsed.data.note ?? null,
+        });
       });
     } catch (err) {
       if (err instanceof Error && err.message === "already_decided") {
@@ -279,6 +324,13 @@ router.patch(
       })
       .where(eq(usersTable.id, userId))
       .returning();
+    await recordEvent(db, {
+      userId,
+      action: parsed.data.decision === "verify" ? "kyc_verified" : "kyc_rejected",
+      actorUserId: req.user!.id,
+      actorName: req.user!.name,
+      note: parsed.data.note ?? null,
+    });
     const { passwordHash: _ph, ...safe } = row!;
     fireEmail(
       row!.email,
@@ -287,6 +339,69 @@ router.patch(
         : kycRejectedEmail(row!.name, row!.kycNote),
     );
     res.json(safe);
+  },
+);
+
+/**
+ * GET /admin/approvals/:userId/events — full chronological audit trail for an
+ * applicant. Returns both the public state transitions and any internal-only
+ * notes left by staff.
+ */
+router.get(
+  "/admin/approvals/:userId/events",
+  requireSuperAdmin,
+  async (req, res): Promise<void> => {
+    const userId = String(req.params["userId"]);
+    const rows = await db
+      .select()
+      .from(approvalEventsTable)
+      .where(eq(approvalEventsTable.userId, userId))
+      .orderBy(approvalEventsTable.createdAt);
+    res.json(rows);
+  },
+);
+
+const InternalNoteBody = z.object({
+  note: z.string().trim().min(1),
+});
+
+/**
+ * POST /admin/approvals/:userId/notes — staff leave an internal-only note on
+ * an applicant's audit trail. Not surfaced to the applicant.
+ */
+router.post(
+  "/admin/approvals/:userId/notes",
+  requireSuperAdmin,
+  async (req, res): Promise<void> => {
+    const parsed = InternalNoteBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+    const userId = String(req.params["userId"]);
+    const [target] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId));
+    if (!target) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    await recordEvent(db, {
+      userId,
+      action: "note",
+      actorUserId: req.user!.id,
+      actorName: req.user!.name,
+      note: parsed.data.note,
+      internal: true,
+    });
+    const [row] = await db
+      .select()
+      .from(approvalEventsTable)
+      .where(eq(approvalEventsTable.userId, userId))
+      .orderBy(desc(approvalEventsTable.createdAt))
+      .limit(1);
+    res.status(201).json(row);
   },
 );
 

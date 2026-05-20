@@ -26,3 +26,4 @@ export * from "./landingContent";
 export * from "./organizations";
 export * from "./fleetTracking";
 export * from "./fleetPartsOrders";
+export * from "./approvalEvents";
