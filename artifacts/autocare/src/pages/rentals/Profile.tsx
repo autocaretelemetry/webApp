@@ -129,10 +129,9 @@ export default function RenterProfilePage() {
     }
   };
 
-  const kycDone =
-    form.driverLicenseNumber.trim() &&
-    form.driverLicenseUrl.trim() &&
-    form.idDocumentUrl.trim();
+  // KYC minimum: only a government ID is mandatory. Driver's licence is
+  // optional because some renters will only book "with-driver" listings.
+  const kycDone = !!form.idDocumentUrl.trim();
 
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-500">
@@ -187,9 +186,6 @@ export default function RenterProfilePage() {
               Upload clear photos of your documents. JPG or PNG, up to 10 MB each. Owners review these before approving your booking.
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Driver's licence number" required>
-                <Input value={form.driverLicenseNumber} onChange={(e) => update("driverLicenseNumber", e.target.value)} placeholder="LAG-DL-…" />
-              </Field>
               <Field label="ID document type">
                 <Select value={form.idDocumentType} onValueChange={(v) => update("idDocumentType", v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -200,20 +196,26 @@ export default function RenterProfilePage() {
                   </SelectContent>
                 </Select>
               </Field>
+              <Field label="Driver's licence number (optional)">
+                <Input value={form.driverLicenseNumber} onChange={(e) => update("driverLicenseNumber", e.target.value)} placeholder="LAG-DL-…" />
+              </Field>
             </div>
+            <p className="text-xs text-muted-foreground">
+              A driver's licence is only required if you plan to self-drive. If
+              you'll always rent with a driver, you can skip the licence fields.
+            </p>
 
             <div className="grid gap-4 sm:grid-cols-3">
               <UploadField
-                label="Driver's licence photo"
-                required
-                url={form.driverLicenseUrl}
-                onChange={(url) => update("driverLicenseUrl", url)}
-              />
-              <UploadField
-                label="ID document photo"
+                label="Government ID photo"
                 required
                 url={form.idDocumentUrl}
                 onChange={(url) => update("idDocumentUrl", url)}
+              />
+              <UploadField
+                label="Driver's licence photo (optional)"
+                url={form.driverLicenseUrl}
+                onChange={(url) => update("driverLicenseUrl", url)}
               />
               <UploadField
                 label="Selfie (optional)"
@@ -227,7 +229,8 @@ export default function RenterProfilePage() {
         {!kycDone && (
           <p className="text-xs text-muted-foreground flex items-center gap-1.5">
             <CheckCircle2 className="h-3.5 w-3.5" />
-            Add your licence number, licence photo and ID photo to start booking rentals.
+            Add a clear photo of your government ID to start booking rentals.
+            Upload your licence too if you want to self-drive.
           </p>
         )}
 
@@ -335,14 +338,31 @@ function UploadField({
   );
 }
 
+/**
+ * Minimum KYC for booking any rental: a government ID is always required.
+ * For "self_drive" bookings we additionally require a licence number AND a
+ * licence photo — see `isProfileReadyForMode`.
+ */
 export function isProfileReadyForBooking(p: {
-  driverLicenseNumber?: string | null;
-  driverLicenseUrl?: string | null;
   idDocumentUrl?: string | null;
 }): boolean {
-  return Boolean(
-    p.driverLicenseNumber?.trim() &&
-      p.driverLicenseUrl?.trim() &&
-      p.idDocumentUrl?.trim(),
-  );
+  return Boolean(p.idDocumentUrl?.trim());
+}
+
+/**
+ * KYC required for a specific rental mode. `with_driver` only needs the base
+ * KYC (gov ID); `self_drive` also needs the licence number and a licence
+ * photo so the owner can verify the renter is allowed to drive.
+ */
+export function isProfileReadyForMode(
+  p: {
+    driverLicenseNumber?: string | null;
+    driverLicenseUrl?: string | null;
+    idDocumentUrl?: string | null;
+  },
+  mode: "self_drive" | "with_driver",
+): boolean {
+  if (!isProfileReadyForBooking(p)) return false;
+  if (mode === "with_driver") return true;
+  return Boolean(p.driverLicenseNumber?.trim() && p.driverLicenseUrl?.trim());
 }

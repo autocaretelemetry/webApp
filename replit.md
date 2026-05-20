@@ -26,6 +26,8 @@ Connected automotive service platform that pairs vehicle owners with service cen
 - `lib/api-spec/openapi.yaml` — single source of truth for the API contract
 - `lib/api-client-react/src/generated/` — generated hooks (`useGetBooking`, `getGetBookingQueryKey`, etc.) and Zod schemas
 - `lib/db/src/schema.ts` — Drizzle schema for vehicles, service_centers, mechanics, bookings, booking_events, invoices
+- `lib/db/src/schema/drivers.ts` — chauffeur profiles attached to with-driver listings (scoped by ownerPhone)
+- `artifacts/autocare/src/pages/rentals/Drivers.tsx` — owner-facing driver CRUD
 - `lib/db/src/seed.ts` — demo data (3 centers, 5 mechanics, 2 vehicles, 5 bookings, 3 invoices)
 - `artifacts/api-server/src/routes/` — Express route handlers per resource
 - `artifacts/autocare/src/index.css` — warm-industrial theme tokens (orange primary, teal secondary, concrete-beige background)
@@ -39,6 +41,8 @@ Connected automotive service platform that pairs vehicle owners with service cen
 - Contract-first: every API change goes OpenAPI → codegen → server route + client hook. Server handlers consume the same generated Zod schemas, so request/response types cannot drift from the contract.
 - Booking lifecycle is one finite-state machine guarded server-side (`requested → accepted → in_progress → awaiting_approval → approved → completed`, with `cancelled`/`rejected` terminal branches); UI surfaces only the actions legal for the current state and role.
 - Generated React Query hooks require an explicit `queryKey` when `enabled` is conditional — always pair `{ enabled, queryKey: getXQueryKey(id) }`. Invalidate via the same `getXQueryKey` helper after mutations.
+- A rental car carries `rentalModes: ('self_drive' | 'with_driver')[]` (at least one). Any listing that includes `with_driver` MUST have a valid `driverId` belonging to the same `ownerPhone`; the server validates and the UI prevents otherwise. Dropping `with_driver` on update nulls `driverId` automatically. With-driver bookings use `withDriverDailyRate` (falling back to `dailyRate` when unset).
+- Renter KYC minimum is a government ID photo; the driver's licence is optional for everyone. Use `isProfileReadyForBooking` for the base gate and `isProfileReadyForMode(profile, mode)` to require licence info only for self-drive bookings.
 
 ## Product
 

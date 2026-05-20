@@ -6,6 +6,7 @@ import {
   rentalBookingsTable,
   renterProfilesTable,
   bookingsTable,
+  driversTable,
 } from "@workspace/db";
 import {
   ListRentalCarsQueryParams,
@@ -42,6 +43,43 @@ function dayDiff(start: Date, end: Date): number {
 
 function fmtDate(d: Date): string {
   return d.toISOString().slice(0, 10);
+}
+
+const RENTAL_MODE_VALUES = ["self_drive", "with_driver"] as const;
+type RentalMode = (typeof RENTAL_MODE_VALUES)[number];
+
+/**
+ * Normalize an incoming rentalModes array: dedupe, drop unknowns, default to
+ * ['self_drive'] when empty. Returns null when the input contains only
+ * invalid values so callers can reject with 400.
+ */
+function normalizeRentalModes(input: string[] | undefined | null): RentalMode[] | null {
+  if (!input || input.length === 0) return ["self_drive"];
+  const allowed = new Set<RentalMode>(RENTAL_MODE_VALUES);
+  const out: RentalMode[] = [];
+  for (const v of input) {
+    if (allowed.has(v as RentalMode) && !out.includes(v as RentalMode)) {
+      out.push(v as RentalMode);
+    }
+  }
+  return out.length === 0 ? null : out;
+}
+
+/**
+ * Attach driver objects to a list of cars in one query. Cars without a
+ * driverId keep `driver: null`.
+ */
+async function hydrateCarsWithDriver<T extends { driverId: string | null }>(
+  rows: T[],
+): Promise<(T & { driver: typeof driversTable.$inferSelect | null })[]> {
+  const ids = [...new Set(rows.map((r) => r.driverId).filter((x): x is string => !!x))];
+  if (ids.length === 0) return rows.map((r) => ({ ...r, driver: null }));
+  const drivers = await db
+    .select()
+    .from(driversTable)
+    .where(inArray(driversTable.id, ids));
+  const map = new Map(drivers.map((d) => [d.id, d]));
+  return rows.map((r) => ({ ...r, driver: r.driverId ? map.get(r.driverId) ?? null : null }));
 }
 
 function buildContractText(args: {
@@ -187,7 +225,7 @@ router.get("/rental-cars", async (req, res): Promise<void> => {
     .from(rentalCarsTable)
     .where(filters.length ? and(...filters) : undefined)
     .orderBy(desc(rentalCarsTable.createdAt));
-  res.json(rows);
+  res.json(await hydrateCarsWithDriver(rows));
 });
 
 router.get("/rental-cars/:carId/public", async (req, res): Promise<void> => {
@@ -207,6 +245,23 @@ router.get("/rental-cars/:carId/public", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Rental car not found" });
     return;
   }
+  // Public share view of the driver: keep only the fields a prospective
+  // renter needs to evaluate the chauffeur (name, photo, experience,
+  // languages, bio). Phone and licence number are PII and are withheld
+  // until a booking is created and the owner approves it.
+  const fullDriver = row.driverId
+    ? (await db.select().from(driversTable).where(eq(driversTable.id, row.driverId)))[0] ?? null
+    : null;
+  const driver = fullDriver
+    ? {
+        id: fullDriver.id,
+        name: fullDriver.name,
+        photoUrl: fullDriver.photoUrl,
+        yearsExperience: fullDriver.yearsExperience,
+        languages: fullDriver.languages ?? [],
+        bio: fullDriver.bio,
+      }
+    : null;
   res.json({
     id: row.id,
     ownerKind: row.ownerKind,
@@ -224,6 +279,9 @@ router.get("/rental-cars/:carId/public", async (req, res): Promise<void> => {
     description: row.description,
     imageUrl: row.imageUrl,
     imageUrls: row.imageUrls ?? [],
+    rentalModes: row.rentalModes ?? ["self_drive"],
+    withDriverDailyRate: row.withDriverDailyRate,
+    driver,
   });
 });
 
@@ -241,7 +299,8 @@ router.get("/rental-cars/:carId", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Rental car not found" });
     return;
   }
-  res.json(row);
+  const [hydrated] = await hydrateCarsWithDriver([row]);
+  res.json(hydrated);
 });
 
 router.post("/rental-cars", async (req, res): Promise<void> => {
@@ -264,6 +323,32 @@ router.post("/rental-cars", async (req, res): Promise<void> => {
         ? [body.data.imageUrl]
         : [];
   const imageUrl = imageUrls[0];
+
+  // Rental modes: default to self_drive if omitted. If with_driver is
+  // selected, a driverId is required and must belong to this owner — we
+  // can't ship a listing that advertises a chauffeur with no profile.
+  const rentalModes = normalizeRentalModes(body.data.rentalModes ?? null);
+  if (!rentalModes) {
+    res.status(400).json({ error: "rentalModes must contain at least one of self_drive, with_driver." });
+    return;
+  }
+  let driverId: string | null = null;
+  if (rentalModes.includes("with_driver")) {
+    if (!body.data.driverId) {
+      res.status(400).json({ error: "Pick a driver profile before listing the car as with-driver." });
+      return;
+    }
+    const [drv] = await db
+      .select()
+      .from(driversTable)
+      .where(eq(driversTable.id, body.data.driverId));
+    if (!drv || drv.ownerPhone !== body.data.ownerPhone) {
+      res.status(400).json({ error: "Selected driver does not belong to you." });
+      return;
+    }
+    driverId = drv.id;
+  }
+
   const [row] = await db
     .insert(rentalCarsTable)
     .values({
@@ -272,9 +357,13 @@ router.post("/rental-cars", async (req, res): Promise<void> => {
       imageUrls,
       ownerKind: "user",
       status: "pending",
+      rentalModes,
+      withDriverDailyRate: body.data.withDriverDailyRate ?? null,
+      driverId,
     })
     .returning();
-  res.status(201).json(row);
+  const [hydrated] = await hydrateCarsWithDriver([row]);
+  res.status(201).json(hydrated);
 });
 
 router.patch("/rental-cars/:carId", async (req, res): Promise<void> => {
@@ -293,6 +382,48 @@ router.patch("/rental-cars/:carId", async (req, res): Promise<void> => {
   } else if (patch.imageUrl !== undefined) {
     patch.imageUrls = [patch.imageUrl];
   }
+
+  // If rentalModes or driverId is being updated, re-validate the invariant
+  // that with_driver listings always have a valid, owner-owned driver.
+  if (patch.rentalModes !== undefined || patch.driverId !== undefined) {
+    const [existing] = await db
+      .select()
+      .from(rentalCarsTable)
+      .where(eq(rentalCarsTable.id, params.data.carId));
+    if (!existing) {
+      res.status(404).json({ error: "Rental car not found" });
+      return;
+    }
+    const nextModes = normalizeRentalModes(
+      patch.rentalModes ?? existing.rentalModes,
+    );
+    if (!nextModes) {
+      res.status(400).json({ error: "rentalModes must contain at least one of self_drive, with_driver." });
+      return;
+    }
+    patch.rentalModes = nextModes;
+    const nextDriverId =
+      patch.driverId === undefined ? existing.driverId : patch.driverId;
+    if (nextModes.includes("with_driver")) {
+      if (!nextDriverId) {
+        res.status(400).json({ error: "Pick a driver profile before listing the car as with-driver." });
+        return;
+      }
+      const [drv] = await db
+        .select()
+        .from(driversTable)
+        .where(eq(driversTable.id, nextDriverId));
+      if (!drv || drv.ownerPhone !== existing.ownerPhone) {
+        res.status(400).json({ error: "Selected driver does not belong to you." });
+        return;
+      }
+    } else {
+      // Dropping with_driver — null out the driver link so the car page
+      // doesn't keep showing a profile that no longer applies.
+      patch.driverId = null;
+    }
+  }
+
   const [row] = await db
     .update(rentalCarsTable)
     .set(patch)
@@ -302,7 +433,8 @@ router.patch("/rental-cars/:carId", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Rental car not found" });
     return;
   }
-  res.json(row);
+  const [hydrated] = await hydrateCarsWithDriver([row]);
+  res.json(hydrated);
 });
 
 router.delete("/rental-cars/:carId", async (req, res): Promise<void> => {
@@ -479,8 +611,29 @@ router.post("/rental-bookings", async (req, res): Promise<void> => {
     });
     return;
   }
+  // Rental mode: validate against what the owner offers and pick the right
+  // per-day rate. With-driver uses withDriverDailyRate when set, otherwise
+  // falls back to the plain dailyRate.
+  const rentalMode: RentalMode = (body.data.rentalMode ?? "self_drive") as RentalMode;
+  const offered = (car.rentalModes ?? ["self_drive"]) as RentalMode[];
+  if (!offered.includes(rentalMode)) {
+    res.status(400).json({
+      error: `This car is not offered in "${rentalMode}" mode. Choose one of: ${offered.join(", ")}.`,
+    });
+    return;
+  }
+  if (rentalMode === "with_driver" && !car.driverId) {
+    res.status(400).json({
+      error: "Owner advertised this car with-driver but no driver profile is attached.",
+    });
+    return;
+  }
+  const effectiveDailyRate =
+    rentalMode === "with_driver" && car.withDriverDailyRate != null
+      ? car.withDriverDailyRate
+      : car.dailyRate;
   const days = dayDiff(start, end);
-  const total = days * car.dailyRate;
+  const total = days * effectiveDailyRate;
   const [row] = await db
     .insert(rentalBookingsTable)
     .values({
@@ -492,13 +645,14 @@ router.post("/rental-bookings", async (req, res): Promise<void> => {
       startDate: start,
       endDate: end,
       days,
-      dailyRate: car.dailyRate,
+      dailyRate: effectiveDailyRate,
       total,
       status: "pending_review",
       ownerReviewStatus: "pending",
       purpose,
       serviceBookingId: body.data.serviceBookingId ?? null,
       notes: body.data.notes,
+      rentalMode,
     })
     .returning();
   const [hydrated] = await hydrateRentalBookings([row]);

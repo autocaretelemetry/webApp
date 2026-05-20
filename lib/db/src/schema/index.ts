@@ -12,6 +12,7 @@ export * from "./vendorStaff";
 export * from "./centerStaff";
 export * from "./subscriptionPlans";
 export * from "./subscriptions";
+export * from "./drivers";
 export * from "./rentalCars";
 export * from "./renterProfiles";
 export * from "./rentalBookings";

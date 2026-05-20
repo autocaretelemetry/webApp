@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { CreateRentalBookingInputPurpose } from './createRentalBookingInputPurpose';
+import type { CreateRentalBookingInputRentalMode } from './createRentalBookingInputRentalMode';
 
 export interface CreateRentalBookingInput {
   carId: string;
@@ -15,4 +16,5 @@ export interface CreateRentalBookingInput {
   purpose?: CreateRentalBookingInputPurpose;
   serviceBookingId?: string;
   notes?: string;
+  rentalMode?: CreateRentalBookingInputRentalMode;
 }

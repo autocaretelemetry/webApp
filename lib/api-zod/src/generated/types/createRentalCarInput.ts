@@ -7,6 +7,7 @@
  */
 import type { CreateRentalCarInputFuelType } from './createRentalCarInputFuelType';
 import type { CreateRentalCarInputOwnerKind } from './createRentalCarInputOwnerKind';
+import type { CreateRentalCarInputRentalModesItem } from './createRentalCarInputRentalModesItem';
 import type { CreateRentalCarInputTransmission } from './createRentalCarInputTransmission';
 
 export interface CreateRentalCarInput {
@@ -42,4 +43,8 @@ export interface CreateRentalCarInput {
   description?: string;
   imageUrl?: string;
   imageUrls?: string[];
+  rentalModes?: CreateRentalCarInputRentalModesItem[];
+  /** @minimum 0 */
+  withDriverDailyRate?: number;
+  driverId?: string;
 }

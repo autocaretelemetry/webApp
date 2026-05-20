@@ -9,6 +9,7 @@ import type { RentalBookingOwnerReviewStatus } from './rentalBookingOwnerReviewS
 import type { RentalBookingPaymentMethod } from './rentalBookingPaymentMethod';
 import type { RentalBookingPaymentStatus } from './rentalBookingPaymentStatus';
 import type { RentalBookingPurpose } from './rentalBookingPurpose';
+import type { RentalBookingRentalMode } from './rentalBookingRentalMode';
 import type { RentalBookingStatus } from './rentalBookingStatus';
 import type { RenterProfile } from './renterProfile';
 
@@ -34,6 +35,7 @@ export interface RentalBooking {
   purpose: RentalBookingPurpose;
   serviceBookingId?: string | null;
   notes?: string | null;
+  rentalMode?: RentalBookingRentalMode;
   ownerReviewStatus: RentalBookingOwnerReviewStatus;
   ownerReviewNotes?: string | null;
   ownerReviewedAt?: Date | null;

@@ -2421,6 +2421,107 @@ export const GetRevenueOverviewResponse = zod.object({
 
 
 /**
+ * @summary List drivers for an owner
+ */
+export const ListDriversQueryParams = zod.object({
+  "ownerPhone": zod.coerce.string()
+})
+
+export const ListDriversResponseItem = zod.object({
+  "id": zod.string(),
+  "ownerPhone": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "photoUrl": zod.string().nullish(),
+  "licenseNumber": zod.string().nullish(),
+  "yearsExperience": zod.number(),
+  "languages": zod.array(zod.string()),
+  "bio": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+})
+export const ListDriversResponse = zod.array(ListDriversResponseItem)
+
+
+/**
+ * @summary Create a chauffeur profile (used by with-driver listings)
+ */
+
+
+
+export const createDriverBodyYearsExperienceMin = 0;
+
+
+
+export const CreateDriverBody = zod.object({
+  "ownerPhone": zod.string().min(1),
+  "name": zod.string().min(1),
+  "phone": zod.string().min(1),
+  "photoUrl": zod.string().optional(),
+  "licenseNumber": zod.string().optional(),
+  "yearsExperience": zod.number().min(createDriverBodyYearsExperienceMin).optional(),
+  "languages": zod.array(zod.string()).optional(),
+  "bio": zod.string().optional()
+})
+
+
+export const GetDriverParams = zod.object({
+  "driverId": zod.coerce.string()
+})
+
+export const GetDriverResponse = zod.object({
+  "id": zod.string(),
+  "ownerPhone": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "photoUrl": zod.string().nullish(),
+  "licenseNumber": zod.string().nullish(),
+  "yearsExperience": zod.number(),
+  "languages": zod.array(zod.string()),
+  "bio": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+
+export const UpdateDriverParams = zod.object({
+  "driverId": zod.coerce.string()
+})
+
+
+
+export const updateDriverBodyYearsExperienceMin = 0;
+
+
+
+export const UpdateDriverBody = zod.object({
+  "name": zod.string().min(1).optional(),
+  "phone": zod.string().min(1).optional(),
+  "photoUrl": zod.string().nullish(),
+  "licenseNumber": zod.string().nullish(),
+  "yearsExperience": zod.number().min(updateDriverBodyYearsExperienceMin).optional(),
+  "languages": zod.array(zod.string()).optional(),
+  "bio": zod.string().nullish()
+})
+
+export const UpdateDriverResponse = zod.object({
+  "id": zod.string(),
+  "ownerPhone": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "photoUrl": zod.string().nullish(),
+  "licenseNumber": zod.string().nullish(),
+  "yearsExperience": zod.number(),
+  "languages": zod.array(zod.string()),
+  "bio": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+
+export const DeleteDriverParams = zod.object({
+  "driverId": zod.coerce.string()
+})
+
+
+/**
  * @summary Browse rental cars
  */
 export const ListRentalCarsQueryParams = zod.object({
@@ -2452,6 +2553,21 @@ export const ListRentalCarsResponseItem = zod.object({
   "imageUrls": zod.array(zod.string()).optional(),
   "status": zod.enum(['pending', 'approved', 'unavailable']),
   "active": zod.boolean(),
+  "rentalModes": zod.array(zod.enum(['self_drive', 'with_driver'])).describe('Modes the owner offers. At least one of: self_drive, with_driver.'),
+  "withDriverDailyRate": zod.number().nullish(),
+  "driverId": zod.string().nullish(),
+  "driver": zod.object({
+  "id": zod.string(),
+  "ownerPhone": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "photoUrl": zod.string().nullish(),
+  "licenseNumber": zod.string().nullish(),
+  "yearsExperience": zod.number(),
+  "languages": zod.array(zod.string()),
+  "bio": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+}).nullish(),
   "createdAt": zod.coerce.date()
 })
 export const ListRentalCarsResponse = zod.array(ListRentalCarsResponseItem)
@@ -2475,6 +2591,8 @@ export const createRentalCarBodyDailyRateMin = 0;
 
 
 
+export const createRentalCarBodyWithDriverDailyRateMin = 0;
+
 
 
 export const CreateRentalCarBody = zod.object({
@@ -2495,7 +2613,10 @@ export const CreateRentalCarBody = zod.object({
   "pickupAddress": zod.string().min(1),
   "description": zod.string().optional(),
   "imageUrl": zod.string().optional(),
-  "imageUrls": zod.array(zod.string()).optional()
+  "imageUrls": zod.array(zod.string()).optional(),
+  "rentalModes": zod.array(zod.enum(['self_drive', 'with_driver'])).optional(),
+  "withDriverDailyRate": zod.number().min(createRentalCarBodyWithDriverDailyRateMin).optional(),
+  "driverId": zod.string().optional()
 })
 
 
@@ -2525,6 +2646,21 @@ export const GetRentalCarResponse = zod.object({
   "imageUrls": zod.array(zod.string()).optional(),
   "status": zod.enum(['pending', 'approved', 'unavailable']),
   "active": zod.boolean(),
+  "rentalModes": zod.array(zod.enum(['self_drive', 'with_driver'])).describe('Modes the owner offers. At least one of: self_drive, with_driver.'),
+  "withDriverDailyRate": zod.number().nullish(),
+  "driverId": zod.string().nullish(),
+  "driver": zod.object({
+  "id": zod.string(),
+  "ownerPhone": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "photoUrl": zod.string().nullish(),
+  "licenseNumber": zod.string().nullish(),
+  "yearsExperience": zod.number(),
+  "languages": zod.array(zod.string()),
+  "bio": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+}).nullish(),
   "createdAt": zod.coerce.date()
 })
 
@@ -2535,6 +2671,8 @@ export const UpdateRentalCarParams = zod.object({
 
 export const updateRentalCarBodyDailyRateMin = 0;
 
+export const updateRentalCarBodyWithDriverDailyRateMin = 0;
+
 
 
 export const UpdateRentalCarBody = zod.object({
@@ -2544,7 +2682,10 @@ export const UpdateRentalCarBody = zod.object({
   "description": zod.string().optional(),
   "pickupAddress": zod.string().optional(),
   "imageUrl": zod.string().optional(),
-  "imageUrls": zod.array(zod.string()).optional()
+  "imageUrls": zod.array(zod.string()).optional(),
+  "rentalModes": zod.array(zod.enum(['self_drive', 'with_driver'])).optional(),
+  "withDriverDailyRate": zod.number().min(updateRentalCarBodyWithDriverDailyRateMin).nullish(),
+  "driverId": zod.string().nullish()
 })
 
 export const UpdateRentalCarResponse = zod.object({
@@ -2569,6 +2710,21 @@ export const UpdateRentalCarResponse = zod.object({
   "imageUrls": zod.array(zod.string()).optional(),
   "status": zod.enum(['pending', 'approved', 'unavailable']),
   "active": zod.boolean(),
+  "rentalModes": zod.array(zod.enum(['self_drive', 'with_driver'])).describe('Modes the owner offers. At least one of: self_drive, with_driver.'),
+  "withDriverDailyRate": zod.number().nullish(),
+  "driverId": zod.string().nullish(),
+  "driver": zod.object({
+  "id": zod.string(),
+  "ownerPhone": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "photoUrl": zod.string().nullish(),
+  "licenseNumber": zod.string().nullish(),
+  "yearsExperience": zod.number(),
+  "languages": zod.array(zod.string()),
+  "bio": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+}).nullish(),
   "createdAt": zod.coerce.date()
 })
 
@@ -2745,7 +2901,17 @@ export const GetPublicRentalCarResponse = zod.object({
   "pickupAddress": zod.string(),
   "description": zod.string().nullish(),
   "imageUrl": zod.string().nullish(),
-  "imageUrls": zod.array(zod.string()).optional()
+  "imageUrls": zod.array(zod.string()).optional(),
+  "rentalModes": zod.array(zod.enum(['self_drive', 'with_driver'])),
+  "withDriverDailyRate": zod.number().nullish(),
+  "driver": zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "photoUrl": zod.string().nullish(),
+  "yearsExperience": zod.number(),
+  "languages": zod.array(zod.string()),
+  "bio": zod.string().nullish()
+}).describe('Sanitized driver view bundled into PublicRentalCar. Excludes the\ndriver\'s phone and licence number — those are PII shown only once\nan owner has approved a booking.\n').nullish()
 }).describe('Sanitized rental car view served at \/rental-cars\/{carId}\/public for\nanonymous share-link visitors. Owner phone\/email and plate number are\nintentionally omitted.\n')
 
 
@@ -2913,6 +3079,7 @@ export const ListRentalBookingsResponseItem = zod.object({
   "purpose": zod.enum(['general', 'loaner']),
   "serviceBookingId": zod.string().nullish(),
   "notes": zod.string().nullish(),
+  "rentalMode": zod.enum(['self_drive', 'with_driver']).optional(),
   "ownerReviewStatus": zod.enum(['pending', 'approved', 'rejected']),
   "ownerReviewNotes": zod.string().nullish(),
   "ownerReviewedAt": zod.coerce.date().nullish(),
@@ -2942,7 +3109,8 @@ export const CreateRentalBookingBody = zod.object({
   "endDate": zod.coerce.date(),
   "purpose": zod.enum(['general', 'loaner']).optional(),
   "serviceBookingId": zod.string().optional(),
-  "notes": zod.string().optional()
+  "notes": zod.string().optional(),
+  "rentalMode": zod.enum(['self_drive', 'with_driver']).optional()
 })
 
 
@@ -3007,6 +3175,7 @@ export const UpdateRentalBookingResponse = zod.object({
   "purpose": zod.enum(['general', 'loaner']),
   "serviceBookingId": zod.string().nullish(),
   "notes": zod.string().nullish(),
+  "rentalMode": zod.enum(['self_drive', 'with_driver']).optional(),
   "ownerReviewStatus": zod.enum(['pending', 'approved', 'rejected']),
   "ownerReviewNotes": zod.string().nullish(),
   "ownerReviewedAt": zod.coerce.date().nullish(),

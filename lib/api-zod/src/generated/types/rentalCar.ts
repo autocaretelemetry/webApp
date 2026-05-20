@@ -5,8 +5,10 @@
  * AutoCare API — vehicle owners book services, service centers fulfill them.
  * OpenAPI spec version: 0.1.0
  */
+import type { Driver } from './driver';
 import type { RentalCarFuelType } from './rentalCarFuelType';
 import type { RentalCarOwnerKind } from './rentalCarOwnerKind';
+import type { RentalCarRentalModesItem } from './rentalCarRentalModesItem';
 import type { RentalCarStatus } from './rentalCarStatus';
 import type { RentalCarTransmission } from './rentalCarTransmission';
 
@@ -32,5 +34,10 @@ export interface RentalCar {
   imageUrls?: string[];
   status: RentalCarStatus;
   active: boolean;
+  /** Modes the owner offers. At least one of: self_drive, with_driver. */
+  rentalModes: RentalCarRentalModesItem[];
+  withDriverDailyRate?: number | null;
+  driverId?: string | null;
+  driver?: Driver | null;
   createdAt: Date;
 }

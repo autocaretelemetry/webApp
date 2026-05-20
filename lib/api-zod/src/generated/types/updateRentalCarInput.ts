@@ -5,6 +5,7 @@
  * AutoCare API — vehicle owners book services, service centers fulfill them.
  * OpenAPI spec version: 0.1.0
  */
+import type { UpdateRentalCarInputRentalModesItem } from './updateRentalCarInputRentalModesItem';
 import type { UpdateRentalCarInputStatus } from './updateRentalCarInputStatus';
 
 export interface UpdateRentalCarInput {
@@ -16,4 +17,8 @@ export interface UpdateRentalCarInput {
   pickupAddress?: string;
   imageUrl?: string;
   imageUrls?: string[];
+  rentalModes?: UpdateRentalCarInputRentalModesItem[];
+  /** @minimum 0 */
+  withDriverDailyRate?: number | null;
+  driverId?: string | null;
 }

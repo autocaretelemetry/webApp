@@ -1218,6 +1218,78 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/RevenueOverview" }
 
+  /drivers:
+    get:
+      operationId: listDrivers
+      tags: [rentals]
+      summary: List drivers for an owner
+      parameters:
+        - { name: ownerPhone, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Driver" }
+    post:
+      operationId: createDriver
+      tags: [rentals]
+      summary: Create a chauffeur profile (used by with-driver listings)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateDriverInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Driver" }
+
+  /drivers/{driverId}:
+    get:
+      operationId: getDriver
+      tags: [rentals]
+      parameters:
+        - { name: driverId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Driver" }
+    patch:
+      operationId: updateDriver
+      tags: [rentals]
+      parameters:
+        - { name: driverId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateDriverInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Driver" }
+    delete:
+      operationId: deleteDriver
+      tags: [rentals]
+      parameters:
+        - { name: driverId, in: path, required: true, schema: { type: string } }
+      responses:
+        "204": { description: Deleted }
+        "409":
+          description: Conflict — driver is attached to a listing
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeleteConflict" }
+
   /rental-cars:
     get:
       operationId: listRentalCars
@@ -2808,9 +2880,54 @@ components:
         amount: { type: number }
         paidAt: { type: string, format: date-time }
 
+    Driver:
+      type: object
+      required: [id, ownerPhone, name, phone, yearsExperience, languages, createdAt]
+      properties:
+        id: { type: string }
+        ownerPhone: { type: string }
+        name: { type: string }
+        phone: { type: string }
+        photoUrl: { type: string, nullable: true }
+        licenseNumber: { type: string, nullable: true }
+        yearsExperience: { type: integer }
+        languages:
+          type: array
+          items: { type: string }
+        bio: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    CreateDriverInput:
+      type: object
+      required: [ownerPhone, name, phone]
+      properties:
+        ownerPhone: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        phone: { type: string, minLength: 1 }
+        photoUrl: { type: string }
+        licenseNumber: { type: string }
+        yearsExperience: { type: integer, minimum: 0 }
+        languages:
+          type: array
+          items: { type: string }
+        bio: { type: string }
+
+    UpdateDriverInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        phone: { type: string, minLength: 1 }
+        photoUrl: { type: string, nullable: true }
+        licenseNumber: { type: string, nullable: true }
+        yearsExperience: { type: integer, minimum: 0 }
+        languages:
+          type: array
+          items: { type: string }
+        bio: { type: string, nullable: true }
+
     RentalCar:
       type: object
-      required: [id, ownerKind, ownerName, ownerPhone, brand, model, year, color, plateNumber, transmission, seats, fuelType, dailyRate, city, pickupAddress, status, active, createdAt]
+      required: [id, ownerKind, ownerName, ownerPhone, brand, model, year, color, plateNumber, transmission, seats, fuelType, dailyRate, city, pickupAddress, status, active, rentalModes, createdAt]
       properties:
         id: { type: string }
         ownerKind: { type: string, enum: [platform, user] }
@@ -2835,6 +2952,16 @@ components:
           items: { type: string }
         status: { type: string, enum: [pending, approved, unavailable] }
         active: { type: boolean }
+        rentalModes:
+          type: array
+          description: "Modes the owner offers. At least one of: self_drive, with_driver."
+          items: { type: string, enum: [self_drive, with_driver] }
+        withDriverDailyRate: { type: number, nullable: true }
+        driverId: { type: string, nullable: true }
+        driver:
+          allOf:
+            - { $ref: "#/components/schemas/Driver" }
+          nullable: true
         createdAt: { type: string, format: date-time }
 
     RetainerPlan:
@@ -2909,7 +3036,7 @@ components:
         Sanitized rental car view served at /rental-cars/{carId}/public for
         anonymous share-link visitors. Owner phone/email and plate number are
         intentionally omitted.
-      required: [id, ownerKind, ownerName, brand, model, year, color, transmission, seats, fuelType, dailyRate, city, pickupAddress]
+      required: [id, ownerKind, ownerName, brand, model, year, color, transmission, seats, fuelType, dailyRate, city, pickupAddress, rentalModes]
       properties:
         id: { type: string }
         ownerKind: { type: string, enum: [platform, user] }
@@ -2929,6 +3056,31 @@ components:
         imageUrls:
           type: array
           items: { type: string }
+        rentalModes:
+          type: array
+          items: { type: string, enum: [self_drive, with_driver] }
+        withDriverDailyRate: { type: number, nullable: true }
+        driver:
+          allOf:
+            - { $ref: "#/components/schemas/PublicDriver" }
+          nullable: true
+
+    PublicDriver:
+      type: object
+      description: |
+        Sanitized driver view bundled into PublicRentalCar. Excludes the
+        driver's phone and licence number — those are PII shown only once
+        an owner has approved a booking.
+      required: [id, name, yearsExperience, languages]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        photoUrl: { type: string, nullable: true }
+        yearsExperience: { type: integer }
+        languages:
+          type: array
+          items: { type: string }
+        bio: { type: string, nullable: true }
 
     CreateRentalCarInput:
       type: object
@@ -2954,6 +3106,11 @@ components:
         imageUrls:
           type: array
           items: { type: string }
+        rentalModes:
+          type: array
+          items: { type: string, enum: [self_drive, with_driver] }
+        withDriverDailyRate: { type: number, minimum: 0 }
+        driverId: { type: string }
 
     UpdateRentalCarInput:
       type: object
@@ -2967,6 +3124,11 @@ components:
         imageUrls:
           type: array
           items: { type: string }
+        rentalModes:
+          type: array
+          items: { type: string, enum: [self_drive, with_driver] }
+        withDriverDailyRate: { type: number, minimum: 0, nullable: true }
+        driverId: { type: string, nullable: true }
 
     RentalBooking:
       type: object
@@ -3005,6 +3167,7 @@ components:
         purpose: { type: string, enum: [general, loaner] }
         serviceBookingId: { type: string, nullable: true }
         notes: { type: string, nullable: true }
+        rentalMode: { type: string, enum: [self_drive, with_driver] }
         ownerReviewStatus: { type: string, enum: [pending, approved, rejected] }
         ownerReviewNotes: { type: string, nullable: true }
         ownerReviewedAt: { type: string, format: date-time, nullable: true }
@@ -3035,6 +3198,7 @@ components:
         purpose: { type: string, enum: [general, loaner] }
         serviceBookingId: { type: string }
         notes: { type: string }
+        rentalMode: { type: string, enum: [self_drive, with_driver] }
 
     UpdateRentalBookingInput:
       type: object

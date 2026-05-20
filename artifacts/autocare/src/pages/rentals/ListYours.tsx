@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCreateRentalCar } from "@workspace/api-client-react";
-import { getListRentalCarsQueryKey } from "@/lib/queryKeys";
+import { Link } from "wouter";
+import { useCreateRentalCar, useListDrivers } from "@workspace/api-client-react";
+import { getListRentalCarsQueryKey, getListDriversQueryKey } from "@/lib/queryKeys";
 import { describeMutationError } from "@/lib/adminErrors";
 import { useRenterProfile, setRenterProfile } from "@/lib/profile";
 import { PageHeader } from "@/components/PageHeader";
@@ -18,7 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Car, Banknote, ShieldCheck, Wrench, Camera } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Car, Banknote, ShieldCheck, Wrench, Camera, User, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { MultiImageUploader } from "@/components/MultiImageUploader";
 
@@ -57,7 +59,21 @@ export default function ListYourCar() {
     pickupAddress: "",
     description: "",
     imageUrls: [] as string[],
+    selfDrive: true,
+    withDriver: false,
+    withDriverDailyRate: 0,
+    driverId: "",
   });
+
+  const { data: drivers } = useListDrivers(
+    { ownerPhone: form.ownerPhone },
+    {
+      query: {
+        enabled: !!form.ownerPhone && form.withDriver,
+        queryKey: getListDriversQueryKey({ ownerPhone: form.ownerPhone }),
+      },
+    },
+  );
 
   const update = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -66,6 +82,17 @@ export default function ListYourCar() {
     e.preventDefault();
     if (form.imageUrls.length === 0) {
       toast.error("Please upload at least one photo of the car before submitting.");
+      return;
+    }
+    const rentalModes: ("self_drive" | "with_driver")[] = [];
+    if (form.selfDrive) rentalModes.push("self_drive");
+    if (form.withDriver) rentalModes.push("with_driver");
+    if (rentalModes.length === 0) {
+      toast.error("Pick at least one rental mode — self-drive, with driver, or both.");
+      return;
+    }
+    if (form.withDriver && !form.driverId) {
+      toast.error("Pick the driver profile that will be attached to this listing.");
       return;
     }
     try {
@@ -89,6 +116,12 @@ export default function ListYourCar() {
           description: form.description || undefined,
           imageUrl: form.imageUrls[0],
           imageUrls: form.imageUrls,
+          rentalModes,
+          withDriverDailyRate:
+            form.withDriver && form.withDriverDailyRate > 0
+              ? Number(form.withDriverDailyRate)
+              : undefined,
+          driverId: form.withDriver ? form.driverId : undefined,
         },
       });
       setRenterProfile({
@@ -265,6 +298,98 @@ export default function ListYourCar() {
                 required
               />
             </Field>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <User className="h-4 w-4" /> Rental modes
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Pick how you'll offer this car. You can offer self-drive,
+              with-driver, or both. Renters will choose at booking time.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="flex items-start gap-3 rounded-md border p-3 cursor-pointer hover:bg-accent/40 transition-colors">
+                <Checkbox
+                  checked={form.selfDrive}
+                  onCheckedChange={(v) => update("selfDrive", !!v)}
+                />
+                <div className="space-y-0.5">
+                  <p className="text-sm font-medium">Self-drive</p>
+                  <p className="text-xs text-muted-foreground">
+                    Renter drives the car themselves. We verify their licence.
+                  </p>
+                </div>
+              </label>
+              <label className="flex items-start gap-3 rounded-md border p-3 cursor-pointer hover:bg-accent/40 transition-colors">
+                <Checkbox
+                  checked={form.withDriver}
+                  onCheckedChange={(v) => update("withDriver", !!v)}
+                />
+                <div className="space-y-0.5">
+                  <p className="text-sm font-medium">With driver</p>
+                  <p className="text-xs text-muted-foreground">
+                    Your chauffeur drives. Renter sees the driver's profile.
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            {form.withDriver && (
+              <div className="space-y-3 rounded-md border bg-muted/30 p-3">
+                <Field label="Daily rate when rented with driver (GHS)">
+                  <Input
+                    type="number"
+                    min={0}
+                    value={form.withDriverDailyRate}
+                    onChange={(e) =>
+                      update("withDriverDailyRate", Number(e.target.value))
+                    }
+                    placeholder="Leave 0 to use the same daily rate"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Most owners charge a bit more to cover the driver's time.
+                    Leave it at 0 to use the same rate as self-drive.
+                  </p>
+                </Field>
+
+                <Field label="Driver profile" required>
+                  {(drivers ?? []).length === 0 ? (
+                    <div className="rounded-md border border-dashed p-3 text-sm space-y-2">
+                      <p className="text-muted-foreground">
+                        You haven't added any drivers yet. Add one first, then
+                        come back to attach them to this listing.
+                      </p>
+                      <Link href="/rentals/drivers">
+                        <Button type="button" variant="outline" size="sm" className="gap-2">
+                          <UserPlus className="h-4 w-4" /> Add a driver
+                        </Button>
+                      </Link>
+                    </div>
+                  ) : (
+                    <Select
+                      value={form.driverId}
+                      onValueChange={(v) => update("driverId", v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pick a driver" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(drivers ?? []).map((d) => (
+                          <SelectItem key={d.id} value={d.id}>
+                            {d.name} · {d.yearsExperience}y experience
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </Field>
+              </div>
+            )}
           </CardContent>
         </Card>
 

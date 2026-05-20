@@ -29,6 +29,9 @@ export const rentalBookingsTable = pgTable("rental_bookings", {
     onDelete: "set null",
   }),
   notes: text("notes"),
+  // Whether the renter chose 'self_drive' or 'with_driver' for this booking.
+  // Defaults to 'self_drive' for backward compatibility with existing rows.
+  rentalMode: text("rental_mode").notNull().default("self_drive"),
 
   // Owner review of renter & request
   ownerReviewStatus: text("owner_review_status").notNull().default("pending"),

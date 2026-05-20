@@ -62,6 +62,7 @@ import ListYourCar from "@/pages/rentals/ListYours";
 import MyListings from "@/pages/rentals/MyListings";
 import MyRentals from "@/pages/rentals/MyRentals";
 import RenterProfilePage from "@/pages/rentals/Profile";
+import DriversPage from "@/pages/rentals/Drivers";
 import ListingRequests from "@/pages/rentals/ListingRequests";
 import SharedCar from "@/pages/rentals/SharedCar";
 
@@ -180,6 +181,7 @@ function AppRouter() {
         <Route path="/rentals/my-listings" component={ownerOnly(MyListings)} />
         <Route path="/rentals/my-bookings" component={ownerOnly(MyRentals)} />
         <Route path="/rentals/profile" component={ownerOnly(RenterProfilePage)} />
+        <Route path="/rentals/drivers" component={ownerOnly(DriversPage)} />
         <Route path="/rentals/listing-requests" component={ownerOnly(ListingRequests)} />
         <Route path="/rentals/:id" component={RentalDetail} />
 

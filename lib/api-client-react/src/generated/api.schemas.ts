@@ -1093,6 +1093,47 @@ export interface RevenueOverview {
   recentPayments: RecentPayment[];
 }
 
+export interface Driver {
+  id: string;
+  ownerPhone: string;
+  name: string;
+  phone: string;
+  photoUrl?: string | null;
+  licenseNumber?: string | null;
+  yearsExperience: number;
+  languages: string[];
+  bio?: string | null;
+  createdAt: string;
+}
+
+export interface CreateDriverInput {
+  /** @minLength 1 */
+  ownerPhone: string;
+  /** @minLength 1 */
+  name: string;
+  /** @minLength 1 */
+  phone: string;
+  photoUrl?: string;
+  licenseNumber?: string;
+  /** @minimum 0 */
+  yearsExperience?: number;
+  languages?: string[];
+  bio?: string;
+}
+
+export interface UpdateDriverInput {
+  /** @minLength 1 */
+  name?: string;
+  /** @minLength 1 */
+  phone?: string;
+  photoUrl?: string | null;
+  licenseNumber?: string | null;
+  /** @minimum 0 */
+  yearsExperience?: number;
+  languages?: string[];
+  bio?: string | null;
+}
+
 export type RentalCarOwnerKind = typeof RentalCarOwnerKind[keyof typeof RentalCarOwnerKind];
 
 
@@ -1128,6 +1169,14 @@ export const RentalCarStatus = {
   unavailable: 'unavailable',
 } as const;
 
+export type RentalCarRentalModesItem = typeof RentalCarRentalModesItem[keyof typeof RentalCarRentalModesItem];
+
+
+export const RentalCarRentalModesItem = {
+  self_drive: 'self_drive',
+  with_driver: 'with_driver',
+} as const;
+
 export interface RentalCar {
   id: string;
   ownerKind: RentalCarOwnerKind;
@@ -1150,6 +1199,11 @@ export interface RentalCar {
   imageUrls?: string[];
   status: RentalCarStatus;
   active: boolean;
+  /** Modes the owner offers. At least one of: self_drive, with_driver. */
+  rentalModes: RentalCarRentalModesItem[];
+  withDriverDailyRate?: number | null;
+  driverId?: string | null;
+  driver?: Driver | null;
   createdAt: string;
 }
 
@@ -1278,6 +1332,29 @@ export const PublicRentalCarFuelType = {
   electric: 'electric',
 } as const;
 
+export type PublicRentalCarRentalModesItem = typeof PublicRentalCarRentalModesItem[keyof typeof PublicRentalCarRentalModesItem];
+
+
+export const PublicRentalCarRentalModesItem = {
+  self_drive: 'self_drive',
+  with_driver: 'with_driver',
+} as const;
+
+/**
+ * Sanitized driver view bundled into PublicRentalCar. Excludes the
+driver's phone and licence number — those are PII shown only once
+an owner has approved a booking.
+
+ */
+export interface PublicDriver {
+  id: string;
+  name: string;
+  photoUrl?: string | null;
+  yearsExperience: number;
+  languages: string[];
+  bio?: string | null;
+}
+
 /**
  * Sanitized rental car view served at /rental-cars/{carId}/public for
 anonymous share-link visitors. Owner phone/email and plate number are
@@ -1301,6 +1378,9 @@ export interface PublicRentalCar {
   description?: string | null;
   imageUrl?: string | null;
   imageUrls?: string[];
+  rentalModes: PublicRentalCarRentalModesItem[];
+  withDriverDailyRate?: number | null;
+  driver?: PublicDriver | null;
 }
 
 export type CreateRentalCarInputOwnerKind = typeof CreateRentalCarInputOwnerKind[keyof typeof CreateRentalCarInputOwnerKind];
@@ -1327,6 +1407,14 @@ export const CreateRentalCarInputFuelType = {
   diesel: 'diesel',
   hybrid: 'hybrid',
   electric: 'electric',
+} as const;
+
+export type CreateRentalCarInputRentalModesItem = typeof CreateRentalCarInputRentalModesItem[keyof typeof CreateRentalCarInputRentalModesItem];
+
+
+export const CreateRentalCarInputRentalModesItem = {
+  self_drive: 'self_drive',
+  with_driver: 'with_driver',
 } as const;
 
 export interface CreateRentalCarInput {
@@ -1362,6 +1450,10 @@ export interface CreateRentalCarInput {
   description?: string;
   imageUrl?: string;
   imageUrls?: string[];
+  rentalModes?: CreateRentalCarInputRentalModesItem[];
+  /** @minimum 0 */
+  withDriverDailyRate?: number;
+  driverId?: string;
 }
 
 export type UpdateRentalCarInputStatus = typeof UpdateRentalCarInputStatus[keyof typeof UpdateRentalCarInputStatus];
@@ -1373,6 +1465,14 @@ export const UpdateRentalCarInputStatus = {
   unavailable: 'unavailable',
 } as const;
 
+export type UpdateRentalCarInputRentalModesItem = typeof UpdateRentalCarInputRentalModesItem[keyof typeof UpdateRentalCarInputRentalModesItem];
+
+
+export const UpdateRentalCarInputRentalModesItem = {
+  self_drive: 'self_drive',
+  with_driver: 'with_driver',
+} as const;
+
 export interface UpdateRentalCarInput {
   status?: UpdateRentalCarInputStatus;
   active?: boolean;
@@ -1382,6 +1482,10 @@ export interface UpdateRentalCarInput {
   pickupAddress?: string;
   imageUrl?: string;
   imageUrls?: string[];
+  rentalModes?: UpdateRentalCarInputRentalModesItem[];
+  /** @minimum 0 */
+  withDriverDailyRate?: number | null;
+  driverId?: string | null;
 }
 
 export type RentalBookingStatus = typeof RentalBookingStatus[keyof typeof RentalBookingStatus];
@@ -1404,6 +1508,14 @@ export type RentalBookingPurpose = typeof RentalBookingPurpose[keyof typeof Rent
 export const RentalBookingPurpose = {
   general: 'general',
   loaner: 'loaner',
+} as const;
+
+export type RentalBookingRentalMode = typeof RentalBookingRentalMode[keyof typeof RentalBookingRentalMode];
+
+
+export const RentalBookingRentalMode = {
+  self_drive: 'self_drive',
+  with_driver: 'with_driver',
 } as const;
 
 export type RentalBookingOwnerReviewStatus = typeof RentalBookingOwnerReviewStatus[keyof typeof RentalBookingOwnerReviewStatus];
@@ -1479,6 +1591,7 @@ export interface RentalBooking {
   purpose: RentalBookingPurpose;
   serviceBookingId?: string | null;
   notes?: string | null;
+  rentalMode?: RentalBookingRentalMode;
   ownerReviewStatus: RentalBookingOwnerReviewStatus;
   ownerReviewNotes?: string | null;
   ownerReviewedAt?: string | null;
@@ -1507,6 +1620,14 @@ export const CreateRentalBookingInputPurpose = {
   loaner: 'loaner',
 } as const;
 
+export type CreateRentalBookingInputRentalMode = typeof CreateRentalBookingInputRentalMode[keyof typeof CreateRentalBookingInputRentalMode];
+
+
+export const CreateRentalBookingInputRentalMode = {
+  self_drive: 'self_drive',
+  with_driver: 'with_driver',
+} as const;
+
 export interface CreateRentalBookingInput {
   carId: string;
   renterId: string;
@@ -1515,6 +1636,7 @@ export interface CreateRentalBookingInput {
   purpose?: CreateRentalBookingInputPurpose;
   serviceBookingId?: string;
   notes?: string;
+  rentalMode?: CreateRentalBookingInputRentalMode;
 }
 
 export type UpdateRentalBookingInputStatus = typeof UpdateRentalBookingInputStatus[keyof typeof UpdateRentalBookingInputStatus];
@@ -1777,6 +1899,10 @@ includeInactive?: boolean;
 export type ListSubscriptionsParams = {
 status?: string;
 subscriberKind?: string;
+};
+
+export type ListDriversParams = {
+ownerPhone: string;
 };
 
 export type ListRentalCarsParams = {
