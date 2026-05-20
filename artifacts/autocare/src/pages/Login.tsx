@@ -104,6 +104,12 @@ export default function Login() {
               <Button type="submit" disabled={submitting} className="w-full">
                 {submitting ? "Signing in..." : "Sign in"}
               </Button>
+              <p className="text-xs text-muted-foreground text-center">
+                New here and want to rent a car?{" "}
+                <Link href="/rentals/signup" className="text-primary font-medium hover:underline">
+                  Create an account
+                </Link>
+              </p>
             </form>
           </CardContent>
         </Card>

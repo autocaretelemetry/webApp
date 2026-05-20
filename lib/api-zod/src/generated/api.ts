@@ -3175,6 +3175,22 @@ export const LoginResponse = zod.object({
 })
 
 
+/**
+ * @summary Create a new owner/renter account and sign in
+ */
+
+export const signupBodyPasswordMin = 8;
+
+
+
+export const SignupBody = zod.object({
+  "name": zod.string().min(1),
+  "email": zod.string().email(),
+  "password": zod.string().min(signupBodyPasswordMin),
+  "phone": zod.string().nullish()
+})
+
+
 export const GetCurrentUserResponse = zod.object({
   "id": zod.string(),
   "email": zod.string(),

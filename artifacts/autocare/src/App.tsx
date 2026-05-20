@@ -9,6 +9,7 @@ import { useRole, type Role } from "@/lib/role";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import Landing from "@/pages/Landing";
 import LoginPage from "@/pages/Login";
+import RentalsSignup from "@/pages/rentals/Signup";
 import NotFound from "@/pages/not-found";
 
 // Owner Pages
@@ -214,6 +215,7 @@ function Router() {
       <Route path="/share/cars/:id" component={SharedCar} />
 
       <Route path="/login" component={LoginPage} />
+      <Route path="/rentals/signup" component={RentalsSignup} />
 
       {loading ? (
         <Route>

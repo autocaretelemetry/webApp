@@ -15,6 +15,15 @@ export interface LoginInput {
   password: string;
 }
 
+export interface SignupInput {
+  /** @minLength 1 */
+  name: string;
+  email: string;
+  /** @minLength 8 */
+  password: string;
+  phone?: string | null;
+}
+
 export type AuthedUserRole = typeof AuthedUserRole[keyof typeof AuthedUserRole];
 
 

@@ -1707,6 +1707,27 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /auth/signup:
+    post:
+      operationId: signup
+      tags: [auth]
+      summary: Create a new owner/renter account and sign in
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SignupInput" }
+      responses:
+        "201":
+          description: Account created and signed in
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthedUser" }
+        "409":
+          description: Email already in use
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /auth/logout:
     post:
       operationId: logout
@@ -1783,6 +1804,15 @@ components:
       properties:
         email: { type: string, format: email }
         password: { type: string, minLength: 1 }
+
+    SignupInput:
+      type: object
+      required: [name, email, password]
+      properties:
+        name: { type: string, minLength: 1 }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        phone: { type: string, nullable: true }
 
     AuthedUser:
       type: object

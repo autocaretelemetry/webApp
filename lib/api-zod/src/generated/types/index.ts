@@ -136,6 +136,7 @@ export * from './revenueOverviewTotals';
 export * from './serviceCenter';
 export * from './serviceRecord';
 export * from './serviceType';
+export * from './signupInput';
 export * from './statusCount';
 export * from './storageError';
 export * from './subscription';

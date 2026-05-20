@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 import {
   LoginBody,
+  SignupBody,
   UpdateMyProfileBody,
   ChangePasswordBody,
 } from "@workspace/api-zod";
@@ -38,6 +39,62 @@ router.post("/auth/login", async (req, res): Promise<void> => {
   issueSessionCookie(res, row.id);
   const { passwordHash: _ph, ...safe } = row;
   res.json(safe);
+});
+
+/**
+ * Public signup — currently only used by the "Sign up to rent" flow, so we
+ * pin every new account to the `owner` role. Renting a car uses an owner
+ * account plus a phone-keyed renter profile created on the next step.
+ */
+router.post("/auth/signup", async (req, res): Promise<void> => {
+  const parsed = SignupBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const email = parsed.data.email.trim().toLowerCase();
+  // Pre-check is a UX optimization only — the DB unique index on users.email
+  // is the source of truth. We still try/catch the insert so two concurrent
+  // signups for the same email both get a deterministic 409.
+  const [dup] = await db
+    .select({ id: usersTable.id })
+    .from(usersTable)
+    .where(eq(usersTable.email, email));
+  if (dup) {
+    res.status(409).json({ error: "An account with that email already exists." });
+    return;
+  }
+  let row;
+  try {
+    [row] = await db
+      .insert(usersTable)
+      .values({
+        email,
+        passwordHash: hashPassword(parsed.data.password),
+        name: parsed.data.name.trim(),
+        role: "owner",
+        phone: parsed.data.phone?.trim() || null,
+      })
+      .returning();
+  } catch (err) {
+    // Postgres unique_violation. node-postgres surfaces the SQLSTATE on
+    // `code`; drizzle wraps it but preserves the underlying error.
+    const code =
+      (err as { code?: string }).code ??
+      (err as { cause?: { code?: string } }).cause?.code;
+    if (code === "23505") {
+      res.status(409).json({ error: "An account with that email already exists." });
+      return;
+    }
+    throw err;
+  }
+  if (!row) {
+    res.status(500).json({ error: "Could not create account" });
+    return;
+  }
+  issueSessionCookie(res, row.id);
+  const { passwordHash: _ph, ...safe } = row;
+  res.status(201).json(safe);
 });
 
 router.post("/auth/logout", (_req, res): void => {
