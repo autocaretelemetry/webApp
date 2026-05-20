@@ -2846,6 +2846,13 @@ components:
         buyerName: { type: string }
         buyerPhone: { type: string }
         shippingAddress: { type: string }
+        # Set when the buyer picked a saved address book entry at checkout;
+        # null for proposal orders and legacy / typed-once direct buys.
+        shippingAddressId: { type: string, nullable: true }
+        # Friendly label of the saved address (e.g. "Home", "Workshop").
+        # Hydrated from `user_addresses.label` when `shippingAddressId` is
+        # set and the entry still exists.
+        shippingAddressLabel: { type: string, nullable: true }
         deliveryCity: { type: string }
         deliveryRegion: { type: string }
         notes: { type: string, nullable: true }
@@ -2944,6 +2951,10 @@ components:
         buyerName: { type: string, minLength: 1 }
         buyerPhone: { type: string, minLength: 1 }
         shippingAddress: { type: string, minLength: 1 }
+        # Optional id of the saved address book entry the buyer picked.
+        # Server verifies the entry belongs to the authenticated user before
+        # persisting; ignored for proposal orders.
+        shippingAddressId: { type: string, nullable: true }
         deliveryCity: { type: string, nullable: true }
         deliveryRegion: { type: string, nullable: true }
         notes: { type: string, nullable: true }

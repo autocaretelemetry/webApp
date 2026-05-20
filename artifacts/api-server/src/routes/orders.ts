@@ -11,6 +11,7 @@ import {
   vehiclesTable,
   deliveryAgentsTable,
   serviceCentersTable,
+  userAddressesTable,
   type OrderItemSnapshot,
 } from "@workspace/db";
 import {
@@ -35,9 +36,10 @@ async function hydrate(orders: (typeof ordersTable.$inferSelect)[]) {
   const mechanicIds = [...new Set(orders.map((o) => o.mechanicId).filter((v): v is string => !!v))];
   const agentIds = [...new Set(orders.map((o) => o.deliveryAgentId).filter((v): v is string => !!v))];
   const bookingIds = [...new Set(orders.map((o) => o.bookingId).filter((v): v is string => !!v))];
+  const addressIds = [...new Set(orders.map((o) => o.shippingAddressId).filter((v): v is string => !!v))];
   const orderIds = orders.map((o) => o.id);
 
-  const [vendors, lineCounts, mechanics, agents, bookings] = await Promise.all([
+  const [vendors, lineCounts, mechanics, agents, bookings, addresses] = await Promise.all([
     db.select().from(vendorsTable).where(inArray(vendorsTable.id, vendorIds)),
     db
       .select({
@@ -74,12 +76,19 @@ async function hydrate(orders: (typeof ordersTable.$inferSelect)[]) {
           model: string;
           year: number;
         }>),
+    addressIds.length
+      ? db
+          .select({ id: userAddressesTable.id, label: userAddressesTable.label })
+          .from(userAddressesTable)
+          .where(inArray(userAddressesTable.id, addressIds))
+      : Promise.resolve([] as Array<{ id: string; label: string }>),
   ]);
 
   const vmap = new Map(vendors.map((v) => [v.id, v]));
   const cmap = new Map(lineCounts.map((c) => [c.orderId, Number(c.n)]));
   const mmap = new Map(mechanics.map((m) => [m.id, m]));
   const amap = new Map(agents.map((a) => [a.id, a]));
+  const admap = new Map(addresses.map((a) => [a.id, a.label]));
   const bmap = new Map(
     bookings.map((b) => [
       b.id,
@@ -98,6 +107,9 @@ async function hydrate(orders: (typeof ordersTable.$inferSelect)[]) {
     mechanic: o.mechanicId ? (mmap.get(o.mechanicId) ?? null) : null,
     deliveryAgent: o.deliveryAgentId ? (amap.get(o.deliveryAgentId) ?? null) : null,
     bookingSummary: o.bookingId ? (bmap.get(o.bookingId) ?? null) : null,
+    shippingAddressLabel: o.shippingAddressId
+      ? (admap.get(o.shippingAddressId) ?? null)
+      : null,
     itemsCount: cmap.get(o.id) ?? 0,
   }));
 }
@@ -299,6 +311,24 @@ router.post("/orders", async (req, res): Promise<void> => {
       const total = +(itemsTotal + shippingFee).toFixed(2);
       const now = new Date();
 
+      // For direct buys, if the buyer picked a saved address book entry,
+      // confirm it belongs to the authenticated user before persisting the
+      // FK — never trust an id from the body alone. Proposals always ship
+      // to the booking's service center, so any incoming id is ignored.
+      let shippingAddressId: string | null = null;
+      if (!isProposal && parsed.data.shippingAddressId && req.user) {
+        const [owned] = await tx
+          .select({ id: userAddressesTable.id })
+          .from(userAddressesTable)
+          .where(
+            and(
+              eq(userAddressesTable.id, parsed.data.shippingAddressId),
+              eq(userAddressesTable.userId, req.user.id),
+            ),
+          );
+        if (owned) shippingAddressId = owned.id;
+      }
+
       const shippingAddress =
         isProposal && mechanicCenter ? mechanicCenter.address : parsed.data.shippingAddress;
       const deliveryCity =
@@ -326,6 +356,7 @@ router.post("/orders", async (req, res): Promise<void> => {
           buyerName,
           buyerPhone,
           shippingAddress,
+          shippingAddressId,
           deliveryCity,
           deliveryRegion,
           notes: parsed.data.notes ?? null,

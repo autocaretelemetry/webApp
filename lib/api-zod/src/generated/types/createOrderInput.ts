@@ -19,6 +19,7 @@ export interface CreateOrderInput {
   buyerPhone: string;
   /** @minLength 1 */
   shippingAddress: string;
+  shippingAddressId?: string | null;
   deliveryCity?: string | null;
   deliveryRegion?: string | null;
   notes?: string | null;

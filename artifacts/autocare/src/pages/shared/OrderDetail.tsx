@@ -245,7 +245,17 @@ export default function OrderDetail() {
 
           <Card>
             <CardContent className="p-5 space-y-2 text-sm">
-              <p className="font-semibold mb-1">Ship to</p>
+              <div className="flex items-center justify-between mb-1 gap-2">
+                <p className="font-semibold">Ship to</p>
+                {order.shippingAddressLabel && (
+                  <span
+                    className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+                    title="Picked from your saved addresses"
+                  >
+                    {order.shippingAddressLabel}
+                  </span>
+                )}
+              </div>
               <p>{order.buyerName}</p>
               <p className="text-muted-foreground">{order.buyerPhone}</p>
               <p className="text-muted-foreground whitespace-pre-line">{order.shippingAddress}</p>

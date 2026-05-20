@@ -767,6 +767,8 @@ export interface Order {
   buyerName: string;
   buyerPhone: string;
   shippingAddress: string;
+  shippingAddressId?: string | null;
+  shippingAddressLabel?: string | null;
   deliveryCity?: string;
   deliveryRegion?: string;
   notes?: string | null;
@@ -838,6 +840,7 @@ export interface CreateOrderInput {
   buyerPhone: string;
   /** @minLength 1 */
   shippingAddress: string;
+  shippingAddressId?: string | null;
   deliveryCity?: string | null;
   deliveryRegion?: string | null;
   notes?: string | null;

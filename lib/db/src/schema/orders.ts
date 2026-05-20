@@ -4,6 +4,7 @@ import { partsTable } from "./parts";
 import { bookingsTable } from "./bookings";
 import { mechanicsTable } from "./mechanics";
 import { deliveryAgentsTable } from "./deliveryAgents";
+import { userAddressesTable } from "./userAddresses";
 
 export type OrderItemSnapshot = {
   partId: string;
@@ -33,6 +34,15 @@ export const ordersTable = pgTable("orders", {
   buyerName: text("buyer_name").notNull(),
   buyerPhone: text("buyer_phone").notNull(),
   shippingAddress: text("shipping_address").notNull(),
+  // Optional FK back to the saved address book entry the buyer picked at
+  // checkout. Null for proposal orders (which ship to the booking's
+  // service center, not a saved address) and for legacy / typed-once
+  // direct buys. `onDelete: set null` so removing an address from the
+  // book doesn't cascade-delete historical orders.
+  shippingAddressId: uuid("shipping_address_id").references(
+    () => userAddressesTable.id,
+    { onDelete: "set null" },
+  ),
   deliveryCity: text("delivery_city").notNull().default(""),
   deliveryRegion: text("delivery_region").notNull().default(""),
   notes: text("notes"),

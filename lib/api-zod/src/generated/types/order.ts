@@ -22,6 +22,8 @@ export interface Order {
   buyerName: string;
   buyerPhone: string;
   shippingAddress: string;
+  shippingAddressId?: string | null;
+  shippingAddressLabel?: string | null;
   deliveryCity?: string;
   deliveryRegion?: string;
   notes?: string | null;

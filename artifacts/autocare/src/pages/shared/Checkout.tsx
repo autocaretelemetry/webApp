@@ -276,6 +276,10 @@ export default function Checkout() {
             notes: notes.trim() || null,
             deliveryCity: deliveryCity.trim() || null,
             deliveryRegion: deliveryRegion.trim() || null,
+            // Link the order back to the saved address book entry the
+            // buyer picked (or just created), so the order detail page
+            // can surface its friendly label ("Home", "Workshop", …).
+            shippingAddressId: !isProposal ? touchTargetId : null,
             items: group.lines.map((l) => ({ partId: l.partId, quantity: l.quantity })),
             ...(isProposal && scope
               ? {
