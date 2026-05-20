@@ -9,10 +9,25 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ImageUploader } from "@/components/ImageUploader";
 import { resolveImageUrl } from "@/lib/format";
-import { Loader2, ShieldCheck } from "lucide-react";
+import { Bell, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
+
+type NotifChannel = "email" | "whatsapp";
+const DEFAULT_CHANNELS: NotifChannel[] = ["email", "whatsapp"];
+function normalizeChannels(raw: unknown): NotifChannel[] {
+  if (!Array.isArray(raw) || raw.length === 0) return [...DEFAULT_CHANNELS];
+  const set = new Set(raw);
+  const out = DEFAULT_CHANNELS.filter((c) => set.has(c));
+  return out.length ? out : [...DEFAULT_CHANNELS];
+}
+function sameChannels(a: NotifChannel[], b: NotifChannel[]): boolean {
+  if (a.length !== b.length) return false;
+  const sb = new Set(b);
+  return a.every((c) => sb.has(c));
+}
 
 const ROLE_LABEL: Record<string, string> = {
   owner: "Vehicle Owner",
@@ -31,13 +46,26 @@ export default function ProfilePage() {
   const [name, setName] = useState(user?.name ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl ?? "");
+  const [channels, setChannels] = useState<NotifChannel[]>(() =>
+    normalizeChannels(user?.notificationChannels),
+  );
 
   useEffect(() => {
     if (!user) return;
     setName(user.name);
     setPhone(user.phone ?? "");
     setAvatarUrl(user.avatarUrl ?? "");
+    setChannels(normalizeChannels(user.notificationChannels));
   }, [user]);
+
+  const toggleChannel = (channel: NotifChannel, on: boolean) => {
+    setChannels((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(channel);
+      else next.delete(channel);
+      return DEFAULT_CHANNELS.filter((c) => next.has(c));
+    });
+  };
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -47,14 +75,20 @@ export default function ProfilePage() {
     return <div className="p-8 text-sm text-muted-foreground">Loading…</div>;
   }
 
+  const savedChannels = normalizeChannels(user.notificationChannels);
   const dirty =
     name.trim() !== user.name ||
     (phone.trim() || null) !== (user.phone ?? null) ||
-    (avatarUrl.trim() || null) !== (user.avatarUrl ?? null);
+    (avatarUrl.trim() || null) !== (user.avatarUrl ?? null) ||
+    !sameChannels(channels, savedChannels);
 
   const saveProfile = async () => {
     if (!name.trim()) {
       toast.error("Name can't be empty.");
+      return;
+    }
+    if (channels.length === 0) {
+      toast.error("Pick at least one notification channel so we can reach you.");
       return;
     }
     try {
@@ -63,6 +97,7 @@ export default function ProfilePage() {
           name: name.trim(),
           phone: phone.trim() || null,
           avatarUrl: avatarUrl.trim() || null,
+          notificationChannels: channels,
         },
       });
       await refresh();
@@ -166,6 +201,52 @@ export default function ProfilePage() {
             </div>
           </div>
 
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="h-4 w-4 text-primary" /> Decision notifications
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Choose how we let you know about application approvals, rejections,
+            and KYC decisions. Pick at least one — both are on by default.
+          </p>
+          <div className="space-y-3">
+            <label className="flex items-start gap-3 border p-3 rounded-md cursor-pointer hover:bg-muted/40">
+              <Checkbox
+                id="notif-email"
+                checked={channels.includes("email")}
+                onCheckedChange={(v) => toggleChannel("email", v === true)}
+                className="mt-0.5"
+              />
+              <div className="space-y-0.5">
+                <div className="font-medium text-sm">Email</div>
+                <div className="text-xs text-muted-foreground">
+                  Sent to {user.email}.
+                </div>
+              </div>
+            </label>
+            <label className="flex items-start gap-3 border p-3 rounded-md cursor-pointer hover:bg-muted/40">
+              <Checkbox
+                id="notif-whatsapp"
+                checked={channels.includes("whatsapp")}
+                onCheckedChange={(v) => toggleChannel("whatsapp", v === true)}
+                className="mt-0.5"
+              />
+              <div className="space-y-0.5">
+                <div className="font-medium text-sm">WhatsApp</div>
+                <div className="text-xs text-muted-foreground">
+                  {user.phone
+                    ? `Sent to ${user.phone}.`
+                    : "Add a phone number above to receive WhatsApp messages."}
+                </div>
+              </div>
+            </label>
+          </div>
           <div className="flex justify-end">
             <Button
               onClick={saveProfile}

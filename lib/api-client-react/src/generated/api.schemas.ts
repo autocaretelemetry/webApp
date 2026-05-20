@@ -72,6 +72,14 @@ export const AuthedUserKycStatus = {
   rejected: 'rejected',
 } as const;
 
+export type AuthedUserNotificationChannelsItem = typeof AuthedUserNotificationChannelsItem[keyof typeof AuthedUserNotificationChannelsItem];
+
+
+export const AuthedUserNotificationChannelsItem = {
+  email: 'email',
+  whatsapp: 'whatsapp',
+} as const;
+
 export interface AuthedUser {
   id: string;
   email: string;
@@ -86,6 +94,7 @@ export interface AuthedUser {
   kycStatus?: AuthedUserKycStatus;
   kycNote?: string | null;
   requestedRole?: string | null;
+  notificationChannels?: AuthedUserNotificationChannelsItem[];
 }
 
 export interface KycDocument {
@@ -125,11 +134,20 @@ export interface KycDecisionInput {
   note?: string | null;
 }
 
+export type UpdateProfileInputNotificationChannelsItem = typeof UpdateProfileInputNotificationChannelsItem[keyof typeof UpdateProfileInputNotificationChannelsItem];
+
+
+export const UpdateProfileInputNotificationChannelsItem = {
+  email: 'email',
+  whatsapp: 'whatsapp',
+} as const;
+
 export interface UpdateProfileInput {
   /** @minLength 1 */
   name?: string;
   phone?: string | null;
   avatarUrl?: string | null;
+  notificationChannels?: UpdateProfileInputNotificationChannelsItem[];
 }
 
 export interface ChangePasswordInput {

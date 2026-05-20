@@ -7,6 +7,7 @@
  */
 import type { AuthedUserApprovalStatus } from './authedUserApprovalStatus';
 import type { AuthedUserKycStatus } from './authedUserKycStatus';
+import type { AuthedUserNotificationChannelsItem } from './authedUserNotificationChannelsItem';
 import type { AuthedUserRole } from './authedUserRole';
 
 export interface AuthedUser {
@@ -23,4 +24,5 @@ export interface AuthedUser {
   kycStatus?: AuthedUserKycStatus;
   kycNote?: string | null;
   requestedRole?: string | null;
+  notificationChannels?: AuthedUserNotificationChannelsItem[];
 }

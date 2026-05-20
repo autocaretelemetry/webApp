@@ -5,10 +5,12 @@
  * AutoCare API — vehicle owners book services, service centers fulfill them.
  * OpenAPI spec version: 0.1.0
  */
+import type { UpdateProfileInputNotificationChannelsItem } from './updateProfileInputNotificationChannelsItem';
 
 export interface UpdateProfileInput {
   /** @minLength 1 */
   name?: string;
   phone?: string | null;
   avatarUrl?: string | null;
+  notificationChannels?: UpdateProfileInputNotificationChannelsItem[];
 }

@@ -52,26 +52,45 @@ function fireWhatsApp(to: string | null | undefined, body: string): void {
 
 type DecisionKind = "approved" | "rejected" | "kyc_verified" | "kyc_rejected";
 
-function fireDecisionNotifications(
-  kind: DecisionKind,
-  user: { name: string; email: string | null; phone: string | null; approvalNote: string | null; kycNote: string | null },
-): void {
+type DecisionUser = {
+  name: string;
+  email: string | null;
+  phone: string | null;
+  approvalNote: string | null;
+  kycNote: string | null;
+  notificationChannels?: readonly string[] | null;
+};
+
+function wantsChannel(
+  user: DecisionUser,
+  channel: "email" | "whatsapp",
+): boolean {
+  // Default to delivering on every channel when the field is missing/empty so
+  // grandfathered users keep getting notified until they explicitly opt out.
+  const list = user.notificationChannels;
+  if (!list || list.length === 0) return true;
+  return list.includes(channel);
+}
+
+function fireDecisionNotifications(kind: DecisionKind, user: DecisionUser): void {
+  const email = wantsChannel(user, "email") ? user.email : null;
+  const phone = wantsChannel(user, "whatsapp") ? user.phone : null;
   switch (kind) {
     case "approved":
-      fireEmail(user.email, applicationApprovedEmail(user.name, user.approvalNote));
-      fireWhatsApp(user.phone, applicationApprovedWhatsApp(user.name, user.approvalNote));
+      fireEmail(email, applicationApprovedEmail(user.name, user.approvalNote));
+      fireWhatsApp(phone, applicationApprovedWhatsApp(user.name, user.approvalNote));
       return;
     case "rejected":
-      fireEmail(user.email, applicationRejectedEmail(user.name, user.approvalNote));
-      fireWhatsApp(user.phone, applicationRejectedWhatsApp(user.name, user.approvalNote));
+      fireEmail(email, applicationRejectedEmail(user.name, user.approvalNote));
+      fireWhatsApp(phone, applicationRejectedWhatsApp(user.name, user.approvalNote));
       return;
     case "kyc_verified":
-      fireEmail(user.email, kycVerifiedEmail(user.name, user.kycNote));
-      fireWhatsApp(user.phone, kycVerifiedWhatsApp(user.name, user.kycNote));
+      fireEmail(email, kycVerifiedEmail(user.name, user.kycNote));
+      fireWhatsApp(phone, kycVerifiedWhatsApp(user.name, user.kycNote));
       return;
     case "kyc_rejected":
-      fireEmail(user.email, kycRejectedEmail(user.name, user.kycNote));
-      fireWhatsApp(user.phone, kycRejectedWhatsApp(user.name, user.kycNote));
+      fireEmail(email, kycRejectedEmail(user.name, user.kycNote));
+      fireWhatsApp(phone, kycRejectedWhatsApp(user.name, user.kycNote));
       return;
   }
 }

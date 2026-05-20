@@ -3609,7 +3609,8 @@ export const LoginResponse = zod.object({
   "approvalNote": zod.string().nullish(),
   "kycStatus": zod.enum(['not_submitted', 'submitted', 'verified', 'rejected']).nullish(),
   "kycNote": zod.string().nullish(),
-  "requestedRole": zod.string().nullish()
+  "requestedRole": zod.string().nullish(),
+  "notificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional()
 })
 
 
@@ -3644,7 +3645,8 @@ export const GetCurrentUserResponse = zod.object({
   "approvalNote": zod.string().nullish(),
   "kycStatus": zod.enum(['not_submitted', 'submitted', 'verified', 'rejected']).nullish(),
   "kycNote": zod.string().nullish(),
-  "requestedRole": zod.string().nullish()
+  "requestedRole": zod.string().nullish(),
+  "notificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional()
 })
 
 
@@ -3654,7 +3656,8 @@ export const GetCurrentUserResponse = zod.object({
 export const UpdateMyProfileBody = zod.object({
   "name": zod.string().min(1).optional(),
   "phone": zod.string().nullish(),
-  "avatarUrl": zod.string().nullish()
+  "avatarUrl": zod.string().nullish(),
+  "notificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional()
 })
 
 export const UpdateMyProfileResponse = zod.object({
@@ -3670,7 +3673,8 @@ export const UpdateMyProfileResponse = zod.object({
   "approvalNote": zod.string().nullish(),
   "kycStatus": zod.enum(['not_submitted', 'submitted', 'verified', 'rejected']).nullish(),
   "kycNote": zod.string().nullish(),
-  "requestedRole": zod.string().nullish()
+  "requestedRole": zod.string().nullish(),
+  "notificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional()
 })
 
 
@@ -3701,7 +3705,8 @@ export const SubmitKycResponse = zod.object({
   "approvalNote": zod.string().nullish(),
   "kycStatus": zod.enum(['not_submitted', 'submitted', 'verified', 'rejected']).nullish(),
   "kycNote": zod.string().nullish(),
-  "requestedRole": zod.string().nullish()
+  "requestedRole": zod.string().nullish(),
+  "notificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional()
 })
 
 
@@ -3738,7 +3743,8 @@ export const ListApprovalsResponse = zod.object({
   "approvalNote": zod.string().nullish(),
   "kycStatus": zod.enum(['not_submitted', 'submitted', 'verified', 'rejected']).nullish(),
   "kycNote": zod.string().nullish(),
-  "requestedRole": zod.string().nullish()
+  "requestedRole": zod.string().nullish(),
+  "notificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional()
 })),
   "nextCursor": zod.string().nullable()
 })
@@ -3769,7 +3775,8 @@ export const DecideApprovalResponse = zod.object({
   "approvalNote": zod.string().nullish(),
   "kycStatus": zod.enum(['not_submitted', 'submitted', 'verified', 'rejected']).nullish(),
   "kycNote": zod.string().nullish(),
-  "requestedRole": zod.string().nullish()
+  "requestedRole": zod.string().nullish(),
+  "notificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional()
 })
 
 
@@ -3798,7 +3805,8 @@ export const DecideKycResponse = zod.object({
   "approvalNote": zod.string().nullish(),
   "kycStatus": zod.enum(['not_submitted', 'submitted', 'verified', 'rejected']).nullish(),
   "kycNote": zod.string().nullish(),
-  "requestedRole": zod.string().nullish()
+  "requestedRole": zod.string().nullish(),
+  "notificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional()
 })
 
 

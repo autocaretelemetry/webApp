@@ -1,7 +1,18 @@
+import { sql } from "drizzle-orm";
 import { pgTable, uuid, text, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
 
 export const APPROVAL_STATUSES = ["pending", "approved", "rejected"] as const;
 export type ApprovalStatus = (typeof APPROVAL_STATUSES)[number];
+
+// Channels we can deliver decision notifications over. Stored on the user so
+// each applicant can opt out of email or WhatsApp independently. Defaults to
+// both so behaviour is unchanged for existing rows.
+export const NOTIFICATION_CHANNELS = ["email", "whatsapp"] as const;
+export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
+export const DEFAULT_NOTIFICATION_CHANNELS: NotificationChannel[] = [
+  "email",
+  "whatsapp",
+];
 
 export const KYC_STATUSES = [
   "not_submitted",
@@ -54,6 +65,14 @@ export const usersTable = pgTable("users", {
   // Free-form role-specific signup payload captured for the approver to read
   // (business name, vehicle count, region, etc.).
   applicantData: jsonb("applicant_data").$type<Record<string, unknown>>(),
+  // Per-user preference for decision notifications. Stored as a Postgres
+  // text[] (e.g. `{email,whatsapp}`) and read by `fireDecisionNotifications`
+  // to skip channels the user has opted out of.
+  notificationChannels: text("notification_channels")
+    .array()
+    .$type<NotificationChannel[]>()
+    .notNull()
+    .default(sql`ARRAY['email','whatsapp']::text[]`),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

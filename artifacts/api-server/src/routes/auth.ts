@@ -173,6 +173,12 @@ router.patch("/auth/me", requireAuth, async (req, res): Promise<void> => {
     const a = parsed.data.avatarUrl?.trim();
     patch["avatarUrl"] = a ? a : null;
   }
+  if (parsed.data.notificationChannels !== undefined) {
+    // De-dupe and preserve canonical order so storage stays normalised.
+    const allowed = ["email", "whatsapp"] as const;
+    const set = new Set(parsed.data.notificationChannels);
+    patch["notificationChannels"] = allowed.filter((c) => set.has(c));
+  }
   if (Object.keys(patch).length === 0) {
     res.json(req.user);
     return;
