@@ -1954,6 +1954,130 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /me/kyc:
+    post:
+      operationId: submitKyc
+      tags: [onboarding]
+      summary: Submit role-specific KYC documents for review
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/KycSubmissionInput" }
+      responses:
+        "200":
+          description: KYC submitted (status flipped to "submitted")
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthedUser" }
+        "400":
+          description: Invalid submission
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Account is not approved yet
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /admin/approvals:
+    get:
+      operationId: listApprovals
+      tags: [onboarding]
+      summary: Super-admin queue of self-signup applications
+      parameters:
+        - in: query
+          name: state
+          required: false
+          schema:
+            type: string
+            enum: [pending, kyc_pending, rejected, all]
+            default: pending
+      responses:
+        "200":
+          description: List of applicants
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AuthedUser" }
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Forbidden (not super admin)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /admin/approvals/{userId}:
+    patch:
+      operationId: decideApproval
+      tags: [onboarding]
+      summary: Approve or reject a pending application
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ApprovalDecisionInput" }
+      responses:
+        "200":
+          description: Decision applied
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthedUser" }
+        "404":
+          description: Applicant not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Application is not pending
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /admin/kyc/{userId}:
+    patch:
+      operationId: decideKyc
+      tags: [onboarding]
+      summary: Verify or reject a submitted KYC bundle
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/KycDecisionInput" }
+      responses:
+        "200":
+          description: Decision applied
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthedUser" }
+        "404":
+          description: Applicant not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: No KYC submission to review
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /auth/change-password:
     post:
       operationId: changePassword
@@ -2033,6 +2157,41 @@ components:
           enum: [not_submitted, submitted, verified, rejected]
         kycNote: { type: string, nullable: true }
         requestedRole: { type: string, nullable: true }
+
+    KycDocument:
+      type: object
+      required: [key, label, url]
+      properties:
+        key: { type: string }
+        label: { type: string }
+        url: { type: string }
+
+    KycSubmissionInput:
+      type: object
+      required: [documents]
+      properties:
+        documents:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/KycDocument" }
+
+    ApprovalDecisionInput:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [approve, reject]
+        note: { type: string, nullable: true }
+
+    KycDecisionInput:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [verify, reject]
+        note: { type: string, nullable: true }
 
     UpdateProfileInput:
       type: object

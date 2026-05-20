@@ -37,14 +37,14 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     return;
   }
   if (row.approvalStatus === "pending") {
-    res.status(403).json({
+    res.status(401).json({
       error: "Your application is still under review.",
       reason: "pending",
     });
     return;
   }
   if (row.approvalStatus === "rejected") {
-    res.status(403).json({
+    res.status(401).json({
       error: "Your application was not approved.",
       reason: "rejected",
       note: row.approvalNote ?? null,

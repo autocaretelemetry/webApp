@@ -3674,6 +3674,122 @@ export const UpdateMyProfileResponse = zod.object({
 })
 
 
+/**
+ * @summary Submit role-specific KYC documents for review
+ */
+
+
+
+export const SubmitKycBody = zod.object({
+  "documents": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "url": zod.string()
+})).min(1)
+})
+
+export const SubmitKycResponse = zod.object({
+  "id": zod.string(),
+  "email": zod.string(),
+  "name": zod.string(),
+  "role": zod.enum(['owner', 'center', 'vendor', 'delivery', 'fleet', 'admin', 'super_admin']),
+  "phone": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "approvalStatus": zod.enum(['pending', 'approved', 'rejected']).nullish(),
+  "approvalNote": zod.string().nullish(),
+  "kycStatus": zod.enum(['not_submitted', 'submitted', 'verified', 'rejected']).nullish(),
+  "kycNote": zod.string().nullish(),
+  "requestedRole": zod.string().nullish()
+})
+
+
+/**
+ * @summary Super-admin queue of self-signup applications
+ */
+export const listApprovalsQueryStateDefault = `pending`;
+
+export const ListApprovalsQueryParams = zod.object({
+  "state": zod.enum(['pending', 'kyc_pending', 'rejected', 'all']).default(listApprovalsQueryStateDefault)
+})
+
+export const ListApprovalsResponseItem = zod.object({
+  "id": zod.string(),
+  "email": zod.string(),
+  "name": zod.string(),
+  "role": zod.enum(['owner', 'center', 'vendor', 'delivery', 'fleet', 'admin', 'super_admin']),
+  "phone": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "approvalStatus": zod.enum(['pending', 'approved', 'rejected']).nullish(),
+  "approvalNote": zod.string().nullish(),
+  "kycStatus": zod.enum(['not_submitted', 'submitted', 'verified', 'rejected']).nullish(),
+  "kycNote": zod.string().nullish(),
+  "requestedRole": zod.string().nullish()
+})
+export const ListApprovalsResponse = zod.array(ListApprovalsResponseItem)
+
+
+/**
+ * @summary Approve or reject a pending application
+ */
+export const DecideApprovalParams = zod.object({
+  "userId": zod.coerce.string()
+})
+
+export const DecideApprovalBody = zod.object({
+  "decision": zod.enum(['approve', 'reject']),
+  "note": zod.string().nullish()
+})
+
+export const DecideApprovalResponse = zod.object({
+  "id": zod.string(),
+  "email": zod.string(),
+  "name": zod.string(),
+  "role": zod.enum(['owner', 'center', 'vendor', 'delivery', 'fleet', 'admin', 'super_admin']),
+  "phone": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "approvalStatus": zod.enum(['pending', 'approved', 'rejected']).nullish(),
+  "approvalNote": zod.string().nullish(),
+  "kycStatus": zod.enum(['not_submitted', 'submitted', 'verified', 'rejected']).nullish(),
+  "kycNote": zod.string().nullish(),
+  "requestedRole": zod.string().nullish()
+})
+
+
+/**
+ * @summary Verify or reject a submitted KYC bundle
+ */
+export const DecideKycParams = zod.object({
+  "userId": zod.coerce.string()
+})
+
+export const DecideKycBody = zod.object({
+  "decision": zod.enum(['verify', 'reject']),
+  "note": zod.string().nullish()
+})
+
+export const DecideKycResponse = zod.object({
+  "id": zod.string(),
+  "email": zod.string(),
+  "name": zod.string(),
+  "role": zod.enum(['owner', 'center', 'vendor', 'delivery', 'fleet', 'admin', 'super_admin']),
+  "phone": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "approvalStatus": zod.enum(['pending', 'approved', 'rejected']).nullish(),
+  "approvalNote": zod.string().nullish(),
+  "kycStatus": zod.enum(['not_submitted', 'submitted', 'verified', 'rejected']).nullish(),
+  "kycNote": zod.string().nullish(),
+  "requestedRole": zod.string().nullish()
+})
+
+
 
 export const changePasswordBodyNewPasswordMin = 8;
 

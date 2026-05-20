@@ -88,6 +88,43 @@ export interface AuthedUser {
   requestedRole?: string | null;
 }
 
+export interface KycDocument {
+  key: string;
+  label: string;
+  url: string;
+}
+
+export interface KycSubmissionInput {
+  /** @minItems 1 */
+  documents: KycDocument[];
+}
+
+export type ApprovalDecisionInputDecision = typeof ApprovalDecisionInputDecision[keyof typeof ApprovalDecisionInputDecision];
+
+
+export const ApprovalDecisionInputDecision = {
+  approve: 'approve',
+  reject: 'reject',
+} as const;
+
+export interface ApprovalDecisionInput {
+  decision: ApprovalDecisionInputDecision;
+  note?: string | null;
+}
+
+export type KycDecisionInputDecision = typeof KycDecisionInputDecision[keyof typeof KycDecisionInputDecision];
+
+
+export const KycDecisionInputDecision = {
+  verify: 'verify',
+  reject: 'reject',
+} as const;
+
+export interface KycDecisionInput {
+  decision: KycDecisionInputDecision;
+  note?: string | null;
+}
+
 export interface UpdateProfileInput {
   /** @minLength 1 */
   name?: string;
@@ -2238,4 +2275,18 @@ export type GetVapidPublicKey200 = {
 export type GetVapidPublicKey503 = {
   error: string;
 };
+
+export type ListApprovalsParams = {
+state?: ListApprovalsState;
+};
+
+export type ListApprovalsState = typeof ListApprovalsState[keyof typeof ListApprovalsState];
+
+
+export const ListApprovalsState = {
+  pending: 'pending',
+  kyc_pending: 'kyc_pending',
+  rejected: 'rejected',
+  all: 'all',
+} as const;
 

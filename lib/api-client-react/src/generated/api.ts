@@ -22,6 +22,7 @@ import type {
 import type {
   ActivityEvent,
   AdminOverview,
+  ApprovalDecisionInput,
   AssignMechanicInput,
   AuthedUser,
   Booking,
@@ -60,8 +61,11 @@ import type {
   GetVapidPublicKey503,
   HealthStatus,
   Invoice,
+  KycDecisionInput,
+  KycSubmissionInput,
   LandingContent,
   ListActivityParams,
+  ListApprovalsParams,
   ListBookingsParams,
   ListDeliveryAgentsParams,
   ListDriversParams,
@@ -9080,6 +9084,305 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getUpdateMyProfileMutationOptions(options));
+    }
+
+export const getSubmitKycUrl = () => {
+
+
+
+
+  return `/api/me/kyc`
+}
+
+/**
+ * @summary Submit role-specific KYC documents for review
+ */
+export const submitKyc = async (kycSubmissionInput: KycSubmissionInput, options?: RequestInit): Promise<AuthedUser> => {
+
+  return customFetch<AuthedUser>(getSubmitKycUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      kycSubmissionInput,)
+  }
+);}
+
+
+
+
+export const getSubmitKycMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitKyc>>, TError,{data: BodyType<KycSubmissionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitKyc>>, TError,{data: BodyType<KycSubmissionInput>}, TContext> => {
+
+const mutationKey = ['submitKyc'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitKyc>>, {data: BodyType<KycSubmissionInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  submitKyc(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitKycMutationResult = NonNullable<Awaited<ReturnType<typeof submitKyc>>>
+    export type SubmitKycMutationBody = BodyType<KycSubmissionInput>
+    export type SubmitKycMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Submit role-specific KYC documents for review
+ */
+export const useSubmitKyc = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitKyc>>, TError,{data: BodyType<KycSubmissionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof submitKyc>>,
+        TError,
+        {data: BodyType<KycSubmissionInput>},
+        TContext
+      > => {
+      return useMutation(getSubmitKycMutationOptions(options));
+    }
+
+export const getListApprovalsUrl = (params?: ListApprovalsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/admin/approvals?${stringifiedParams}` : `/api/admin/approvals`
+}
+
+/**
+ * @summary Super-admin queue of self-signup applications
+ */
+export const listApprovals = async (params?: ListApprovalsParams, options?: RequestInit): Promise<AuthedUser[]> => {
+
+  return customFetch<AuthedUser[]>(getListApprovalsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListApprovalsQueryKey = (params?: ListApprovalsParams,) => {
+    return [
+    `/api/admin/approvals`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListApprovalsQueryOptions = <TData = Awaited<ReturnType<typeof listApprovals>>, TError = ErrorType<ErrorResponse>>(params?: ListApprovalsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listApprovals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListApprovalsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listApprovals>>> = ({ signal }) => listApprovals(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listApprovals>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListApprovalsQueryResult = NonNullable<Awaited<ReturnType<typeof listApprovals>>>
+export type ListApprovalsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Super-admin queue of self-signup applications
+ */
+
+export function useListApprovals<TData = Awaited<ReturnType<typeof listApprovals>>, TError = ErrorType<ErrorResponse>>(
+ params?: ListApprovalsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listApprovals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListApprovalsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getDecideApprovalUrl = (userId: string,) => {
+
+
+
+
+  return `/api/admin/approvals/${userId}`
+}
+
+/**
+ * @summary Approve or reject a pending application
+ */
+export const decideApproval = async (userId: string,
+    approvalDecisionInput: ApprovalDecisionInput, options?: RequestInit): Promise<AuthedUser> => {
+
+  return customFetch<AuthedUser>(getDecideApprovalUrl(userId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      approvalDecisionInput,)
+  }
+);}
+
+
+
+
+export const getDecideApprovalMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof decideApproval>>, TError,{userId: string;data: BodyType<ApprovalDecisionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof decideApproval>>, TError,{userId: string;data: BodyType<ApprovalDecisionInput>}, TContext> => {
+
+const mutationKey = ['decideApproval'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof decideApproval>>, {userId: string;data: BodyType<ApprovalDecisionInput>}> = (props) => {
+          const {userId,data} = props ?? {};
+
+          return  decideApproval(userId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DecideApprovalMutationResult = NonNullable<Awaited<ReturnType<typeof decideApproval>>>
+    export type DecideApprovalMutationBody = BodyType<ApprovalDecisionInput>
+    export type DecideApprovalMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Approve or reject a pending application
+ */
+export const useDecideApproval = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof decideApproval>>, TError,{userId: string;data: BodyType<ApprovalDecisionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof decideApproval>>,
+        TError,
+        {userId: string;data: BodyType<ApprovalDecisionInput>},
+        TContext
+      > => {
+      return useMutation(getDecideApprovalMutationOptions(options));
+    }
+
+export const getDecideKycUrl = (userId: string,) => {
+
+
+
+
+  return `/api/admin/kyc/${userId}`
+}
+
+/**
+ * @summary Verify or reject a submitted KYC bundle
+ */
+export const decideKyc = async (userId: string,
+    kycDecisionInput: KycDecisionInput, options?: RequestInit): Promise<AuthedUser> => {
+
+  return customFetch<AuthedUser>(getDecideKycUrl(userId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      kycDecisionInput,)
+  }
+);}
+
+
+
+
+export const getDecideKycMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof decideKyc>>, TError,{userId: string;data: BodyType<KycDecisionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof decideKyc>>, TError,{userId: string;data: BodyType<KycDecisionInput>}, TContext> => {
+
+const mutationKey = ['decideKyc'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof decideKyc>>, {userId: string;data: BodyType<KycDecisionInput>}> = (props) => {
+          const {userId,data} = props ?? {};
+
+          return  decideKyc(userId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DecideKycMutationResult = NonNullable<Awaited<ReturnType<typeof decideKyc>>>
+    export type DecideKycMutationBody = BodyType<KycDecisionInput>
+    export type DecideKycMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Verify or reject a submitted KYC bundle
+ */
+export const useDecideKyc = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof decideKyc>>, TError,{userId: string;data: BodyType<KycDecisionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof decideKyc>>,
+        TError,
+        {userId: string;data: BodyType<KycDecisionInput>},
+        TContext
+      > => {
+      return useMutation(getDecideKycMutationOptions(options));
     }
 
 export const getChangePasswordUrl = () => {
