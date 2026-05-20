@@ -400,6 +400,22 @@ router.get("/rental-cars/:carId/public", async (req, res): Promise<void> => {
   });
 });
 
+// Bookings that count as "the owner approved this renter for this car" — at
+// these statuses the renter legitimately needs the chauffeur's phone /
+// licence to coordinate pickup, so we expose the full driver row. The
+// rental FSM is `pending_review -> contract_pending -> awaiting_payment ->
+// confirmed -> active -> completed`; owner approval flips the booking out
+// of `pending_review` into `contract_pending`, so everything from
+// contract_pending onward (short of cancelled/rejected) counts as
+// owner-approved.
+const DRIVER_PII_BOOKING_STATUSES = [
+  "contract_pending",
+  "awaiting_payment",
+  "confirmed",
+  "active",
+  "completed",
+] as const;
+
 router.get("/rental-cars/:carId", requireAuth, async (req, res): Promise<void> => {
   const params = GetRentalCarParams.safeParse(req.params);
   if (!params.success) {
@@ -415,7 +431,42 @@ router.get("/rental-cars/:carId", requireAuth, async (req, res): Promise<void> =
     return;
   }
   const [hydrated] = await hydrateCarsWithDriver([row]);
-  res.json(hydrated);
+
+  // Decide whether this caller may see the chauffeur's PII (phone, licence
+  // number, etc). General signed-in browsers get the same redacted driver
+  // shape as the public share view; only admins, the car owner, and renters
+  // with an approved booking on this car see the full row.
+  const role = req.user?.role;
+  const isAdmin = role === "admin" || role === "super_admin";
+  const callerPhone = (req.user?.phone ?? "").trim();
+  let canSeeDriverPii = isAdmin || (!!callerPhone && callerPhone === row.ownerPhone.trim());
+  if (!canSeeDriverPii && callerPhone) {
+    const [match] = await db
+      .select({ id: rentalBookingsTable.id })
+      .from(rentalBookingsTable)
+      .where(
+        and(
+          eq(rentalBookingsTable.carId, row.id),
+          eq(rentalBookingsTable.renterPhone, callerPhone),
+          inArray(rentalBookingsTable.status, [...DRIVER_PII_BOOKING_STATUSES]),
+        ),
+      )
+      .limit(1);
+    canSeeDriverPii = !!match;
+  }
+
+  const driver =
+    hydrated.driver && !canSeeDriverPii
+      ? {
+          id: hydrated.driver.id,
+          name: hydrated.driver.name,
+          photoUrl: hydrated.driver.photoUrl,
+          yearsExperience: hydrated.driver.yearsExperience,
+          languages: hydrated.driver.languages ?? [],
+          bio: hydrated.driver.bio,
+        }
+      : hydrated.driver;
+  res.json({ ...hydrated, driver });
 });
 
 router.post("/rental-cars", requireAuth, async (req, res): Promise<void> => {
