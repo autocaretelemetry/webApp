@@ -21,7 +21,7 @@ import {
 } from "@workspace/db";
 import { requireAuth, requireSuperAdmin } from "../lib/auth";
 import { getEntitlements } from "../lib/entitlements";
-import { subscriptionsTable, subscriptionPlansTable } from "@workspace/db";
+import { subscriptionsTable, subscriptionPlansTable, usersTable } from "@workspace/db";
 import { computeReminders } from "../lib/reminders";
 import { createOwnerNotification } from "../lib/notify";
 import PDFDocument from "pdfkit";
@@ -270,7 +270,7 @@ router.get(
       return;
     }
     const orgIds = orgs.map((o) => o.id);
-    const [memberCounts, vehicleCounts, centerCounts, subs] = await Promise.all([
+    const [memberCounts, vehicleCounts, centerCounts, subs, adminVerified] = await Promise.all([
       db
         .select({
           organizationId: organizationMembersTable.organizationId,
@@ -315,6 +315,26 @@ router.get(
           ),
         )
         .orderBy(desc(subscriptionsTable.startedAt)),
+      // Per org, true if at least one admin member exists whose user
+      // account is both approved AND has verified KYC. This is what the
+      // super-admin page actually wants to show as "ready" status —
+      // the org-row's own kycStatus column is not wired to any approval
+      // flow (it defaults to "pending" on insert and stays there).
+      db
+        .select({
+          organizationId: organizationMembersTable.organizationId,
+        })
+        .from(organizationMembersTable)
+        .innerJoin(usersTable, eq(usersTable.phone, organizationMembersTable.phone))
+        .where(
+          and(
+            inArray(organizationMembersTable.organizationId, orgIds),
+            eq(organizationMembersTable.role, "admin"),
+            eq(usersTable.approvalStatus, "approved"),
+            eq(usersTable.kycStatus, "verified"),
+          ),
+        )
+        .groupBy(organizationMembersTable.organizationId),
     ]);
     const memberByOrg = new Map(memberCounts.map((r) => [r.organizationId, Number(r.c)]));
     const vehicleByOrg = new Map(
@@ -328,6 +348,7 @@ router.get(
     for (const s of subs) {
       if (!planByOrg.has(s.subscriberId)) planByOrg.set(s.subscriberId, s.planName);
     }
+    const verifiedOrgIds = new Set(adminVerified.map((r) => r.organizationId));
     res.json({
       organizations: orgs.map((o) => ({
         ...o,
@@ -335,6 +356,7 @@ router.get(
         vehicleCount: vehicleByOrg.get(o.id) ?? 0,
         preferredCenterCount: centerByOrg.get(o.id) ?? 0,
         planName: planByOrg.get(o.id) ?? null,
+        adminVerified: verifiedOrgIds.has(o.id),
       })),
     });
   },

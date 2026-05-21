@@ -16,13 +16,13 @@ type AdminOrg = {
   contactEmail: string | null;
   city: string | null;
   region: string | null;
-  kycStatus: string;
   requireFinanceApproval: boolean;
   createdAt: string;
   memberCount: number;
   vehicleCount: number;
   preferredCenterCount: number;
   planName: string | null;
+  adminVerified: boolean;
 };
 
 async function fetchOrgs(): Promise<AdminOrg[]> {
@@ -30,12 +30,6 @@ async function fetchOrgs(): Promise<AdminOrg[]> {
   if (!res.ok) throw new Error(`Failed to load organizations (${res.status})`);
   const body = (await res.json()) as { organizations: AdminOrg[] };
   return body.organizations;
-}
-
-function kycTone(status: string): "default" | "secondary" | "destructive" | "outline" {
-  if (status === "verified" || status === "approved") return "default";
-  if (status === "rejected") return "destructive";
-  return "secondary";
 }
 
 export default function SuperAdminOrganizations() {
@@ -90,8 +84,11 @@ export default function SuperAdminOrganizations() {
                       {o.industry ?? "Fleet"} · joined {new Date(o.createdAt).toLocaleDateString()}
                     </p>
                   </div>
-                  <Badge variant={kycTone(o.kycStatus)} className="capitalize shrink-0">
-                    {o.kycStatus}
+                  <Badge
+                    variant={o.adminVerified ? "default" : "secondary"}
+                    className="shrink-0"
+                  >
+                    {o.adminVerified ? "Active" : "Awaiting admin KYC"}
                   </Badge>
                 </div>
 
