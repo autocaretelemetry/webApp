@@ -82,6 +82,7 @@ export * from './invoiceStatus';
 export * from './kycDecisionInput';
 export * from './kycDecisionInputDecision';
 export * from './kycDocument';
+export * from './kycDocumentScanStatus';
 export * from './kycSubmissionInput';
 export * from './landingContent';
 export * from './landingRoleCard';

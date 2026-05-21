@@ -10,6 +10,7 @@ import type { AuthedUserKycStatus } from './authedUserKycStatus';
 import type { AuthedUserNotificationChannelsItem } from './authedUserNotificationChannelsItem';
 import type { AuthedUserPendingVerificationChannelsItem } from './authedUserPendingVerificationChannelsItem';
 import type { AuthedUserRole } from './authedUserRole';
+import type { KycDocument } from './kycDocument';
 
 export interface AuthedUser {
   id: string;
@@ -29,4 +30,5 @@ export interface AuthedUser {
   emailVerifiedAt?: Date | null;
   phoneVerifiedAt?: Date | null;
   pendingVerificationChannels?: AuthedUserPendingVerificationChannelsItem[];
+  kycDocuments?: KycDocument[] | null;
 }

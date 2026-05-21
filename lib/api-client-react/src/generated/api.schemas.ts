@@ -98,6 +98,28 @@ export const AuthedUserPendingVerificationChannelsItem = {
   whatsapp: 'whatsapp',
 } as const;
 
+export type KycDocumentScanStatus = typeof KycDocumentScanStatus[keyof typeof KycDocumentScanStatus];
+
+
+export const KycDocumentScanStatus = {
+  pending: 'pending',
+  scanning: 'scanning',
+  clean: 'clean',
+  infected: 'infected',
+  error: 'error',
+} as const;
+
+export interface KycDocument {
+  key: string;
+  label: string;
+  url: string;
+  scanStatus?: KycDocumentScanStatus;
+  scanCheckedAt?: string;
+  scanDetails?: string;
+  rejectionReason?: string;
+  rejectedAt?: string;
+}
+
 export interface AuthedUser {
   id: string;
   email: string;
@@ -116,6 +138,7 @@ export interface AuthedUser {
   emailVerifiedAt?: string | null;
   phoneVerifiedAt?: string | null;
   pendingVerificationChannels?: AuthedUserPendingVerificationChannelsItem[];
+  kycDocuments?: KycDocument[] | null;
 }
 
 export type VerifySignupCodeInputChannel = typeof VerifySignupCodeInputChannel[keyof typeof VerifySignupCodeInputChannel];
@@ -171,12 +194,6 @@ export interface SignupVerificationStatus {
   pendingChannels: SignupVerificationStatusPendingChannelsItem[];
   allVerified: boolean;
   retryAfterSeconds?: number | null;
-}
-
-export interface KycDocument {
-  key: string;
-  label: string;
-  url: string;
 }
 
 export interface KycSubmissionInput {

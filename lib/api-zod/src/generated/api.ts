@@ -3623,7 +3623,17 @@ export const LoginResponse = zod.object({
   "notificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional(),
   "emailVerifiedAt": zod.coerce.date().nullish(),
   "phoneVerifiedAt": zod.coerce.date().nullish(),
-  "pendingVerificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional()
+  "pendingVerificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional(),
+  "kycDocuments": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "url": zod.string(),
+  "scanStatus": zod.enum(['pending', 'scanning', 'clean', 'infected', 'error']).optional(),
+  "scanCheckedAt": zod.coerce.date().optional(),
+  "scanDetails": zod.string().optional(),
+  "rejectionReason": zod.string().optional(),
+  "rejectedAt": zod.coerce.date().optional()
+})).nullish()
 })
 
 
@@ -3703,7 +3713,17 @@ export const GetCurrentUserResponse = zod.object({
   "notificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional(),
   "emailVerifiedAt": zod.coerce.date().nullish(),
   "phoneVerifiedAt": zod.coerce.date().nullish(),
-  "pendingVerificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional()
+  "pendingVerificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional(),
+  "kycDocuments": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "url": zod.string(),
+  "scanStatus": zod.enum(['pending', 'scanning', 'clean', 'infected', 'error']).optional(),
+  "scanCheckedAt": zod.coerce.date().optional(),
+  "scanDetails": zod.string().optional(),
+  "rejectionReason": zod.string().optional(),
+  "rejectedAt": zod.coerce.date().optional()
+})).nullish()
 })
 
 
@@ -3735,7 +3755,17 @@ export const UpdateMyProfileResponse = zod.object({
   "notificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional(),
   "emailVerifiedAt": zod.coerce.date().nullish(),
   "phoneVerifiedAt": zod.coerce.date().nullish(),
-  "pendingVerificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional()
+  "pendingVerificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional(),
+  "kycDocuments": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "url": zod.string(),
+  "scanStatus": zod.enum(['pending', 'scanning', 'clean', 'infected', 'error']).optional(),
+  "scanCheckedAt": zod.coerce.date().optional(),
+  "scanDetails": zod.string().optional(),
+  "rejectionReason": zod.string().optional(),
+  "rejectedAt": zod.coerce.date().optional()
+})).nullish()
 })
 
 
@@ -3749,7 +3779,12 @@ export const SubmitKycBody = zod.object({
   "documents": zod.array(zod.object({
   "key": zod.string(),
   "label": zod.string(),
-  "url": zod.string()
+  "url": zod.string(),
+  "scanStatus": zod.enum(['pending', 'scanning', 'clean', 'infected', 'error']).optional(),
+  "scanCheckedAt": zod.coerce.date().optional(),
+  "scanDetails": zod.string().optional(),
+  "rejectionReason": zod.string().optional(),
+  "rejectedAt": zod.coerce.date().optional()
 })).min(1)
 })
 
@@ -3770,7 +3805,17 @@ export const SubmitKycResponse = zod.object({
   "notificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional(),
   "emailVerifiedAt": zod.coerce.date().nullish(),
   "phoneVerifiedAt": zod.coerce.date().nullish(),
-  "pendingVerificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional()
+  "pendingVerificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional(),
+  "kycDocuments": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "url": zod.string(),
+  "scanStatus": zod.enum(['pending', 'scanning', 'clean', 'infected', 'error']).optional(),
+  "scanCheckedAt": zod.coerce.date().optional(),
+  "scanDetails": zod.string().optional(),
+  "rejectionReason": zod.string().optional(),
+  "rejectedAt": zod.coerce.date().optional()
+})).nullish()
 })
 
 
@@ -3811,7 +3856,17 @@ export const ListApprovalsResponse = zod.object({
   "notificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional(),
   "emailVerifiedAt": zod.coerce.date().nullish(),
   "phoneVerifiedAt": zod.coerce.date().nullish(),
-  "pendingVerificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional()
+  "pendingVerificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional(),
+  "kycDocuments": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "url": zod.string(),
+  "scanStatus": zod.enum(['pending', 'scanning', 'clean', 'infected', 'error']).optional(),
+  "scanCheckedAt": zod.coerce.date().optional(),
+  "scanDetails": zod.string().optional(),
+  "rejectionReason": zod.string().optional(),
+  "rejectedAt": zod.coerce.date().optional()
+})).nullish()
 })),
   "nextCursor": zod.string().nullable()
 })
@@ -3846,7 +3901,17 @@ export const DecideApprovalResponse = zod.object({
   "notificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional(),
   "emailVerifiedAt": zod.coerce.date().nullish(),
   "phoneVerifiedAt": zod.coerce.date().nullish(),
-  "pendingVerificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional()
+  "pendingVerificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional(),
+  "kycDocuments": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "url": zod.string(),
+  "scanStatus": zod.enum(['pending', 'scanning', 'clean', 'infected', 'error']).optional(),
+  "scanCheckedAt": zod.coerce.date().optional(),
+  "scanDetails": zod.string().optional(),
+  "rejectionReason": zod.string().optional(),
+  "rejectedAt": zod.coerce.date().optional()
+})).nullish()
 })
 
 
@@ -3879,7 +3944,17 @@ export const DecideKycResponse = zod.object({
   "notificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional(),
   "emailVerifiedAt": zod.coerce.date().nullish(),
   "phoneVerifiedAt": zod.coerce.date().nullish(),
-  "pendingVerificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional()
+  "pendingVerificationChannels": zod.array(zod.enum(['email', 'whatsapp'])).optional(),
+  "kycDocuments": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "url": zod.string(),
+  "scanStatus": zod.enum(['pending', 'scanning', 'clean', 'infected', 'error']).optional(),
+  "scanCheckedAt": zod.coerce.date().optional(),
+  "scanDetails": zod.string().optional(),
+  "rejectionReason": zod.string().optional(),
+  "rejectedAt": zod.coerce.date().optional()
+})).nullish()
 })
 
 

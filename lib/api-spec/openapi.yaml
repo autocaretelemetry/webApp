@@ -2267,6 +2267,10 @@ components:
         pendingVerificationChannels:
           type: array
           items: { type: string, enum: [email, whatsapp] }
+        kycDocuments:
+          type: array
+          nullable: true
+          items: { $ref: "#/components/schemas/KycDocument" }
 
     VerifySignupCodeInput:
       type: object
@@ -2304,6 +2308,13 @@ components:
         key: { type: string }
         label: { type: string }
         url: { type: string }
+        scanStatus:
+          type: string
+          enum: [pending, scanning, clean, infected, error]
+        scanCheckedAt: { type: string, format: date-time }
+        scanDetails: { type: string }
+        rejectionReason: { type: string }
+        rejectedAt: { type: string, format: date-time }
 
     KycSubmissionInput:
       type: object

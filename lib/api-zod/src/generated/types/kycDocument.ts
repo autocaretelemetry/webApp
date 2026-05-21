@@ -5,9 +5,15 @@
  * AutoCare API — vehicle owners book services, service centers fulfill them.
  * OpenAPI spec version: 0.1.0
  */
+import type { KycDocumentScanStatus } from './kycDocumentScanStatus';
 
 export interface KycDocument {
   key: string;
   label: string;
   url: string;
+  scanStatus?: KycDocumentScanStatus;
+  scanCheckedAt?: Date;
+  scanDetails?: string;
+  rejectionReason?: string;
+  rejectedAt?: Date;
 }
