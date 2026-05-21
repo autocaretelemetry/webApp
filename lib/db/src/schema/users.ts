@@ -40,6 +40,13 @@ export type KycDocument = {
   scanStatus?: KycDocScanStatus;
   scanCheckedAt?: string;
   scanDetails?: string;
+  // Per-document rejection feedback. When a reviewer marks a specific
+  // document as unclear/missing/expired, `rejectionReason` is the message
+  // the applicant sees on their KYC page so they know which exact doc to
+  // re-upload. Re-submitting via POST /me/kyc rebuilds the doc array from
+  // scratch, so these fields naturally clear on the next submission.
+  rejectionReason?: string;
+  rejectedAt?: string;
 };
 
 export const usersTable = pgTable("users", {

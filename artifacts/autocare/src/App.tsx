@@ -71,8 +71,10 @@ import AdminRevenue from "@/pages/admin/Revenue";
 import SuperAdminLandingEditor from "@/pages/super_admin/LandingEditor";
 import SuperAdminApprovals from "@/pages/super_admin/Approvals";
 import SuperAdminOrganizations from "@/pages/super_admin/Organizations";
+import SuperAdminOnboard from "@/pages/super_admin/Onboard";
 import AdminRentals from "@/pages/admin/Rentals";
 import AdminRenters from "@/pages/admin/Renters";
+import AdminOwners from "@/pages/admin/Owners";
 import AdminReminderRuns from "@/pages/admin/ReminderRuns";
 import AdminSafety from "@/pages/admin/Safety";
 
@@ -230,6 +232,7 @@ function AppRouter() {
         <Route path="/admin/revenue" component={adminOnly(AdminRevenue)} />
         <Route path="/admin/rentals" component={adminOnly(AdminRentals)} />
         <Route path="/admin/renters" component={adminOnly(AdminRenters)} />
+        <Route path="/admin/owners" component={adminOnly(AdminOwners)} />
         <Route path="/admin/safety" component={adminOnly(AdminSafety)} />
         <Route path="/admin/reminder-runs" component={adminOnly(AdminReminderRuns)} />
 
@@ -237,6 +240,7 @@ function AppRouter() {
         <Route path="/super-admin/landing" component={superAdminOnly(SuperAdminLandingEditor)} />
         <Route path="/super-admin/approvals" component={superAdminOnly(SuperAdminApprovals)} />
         <Route path="/super-admin/organizations" component={superAdminOnly(SuperAdminOrganizations)} />
+        <Route path="/super-admin/onboard" component={superAdminOnly(SuperAdminOnboard)} />
 
         {/* Rentals Routes (owners + admins can browse; bookings open to any role using owner shell) */}
         <Route path="/rentals" component={RentalsBrowse} />

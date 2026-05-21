@@ -217,6 +217,7 @@ const ADMIN_NAV: NavSection[] = [
       { href: "/admin/mechanics", label: "Mechanics", icon: Users },
       { href: "/admin/agents", label: "Delivery Agents", icon: Truck },
       { href: "/admin/rentals", label: "Rentals", icon: KeyRound },
+      { href: "/admin/owners", label: "Car Owners", icon: Car },
       { href: "/admin/renters", label: "Renters", icon: Users },
       { href: "/admin/safety", label: "Safety & Tracking", icon: ShieldAlert },
       { href: "/admin/reminder-runs", label: "Reminder Runs", icon: BellRing },
@@ -237,6 +238,7 @@ const SUPER_ADMIN_NAV: NavSection[] = [
     label: "Site",
     items: [
       { href: "/super-admin/approvals", label: "Approvals", icon: ShieldCheck },
+      { href: "/super-admin/onboard", label: "Onboard Account", icon: UserPlus },
       { href: "/super-admin/organizations", label: "Institutions & Fleets", icon: Building2 },
       { href: "/super-admin/landing", label: "Landing Page", icon: Paintbrush },
     ],

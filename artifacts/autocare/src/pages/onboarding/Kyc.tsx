@@ -59,6 +59,14 @@ export default function OnboardingKyc() {
 
   const status = user?.kycStatus ?? "not_submitted";
   const note = user?.kycNote ?? null;
+  // Map of doc.key → reviewer-supplied rejection reason. Populated when the
+  // super admin rejected specific documents (see PATCH /admin/kyc/:userId
+  // `documentDecisions`). Cleared by the server on the next /me/kyc submit.
+  const docRejections: Record<string, string> = {};
+  for (const d of user?.kycDocuments ?? []) {
+    if (d.rejectionReason) docRejections[d.key] = d.rejectionReason;
+  }
+  const hasPerDocReasons = Object.keys(docRejections).length > 0;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -119,7 +127,12 @@ export default function OnboardingKyc() {
           icon={AlertCircle}
           tone="bad"
           title="KYC needs changes"
-          body={note ?? "Please re-upload clear images of the required documents."}
+          body={
+            note ??
+            (hasPerDocReasons
+              ? "Please re-upload the documents flagged below."
+              : "Please re-upload clear images of the required documents.")
+          }
         />
       )}
 
@@ -142,6 +155,7 @@ export default function OnboardingKyc() {
                   label={d.label}
                   required={d.required}
                   url={urls[d.key] ?? ""}
+                  rejectionReason={docRejections[d.key]}
                   onChange={(url) => setUrls((u) => ({ ...u, [d.key]: url }))}
                 />
               ))}
@@ -193,11 +207,13 @@ function UploadField({
   label,
   required,
   url,
+  rejectionReason,
   onChange,
 }: {
   label: string;
   required?: boolean;
   url: string;
+  rejectionReason?: string;
   onChange: (url: string) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -221,12 +237,22 @@ function UploadField({
     await uploadFile(file);
   }
 
+  const needsReupload = !!rejectionReason;
   return (
-    <div className="space-y-1.5">
+    <div
+      className={`space-y-1.5 ${
+        needsReupload ? "rounded-md border border-destructive/40 bg-destructive/5 p-2" : ""
+      }`}
+    >
       <Label className="flex items-center justify-between">
         <span>
           {label}
           {required && <span className="text-destructive ml-0.5">*</span>}
+          {needsReupload && (
+            <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-destructive">
+              <AlertCircle className="h-3 w-3" /> Re-upload
+            </span>
+          )}
         </span>
         {url && (
           <button
@@ -265,6 +291,12 @@ function UploadField({
           onChange={onPick}
         />
       </div>
+      {needsReupload && (
+        <p className="text-[11px] text-destructive flex items-start gap-1">
+          <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+          <span>{rejectionReason}</span>
+        </p>
+      )}
     </div>
   );
 }

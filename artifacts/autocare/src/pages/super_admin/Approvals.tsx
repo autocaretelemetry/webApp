@@ -303,6 +303,10 @@ function ApprovalsList({
   const [busy, setBusy] = useState<string | null>(null);
   const [rejectFor, setRejectFor] = useState<AuthedUserRow | null>(null);
   const [reason, setReason] = useState("");
+  // Per-document rejection reasons keyed by `KycDocument.key`. Only used
+  // when `kind === "kyc"` — applicant sees the entry next to that specific
+  // document on /onboarding/kyc.
+  const [docReasons, setDocReasons] = useState<Record<string, string>>({});
   const [historyFor, setHistoryFor] = useState<AuthedUserRow | null>(null);
 
   const [role, setRole] = useState<string>("all");
@@ -369,7 +373,12 @@ function ApprovalsList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, role, q, sort]);
 
-  async function decide(row: AuthedUserRow, action: "approve" | "reject" | "verify", note?: string) {
+  async function decide(
+    row: AuthedUserRow,
+    action: "approve" | "reject" | "verify",
+    note?: string,
+    documentDecisions?: Array<{ key: string; reason: string }>,
+  ) {
     // Approval-time guard: if neither contact channel has been verified by
     // the applicant, the decision email/WhatsApp will be silently skipped
     // (see fireDecisionNotifications in routes/onboarding.ts). Warn the
@@ -394,7 +403,13 @@ function ApprovalsList({
       const url = kind === "kyc" ? `/api/admin/kyc/${row.id}` : `/api/admin/approvals/${row.id}`;
       const body =
         kind === "kyc"
-          ? { decision: action === "approve" || action === "verify" ? "verify" : "reject", note: note ?? null }
+          ? {
+              decision: action === "approve" || action === "verify" ? "verify" : "reject",
+              note: note ?? null,
+              ...(documentDecisions && documentDecisions.length > 0
+                ? { documentDecisions }
+                : {}),
+            }
           : { decision: action === "approve" ? "approve" : "reject", note: note ?? null };
       const res = await fetch(url, {
         method: "PATCH",
@@ -415,6 +430,7 @@ function ApprovalsList({
       setBusy(null);
       setRejectFor(null);
       setReason("");
+      setDocReasons({});
     }
   }
 
@@ -734,22 +750,104 @@ function ApprovalsList({
         onClose={() => setHistoryFor(null)}
       />
 
-      <Dialog open={!!rejectFor} onOpenChange={(o) => !o && setRejectFor(null)}>
-        <DialogContent>
+      <Dialog
+        open={!!rejectFor}
+        onOpenChange={(o) => {
+          if (!o) {
+            setRejectFor(null);
+            setReason("");
+            setDocReasons({});
+          }
+        }}
+      >
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Reject {rejectFor?.name}</DialogTitle>
           </DialogHeader>
-          <Textarea
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            rows={4}
-            placeholder="Reason (shown to the applicant)…"
-          />
+
+          {kind === "kyc" && rejectFor?.kycDocuments && rejectFor.kycDocuments.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Mark each document that needs to be re-uploaded and tell the applicant why.
+                Leave blank to keep that document on file.
+              </p>
+              <div className="space-y-2">
+                {rejectFor.kycDocuments
+                  .filter((d) => (d.scanStatus ?? "pending") === "clean")
+                  .map((d) => (
+                    <div key={d.key} className="rounded-md border p-2.5">
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <span className="text-xs font-medium">{d.label}</span>
+                        <a
+                          href={d.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[11px] text-primary hover:underline"
+                        >
+                          Open
+                        </a>
+                      </div>
+                      <Textarea
+                        value={docReasons[d.key] ?? ""}
+                        onChange={(e) =>
+                          setDocReasons((r) => ({ ...r, [d.key]: e.target.value }))
+                        }
+                        rows={2}
+                        placeholder="Reason this document is rejected (leave blank to keep)…"
+                        className="text-xs"
+                      />
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <p className="text-xs text-muted-foreground">
+              {kind === "kyc"
+                ? "Overall message to the applicant (optional)."
+                : "Reason (shown to the applicant)."}
+            </p>
+            <Textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={3}
+              placeholder={
+                kind === "kyc"
+                  ? "Optional summary message…"
+                  : "Reason (shown to the applicant)…"
+              }
+            />
+          </div>
+
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setRejectFor(null)}>Cancel</Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setRejectFor(null);
+                setReason("");
+                setDocReasons({});
+              }}
+            >
+              Cancel
+            </Button>
             <Button
               variant="destructive"
-              onClick={() => rejectFor && decide(rejectFor, "reject", reason.trim() || undefined)}
+              onClick={() => {
+                if (!rejectFor) return;
+                const docDecisions =
+                  kind === "kyc"
+                    ? Object.entries(docReasons)
+                        .map(([key, r]) => ({ key, reason: r.trim() }))
+                        .filter((d) => d.reason.length > 0)
+                    : undefined;
+                decide(
+                  rejectFor,
+                  "reject",
+                  reason.trim() || undefined,
+                  docDecisions,
+                );
+              }}
               disabled={!!busy}
             >
               Confirm rejection

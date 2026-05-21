@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   db,
   usersTable,
+  vehiclesTable,
   serviceCentersTable,
   vendorsTable,
   deliveryAgentsTable,
@@ -15,7 +16,12 @@ import {
   type EventChannelEntry,
   type KycDocument,
 } from "@workspace/db";
-import { requireAuth, requireSuperAdmin, toAuthedUser } from "../lib/auth";
+import {
+  hashPassword,
+  requireAuth,
+  requireSuperAdmin,
+  toAuthedUser,
+} from "../lib/auth";
 import {
   sendEmail,
   applicationApprovedEmail,
@@ -845,6 +851,12 @@ router.post(
 const KycDecisionBody = z.object({
   decision: z.enum(["verify", "reject"]),
   note: z.string().nullish(),
+  // Optional per-document rejection feedback. Each entry pins a specific
+  // document (by `key` — matches `KycDocument.key`) with the reason the
+  // applicant should re-upload it. Only honoured when `decision = reject`.
+  documentDecisions: z
+    .array(z.object({ key: z.string().min(1), reason: z.string().trim().min(1) }))
+    .optional(),
 });
 
 router.patch(
@@ -866,11 +878,33 @@ router.patch(
       res.status(409).json({ error: "No KYC submission to review." });
       return;
     }
+    // When rejecting and the reviewer specified per-document reasons,
+    // stamp those onto the matching kycDocuments JSONB entries so the
+    // applicant sees exactly which document(s) to re-upload. The user's
+    // next POST /me/kyc rebuilds the array from scratch, so the
+    // rejection markers naturally clear.
+    let updatedDocuments: KycDocument[] | undefined;
+    if (
+      parsed.data.decision === "reject" &&
+      parsed.data.documentDecisions &&
+      parsed.data.documentDecisions.length > 0
+    ) {
+      const reasons = new Map(
+        parsed.data.documentDecisions.map((d) => [d.key, d.reason]),
+      );
+      const now = new Date().toISOString();
+      updatedDocuments = (target.kycDocuments ?? []).map((doc) =>
+        reasons.has(doc.key)
+          ? { ...doc, rejectionReason: reasons.get(doc.key)!, rejectedAt: now }
+          : { ...doc, rejectionReason: undefined, rejectedAt: undefined },
+      );
+    }
     const [row] = await db
       .update(usersTable)
       .set({
         kycStatus: parsed.data.decision === "verify" ? "verified" : "rejected",
         kycNote: parsed.data.note?.trim() || null,
+        ...(updatedDocuments ? { kycDocuments: updatedDocuments } : {}),
       })
       .where(eq(usersTable.id, userId))
       .returning();
@@ -1066,5 +1100,188 @@ async function provisionRoleRecord(tx: Tx, target: UserRow): Promise<void> {
       break;
   }
 }
+
+/**
+ * GET /admin/owners — directory of vehicle owners with their account status
+ * + vehicle count. Powers the "Car Owners" admin page. Filters down to
+ * users with `role = "owner"` (the post-approval role; pending applicants
+ * with `requestedRole = "owner"` show up in the Approvals queue instead).
+ */
+router.get("/admin/owners", requireSuperAdmin, async (_req, res): Promise<void> => {
+  const rows = await db
+    .select({
+      id: usersTable.id,
+      name: usersTable.name,
+      email: usersTable.email,
+      phone: usersTable.phone,
+      approvalStatus: usersTable.approvalStatus,
+      approvalNote: usersTable.approvalNote,
+      kycStatus: usersTable.kycStatus,
+      createdAt: usersTable.createdAt,
+      active: usersTable.active,
+      vehicleCount: sql<number>`(
+        SELECT COUNT(*)::int FROM ${vehiclesTable}
+        WHERE ${vehiclesTable.ownerPhone} = ${usersTable.phone}
+      )`,
+    })
+    .from(usersTable)
+    .where(eq(usersTable.role, "owner"))
+    .orderBy(desc(usersTable.createdAt));
+  res.json(rows);
+});
+
+const UserStatusBody = z.object({
+  approvalStatus: z.enum(["approved", "rejected"]),
+  note: z.string().trim().optional(),
+});
+
+/**
+ * PATCH /admin/users/:userId/status — super-admin toggle to suspend (set
+ * approvalStatus = "rejected") or reinstate (set "approved") an existing
+ * user. Distinct from the Approvals decision endpoint, which only acts on
+ * pending applications. Records the change on the audit trail so the
+ * applicant timeline shows the action.
+ */
+router.patch(
+  "/admin/users/:userId/status",
+  requireSuperAdmin,
+  async (req, res): Promise<void> => {
+    const parsed = UserStatusBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+    const userId = String(req.params["userId"]);
+    if (userId === req.user!.id) {
+      res.status(400).json({ error: "You cannot change your own status." });
+      return;
+    }
+    const [target] = await db
+      .select({ id: usersTable.id, role: usersTable.role })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId));
+    if (!target) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    if (target.role === "super_admin") {
+      res.status(403).json({ error: "Cannot suspend a super admin." });
+      return;
+    }
+    const note = parsed.data.note?.trim() || null;
+    const [row] = await db
+      .update(usersTable)
+      .set({
+        approvalStatus: parsed.data.approvalStatus,
+        approvalNote: note,
+      })
+      .where(eq(usersTable.id, userId))
+      .returning();
+    await recordEvent(db, {
+      userId,
+      action: parsed.data.approvalStatus === "approved" ? "approved" : "rejected",
+      actorUserId: req.user!.id,
+      actorName: req.user!.name,
+      note,
+    });
+    res.json(toAuthedUser(row!));
+  },
+);
+
+const ManualOnboardingBody = z.object({
+  email: z.string().trim().email(),
+  name: z.string().trim().min(1),
+  phone: z.string().trim().min(1),
+  role: z.enum(["owner", "renter", "center", "vendor", "delivery", "fleet"]),
+  password: z.string().min(8).optional(),
+  applicantData: z.record(z.string(), z.unknown()).optional(),
+});
+
+function generateTempPassword(): string {
+  // Human-friendly: 4 random words from a tiny dictionary + 2 digits.
+  // Length always ≥ 12 so it satisfies the 8-char minimum trivially.
+  const words = [
+    "apple", "river", "stone", "cloud", "amber", "delta", "ember", "fable",
+    "grove", "harbor", "ivory", "jade", "kite", "lumen", "maple", "nova",
+  ];
+  const pick = (): string => words[Math.floor(Math.random() * words.length)]!;
+  const digits = String(Math.floor(10 + Math.random() * 90));
+  return `${pick()}-${pick()}-${pick()}-${digits}`;
+}
+
+/**
+ * POST /admin/users — super-admin creates a fully provisioned account on
+ * behalf of an applicant (skip the self-signup + KYC funnel). The new user
+ * lands in `approved` + `verified` state and gets the role-specific
+ * directory row provisioned in the same transaction (renter profile,
+ * service center, vendor row, delivery agent, organization). Owners get
+ * no extra row — their vehicles attach to them by phone.
+ *
+ * The temporary password is returned in the response so the super admin
+ * can hand it to the user; it is intentionally not emailed because the
+ * applicant didn't go through email-verification and we don't want to
+ * leak a password to an unverified address.
+ */
+router.post("/admin/users", requireSuperAdmin, async (req, res): Promise<void> => {
+  const parsed = ManualOnboardingBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const { email, name, phone, role, applicantData } = parsed.data;
+  const emailLc = email.toLowerCase();
+  const [existing] = await db
+    .select({ id: usersTable.id })
+    .from(usersTable)
+    .where(eq(usersTable.email, emailLc));
+  if (existing) {
+    res.status(409).json({ error: "An account with that email already exists." });
+    return;
+  }
+  const tempPassword = parsed.data.password ?? generateTempPassword();
+  try {
+    const row = await db.transaction(async (tx) => {
+      const [inserted] = await tx
+        .insert(usersTable)
+        .values({
+          email: emailLc,
+          name,
+          phone,
+          role,
+          requestedRole: role,
+          passwordHash: hashPassword(tempPassword),
+          approvalStatus: "approved",
+          kycStatus: "verified",
+          applicantData: applicantData ?? null,
+          // Treat super-admin-onboarded users as if they verified both
+          // channels: we trust the staffer that created the row, and we
+          // need the decision-notification gates to consider them ready.
+          emailVerifiedAt: new Date(),
+          phoneVerifiedAt: new Date(),
+        })
+        .returning();
+      if (!inserted) throw new Error("Failed to create user");
+      // Reuse the same provisioner the approval flow uses so the
+      // directory row shape stays consistent.
+      await provisionRoleRecord(tx, inserted);
+      await tx.insert(approvalEventsTable).values({
+        userId: inserted.id,
+        action: "approved",
+        actorUserId: req.user!.id,
+        actorName: req.user!.name,
+        note: `Onboarded directly by ${req.user!.name}`,
+        internal: false,
+      });
+      return inserted;
+    });
+    res.status(201).json({
+      user: toAuthedUser(row),
+      tempPassword,
+    });
+  } catch (err) {
+    req.log.error({ err }, "manual onboarding failed");
+    res.status(500).json({ error: "Failed to create account." });
+  }
+});
 
 export default router;
