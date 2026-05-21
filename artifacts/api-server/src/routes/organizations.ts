@@ -19,8 +19,9 @@ import {
   type OrganizationMember,
   type OrganizationAddress,
 } from "@workspace/db";
-import { requireAuth } from "../lib/auth";
+import { requireAuth, requireSuperAdmin } from "../lib/auth";
 import { getEntitlements } from "../lib/entitlements";
+import { subscriptionsTable, subscriptionPlansTable } from "@workspace/db";
 import { computeReminders } from "../lib/reminders";
 import { createOwnerNotification } from "../lib/notify";
 import PDFDocument from "pdfkit";
@@ -251,6 +252,93 @@ router.get("/organizations/mine", requireAuth, async (req, res): Promise<void> =
     })),
   });
 });
+
+// Super-admin: list every organization on the platform with rollup counts
+// and the active subscription plan name. Powers the super-admin
+// "Institutions & Fleets" page.
+router.get(
+  "/admin/organizations",
+  requireAuth,
+  requireSuperAdmin,
+  async (_req, res): Promise<void> => {
+    const orgs = await db
+      .select()
+      .from(organizationsTable)
+      .orderBy(desc(organizationsTable.createdAt));
+    if (orgs.length === 0) {
+      res.json({ organizations: [] });
+      return;
+    }
+    const orgIds = orgs.map((o) => o.id);
+    const [memberCounts, vehicleCounts, centerCounts, subs] = await Promise.all([
+      db
+        .select({
+          organizationId: organizationMembersTable.organizationId,
+          c: count(),
+        })
+        .from(organizationMembersTable)
+        .where(inArray(organizationMembersTable.organizationId, orgIds))
+        .groupBy(organizationMembersTable.organizationId),
+      db
+        .select({
+          organizationId: vehiclesTable.organizationId,
+          c: count(),
+        })
+        .from(vehiclesTable)
+        .where(inArray(vehiclesTable.organizationId, orgIds))
+        .groupBy(vehiclesTable.organizationId),
+      db
+        .select({
+          organizationId: organizationPreferredCentersTable.organizationId,
+          c: count(),
+        })
+        .from(organizationPreferredCentersTable)
+        .where(inArray(organizationPreferredCentersTable.organizationId, orgIds))
+        .groupBy(organizationPreferredCentersTable.organizationId),
+      db
+        .select({
+          subscriberId: subscriptionsTable.subscriberId,
+          planName: subscriptionPlansTable.name,
+          status: subscriptionsTable.status,
+          startedAt: subscriptionsTable.startedAt,
+        })
+        .from(subscriptionsTable)
+        .innerJoin(
+          subscriptionPlansTable,
+          eq(subscriptionsTable.planId, subscriptionPlansTable.id),
+        )
+        .where(
+          and(
+            eq(subscriptionsTable.subscriberKind, "organization"),
+            eq(subscriptionsTable.status, "active"),
+            inArray(subscriptionsTable.subscriberId, orgIds),
+          ),
+        )
+        .orderBy(desc(subscriptionsTable.startedAt)),
+    ]);
+    const memberByOrg = new Map(memberCounts.map((r) => [r.organizationId, Number(r.c)]));
+    const vehicleByOrg = new Map(
+      vehicleCounts
+        .filter((r): r is { organizationId: string; c: number } => r.organizationId !== null)
+        .map((r) => [r.organizationId, Number(r.c)]),
+    );
+    const centerByOrg = new Map(centerCounts.map((r) => [r.organizationId, Number(r.c)]));
+    // First (newest active) sub wins per org.
+    const planByOrg = new Map<string, string>();
+    for (const s of subs) {
+      if (!planByOrg.has(s.subscriberId)) planByOrg.set(s.subscriberId, s.planName);
+    }
+    res.json({
+      organizations: orgs.map((o) => ({
+        ...o,
+        memberCount: memberByOrg.get(o.id) ?? 0,
+        vehicleCount: vehicleByOrg.get(o.id) ?? 0,
+        preferredCenterCount: centerByOrg.get(o.id) ?? 0,
+        planName: planByOrg.get(o.id) ?? null,
+      })),
+    });
+  },
+);
 
 // Signup. The creator becomes the first admin member.
 router.post("/organizations", requireAuth, async (req, res): Promise<void> => {
