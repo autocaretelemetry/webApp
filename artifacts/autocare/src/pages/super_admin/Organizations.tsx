@@ -1,10 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Building2, Users, Truck, MapPin, ShieldCheck, ExternalLink } from "lucide-react";
+import { Building2, Users, Truck, MapPin, ShieldCheck } from "lucide-react";
 
 const API = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/api`;
 
@@ -129,23 +127,16 @@ export default function SuperAdminOrganizations() {
                   )}
                 </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-border">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant={o.planName ? "default" : "outline"} className="text-xs">
-                      {o.planName ?? "Free tier"}
+                <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-border">
+                  <Badge variant={o.planName ? "default" : "outline"} className="text-xs">
+                    {o.planName ?? "Free tier"}
+                  </Badge>
+                  {o.requireFinanceApproval && (
+                    <Badge variant="secondary" className="text-xs gap-1">
+                      <ShieldCheck className="h-3 w-3" />
+                      Finance approval
                     </Badge>
-                    {o.requireFinanceApproval && (
-                      <Badge variant="secondary" className="text-xs gap-1">
-                        <ShieldCheck className="h-3 w-3" />
-                        Finance approval
-                      </Badge>
-                    )}
-                  </div>
-                  <Button asChild variant="ghost" size="sm">
-                    <Link href={`/fleet/dashboard?orgId=${o.id}`}>
-                      Open <ExternalLink className="ml-1 h-3 w-3" />
-                    </Link>
-                  </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
