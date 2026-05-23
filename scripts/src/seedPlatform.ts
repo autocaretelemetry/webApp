@@ -90,7 +90,7 @@ async function main() {
         name: "Center Pro",
         audience: "center",
         priceMonthly: 45000,
-        features: ["Unlimited bookings", "Priority placement", "Phone support", "Analytics"],
+        features: ["Unlimited bookings", "Featured placement in directory", "Phone support"],
         limits: {
           maxBookingsPerMonth: null,
           maxPartsListed: null,
@@ -118,7 +118,7 @@ async function main() {
         name: "Vendor Plus",
         audience: "vendor",
         priceMonthly: 35000,
-        features: ["Unlimited parts", "Featured placement", "Sales analytics"],
+        features: ["Unlimited parts listed", "Featured placement in marketplace"],
         limits: {
           maxBookingsPerMonth: null,
           maxPartsListed: null,
@@ -148,7 +148,7 @@ async function main() {
         priceMonthly: 80000,
         features: [
           "Up to 10 fleet vehicles",
-          "Preferred service centers",
+          "Maintenance history export (CSV + PDF)",
           "Reminders dashboard",
           "Email support",
         ],

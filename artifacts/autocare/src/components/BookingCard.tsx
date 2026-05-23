@@ -2,7 +2,7 @@ import { Booking } from "@workspace/api-client-react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { StatusBadge } from "./StatusBadge";
 import { formatDateTime, formatDate } from "@/lib/format";
-import { Calendar, Car, Store, Wrench, User } from "lucide-react";
+import { Calendar, Car, Store, Wrench, User, Zap } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 
@@ -19,6 +19,15 @@ export function BookingCard({ booking, role }: BookingCardProps) {
           <div className="flex items-center gap-2">
             <Wrench className="h-5 w-5 text-primary" />
             <h3 className="font-bold">{booking.serviceType}</h3>
+            {booking.priority && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary ring-1 ring-primary/30"
+                title="This owner has a priority-booking subscription. Their job floats to the top of your queue."
+              >
+                <Zap className="h-3 w-3" />
+                Priority
+              </span>
+            )}
           </div>
           <StatusBadge status={booking.status} type="booking" />
         </div>
