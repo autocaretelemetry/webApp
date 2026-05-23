@@ -104,13 +104,12 @@ const CATEGORY_SUGGESTIONS = [
   "Tires",
 ];
 
-const ADD_NEW_VALUE = "__add_new__";
-
 /**
- * Category picker for the new-part form. Combines the seeded suggestions
- * with every category already present in the public catalog, plus an
- * explicit "+ Add new category…" option that swaps the select for a
- * text input. Picking "Cancel" returns to the dropdown.
+ * Category picker for the new-part form. Shows a dropdown of the seeded
+ * suggestions + every category already in the public catalog, alongside
+ * a separate "Add new" button that opens an inline text input. The new
+ * value is selected immediately and joins the dropdown next time the
+ * catalog query refreshes.
  */
 function CategoryPicker({
   value,
@@ -130,82 +129,88 @@ function CategoryPicker({
     return [...set].sort((a, b) => a.localeCompare(b));
   }, [catalog, value]);
 
-  if (adding) {
-    return (
-      <div className="mt-1.5 flex gap-2">
-        <Input
-          autoFocus
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder="e.g. Lubricants"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              const trimmed = draft.trim();
-              if (trimmed) {
-                onChange(trimmed);
-                setAdding(false);
-              }
-            } else if (e.key === "Escape") {
-              setAdding(false);
-              setDraft("");
-            }
-          }}
-        />
-        <Button
-          type="button"
-          size="sm"
-          onClick={() => {
-            const trimmed = draft.trim();
-            if (!trimmed) {
-              toast.error("Category name can't be empty.");
-              return;
-            }
-            onChange(trimmed);
-            setAdding(false);
-          }}
+  return (
+    <div className="mt-1.5 space-y-2">
+      <div className="flex gap-2">
+        <select
+          id="cat"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="flex-1 h-10 rounded-md border border-input bg-background px-3 text-sm"
         >
-          Add
-        </Button>
+          <option value="" disabled>
+            Select a category…
+          </option>
+          {knownCategories.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
         <Button
           type="button"
+          variant="outline"
           size="sm"
-          variant="ghost"
+          className="gap-1.5"
           onClick={() => {
-            setAdding(false);
             setDraft("");
+            setAdding((a) => !a);
           }}
         >
-          Cancel
+          <Plus className="h-4 w-4" />
+          Add new
         </Button>
       </div>
-    );
-  }
-
-  return (
-    <select
-      id="cat"
-      value={value}
-      onChange={(e) => {
-        if (e.target.value === ADD_NEW_VALUE) {
-          setDraft("");
-          setAdding(true);
-          return;
-        }
-        onChange(e.target.value);
-      }}
-      className="mt-1.5 w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
-    >
-      <option value="" disabled>
-        Select a category…
-      </option>
-      {knownCategories.map((c) => (
-        <option key={c} value={c}>
-          {c}
-        </option>
-      ))}
-      <option value={ADD_NEW_VALUE}>+ Add new category…</option>
-    </select>
+      {adding && (
+        <div className="flex gap-2">
+          <Input
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="New category name (e.g. Lubricants)"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                const trimmed = draft.trim();
+                if (trimmed) {
+                  onChange(trimmed);
+                  setAdding(false);
+                }
+              } else if (e.key === "Escape") {
+                setAdding(false);
+                setDraft("");
+              }
+            }}
+          />
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => {
+              const trimmed = draft.trim();
+              if (!trimmed) {
+                toast.error("Category name can't be empty.");
+                return;
+              }
+              onChange(trimmed);
+              setAdding(false);
+            }}
+          >
+            Add
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setAdding(false);
+              setDraft("");
+            }}
+          >
+            Cancel
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
 
