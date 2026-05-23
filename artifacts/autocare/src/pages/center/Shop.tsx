@@ -113,7 +113,7 @@ function NewPartForm({
   const create = useCreateCenterShopPart(centerId);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("Brakes");
+  const [category, setCategory] = useState("");
   const [brand, setBrand] = useState("");
   const [sku, setSku] = useState("");
   const [price, setPrice] = useState(0);
@@ -123,6 +123,10 @@ function NewPartForm({
   const submit = async () => {
     if (!name.trim() || !description.trim() || !brand.trim() || !sku.trim()) {
       toast.error("Name, description, brand, and SKU are required.");
+      return;
+    }
+    if (!category.trim()) {
+      toast.error("Pick a category or type a new one.");
       return;
     }
     if (price <= 0) {
@@ -137,7 +141,7 @@ function NewPartForm({
       await create.mutateAsync({
         name: name.trim(),
         description: description.trim(),
-        category,
+        category: category.trim(),
         brand: brand.trim(),
         sku: sku.trim(),
         price,
@@ -184,18 +188,23 @@ function NewPartForm({
         <div className="grid sm:grid-cols-3 gap-4">
           <div>
             <Label htmlFor="cat">Category</Label>
-            <select
+            {/* Free-text input backed by a datalist so staff can either
+                pick a known category or type a brand-new one. The server
+                stores the string as-is, and the public catalog endpoint
+                already derives the category list from existing parts. */}
+            <Input
               id="cat"
+              list="center-shop-category-suggestions"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="mt-1.5 w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
-            >
+              className="mt-1.5"
+              placeholder="e.g. Brakes, or type a new one"
+            />
+            <datalist id="center-shop-category-suggestions">
               {CATEGORY_SUGGESTIONS.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
+                <option key={c} value={c} />
               ))}
-            </select>
+            </datalist>
           </div>
           <div>
             <Label htmlFor="brand">Brand</Label>
