@@ -673,7 +673,8 @@ export interface Vendor {
 
 export interface Part {
   id: string;
-  vendorId: string;
+  vendorId?: string | null;
+  centerId?: string | null;
   name: string;
   description: string;
   category: string;
@@ -686,6 +687,7 @@ export interface Part {
   active: boolean;
   createdAt: string;
   vendor?: Vendor | null;
+  sellerCenter?: ServiceCenter | null;
 }
 
 export interface CreatePartInput {
@@ -726,6 +728,14 @@ export interface CategoryCount {
   category: string;
   count: number;
 }
+
+export type OrderFulfillmentKind = typeof OrderFulfillmentKind[keyof typeof OrderFulfillmentKind];
+
+
+export const OrderFulfillmentKind = {
+  delivery: 'delivery',
+  on_hand: 'on_hand',
+} as const;
 
 export type OrderBuyerKind = typeof OrderBuyerKind[keyof typeof OrderBuyerKind];
 
@@ -785,7 +795,9 @@ export interface OrderBookingSummary {
 
 export interface Order {
   id: string;
-  vendorId: string;
+  vendorId?: string | null;
+  sellerCenterId?: string | null;
+  fulfillmentKind: OrderFulfillmentKind;
   bookingId?: string | null;
   mechanicId?: string | null;
   deliveryAgentId?: string | null;
@@ -817,6 +829,7 @@ export interface Order {
   invoicedAt?: string | null;
   itemsCount?: number;
   vendor?: Vendor | null;
+  sellerCenter?: ServiceCenter | null;
   mechanic?: Mechanic | null;
   deliveryAgent?: DeliveryAgent | null;
   bookingSummary?: OrderBookingSummary | null;
@@ -860,7 +873,8 @@ export const CreateOrderInputBuyerKind = {
 } as const;
 
 export interface CreateOrderInput {
-  vendorId: string;
+  vendorId?: string | null;
+  sellerCenterId?: string | null;
   bookingId?: string | null;
   mechanicId?: string | null;
   buyerKind: CreateOrderInputBuyerKind;

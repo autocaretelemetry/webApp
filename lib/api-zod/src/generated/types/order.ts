@@ -9,13 +9,17 @@ import type { DeliveryAgent } from './deliveryAgent';
 import type { Mechanic } from './mechanic';
 import type { OrderBookingSummary } from './orderBookingSummary';
 import type { OrderBuyerKind } from './orderBuyerKind';
+import type { OrderFulfillmentKind } from './orderFulfillmentKind';
 import type { OrderPaymentStatus } from './orderPaymentStatus';
 import type { OrderStatus } from './orderStatus';
+import type { ServiceCenter } from './serviceCenter';
 import type { Vendor } from './vendor';
 
 export interface Order {
   id: string;
-  vendorId: string;
+  vendorId?: string | null;
+  sellerCenterId?: string | null;
+  fulfillmentKind: OrderFulfillmentKind;
   bookingId?: string | null;
   mechanicId?: string | null;
   deliveryAgentId?: string | null;
@@ -47,6 +51,7 @@ export interface Order {
   invoicedAt?: Date | null;
   itemsCount?: number;
   vendor?: Vendor | null;
+  sellerCenter?: ServiceCenter | null;
   mechanic?: Mechanic | null;
   deliveryAgent?: DeliveryAgent | null;
   bookingSummary?: OrderBookingSummary | null;

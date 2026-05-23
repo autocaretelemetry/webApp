@@ -5,11 +5,13 @@
  * AutoCare API — vehicle owners book services, service centers fulfill them.
  * OpenAPI spec version: 0.1.0
  */
+import type { ServiceCenter } from './serviceCenter';
 import type { Vendor } from './vendor';
 
 export interface Part {
   id: string;
-  vendorId: string;
+  vendorId?: string | null;
+  centerId?: string | null;
   name: string;
   description: string;
   category: string;
@@ -22,4 +24,5 @@ export interface Part {
   active: boolean;
   createdAt: Date;
   vendor?: Vendor | null;
+  sellerCenter?: ServiceCenter | null;
 }

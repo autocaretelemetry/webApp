@@ -127,6 +127,7 @@ export * from './order';
 export * from './orderBookingSummary';
 export * from './orderBuyerKind';
 export * from './orderDetail';
+export * from './orderFulfillmentKind';
 export * from './orderLine';
 export * from './orderLineSnapshot';
 export * from './orderPaymentStatus';

@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { and, desc, eq, inArray, sql, gte } from "drizzle-orm";
 import {
   db,
@@ -12,6 +12,8 @@ import {
   deliveryAgentsTable,
   serviceCentersTable,
   userAddressesTable,
+  organizationsTable,
+  organizationMembersTable,
   type OrderItemSnapshot,
 } from "@workspace/db";
 import {
@@ -22,14 +24,10 @@ import {
   UpdateOrderStatusBody,
 } from "@workspace/api-zod";
 import { requireAuth } from "../lib/auth";
-import { authorizeServiceBooking } from "./bookings";
+import { authorizeServiceBooking, getCallerCenterIds } from "./bookings";
 
 const router: IRouter = Router();
 
-// Orders carry buyer PII and stock-mutation power. The legacy per-handler
-// 401 checks (see POST /orders for proposals vs direct buys) were
-// inconsistent — gate the entire router so a forgotten check can't open
-// up a new endpoint. Per-handler role/relationship checks remain.
 router.use(requireAuth);
 
 class HttpError extends Error {
@@ -38,17 +36,65 @@ class HttpError extends Error {
   }
 }
 
+const FINANCE_LEVEL_ORG_ROLES = new Set(["admin", "finance"]);
+
+/**
+ * For org-attached vehicles, an org admin/finance member (or a manager/driver
+ * with `canCheckoutDirectly`) acts as the "owner" for parts approval/payment
+ * decisions even though `vehicles.ownerPhone` belongs to a single applicant.
+ * Returns true when the signed-in user qualifies for the given organization.
+ */
+async function callerActsAsOrgOwner(req: Request, orgId: string): Promise<boolean> {
+  const role = req.user?.role;
+  if (role === "admin" || role === "super_admin") return true;
+  const phone = req.user?.phone;
+  if (!phone) return false;
+  const [org] = await db
+    .select()
+    .from(organizationsTable)
+    .where(eq(organizationsTable.id, orgId));
+  if (!org) return false;
+  const [member] = await db
+    .select()
+    .from(organizationMembersTable)
+    .where(
+      and(
+        eq(organizationMembersTable.organizationId, orgId),
+        eq(organizationMembersTable.phone, phone),
+      ),
+    );
+  if (!member) return false;
+  if (FINANCE_LEVEL_ORG_ROLES.has(member.role)) return true;
+  if (!org.requireFinanceApproval) return true;
+  return member.canCheckoutDirectly;
+}
+
 async function hydrate(orders: (typeof ordersTable.$inferSelect)[]) {
   if (orders.length === 0) return [];
-  const vendorIds = [...new Set(orders.map((o) => o.vendorId))];
+  const vendorIds = [
+    ...new Set(orders.map((o) => o.vendorId).filter((v): v is string => !!v)),
+  ];
+  const sellerCenterIds = [
+    ...new Set(
+      orders.map((o) => o.sellerCenterId).filter((v): v is string => !!v),
+    ),
+  ];
   const mechanicIds = [...new Set(orders.map((o) => o.mechanicId).filter((v): v is string => !!v))];
   const agentIds = [...new Set(orders.map((o) => o.deliveryAgentId).filter((v): v is string => !!v))];
   const bookingIds = [...new Set(orders.map((o) => o.bookingId).filter((v): v is string => !!v))];
   const addressIds = [...new Set(orders.map((o) => o.shippingAddressId).filter((v): v is string => !!v))];
   const orderIds = orders.map((o) => o.id);
 
-  const [vendors, lineCounts, mechanics, agents, bookings, addresses] = await Promise.all([
-    db.select().from(vendorsTable).where(inArray(vendorsTable.id, vendorIds)),
+  const [vendors, sellerCenters, lineCounts, mechanics, agents, bookings, addresses] = await Promise.all([
+    vendorIds.length
+      ? db.select().from(vendorsTable).where(inArray(vendorsTable.id, vendorIds))
+      : Promise.resolve([] as (typeof vendorsTable.$inferSelect)[]),
+    sellerCenterIds.length
+      ? db
+          .select()
+          .from(serviceCentersTable)
+          .where(inArray(serviceCentersTable.id, sellerCenterIds))
+      : Promise.resolve([] as (typeof serviceCentersTable.$inferSelect)[]),
     db
       .select({
         orderId: orderItemsTable.orderId,
@@ -93,6 +139,7 @@ async function hydrate(orders: (typeof ordersTable.$inferSelect)[]) {
   ]);
 
   const vmap = new Map(vendors.map((v) => [v.id, v]));
+  const scmap = new Map(sellerCenters.map((c) => [c.id, c]));
   const cmap = new Map(lineCounts.map((c) => [c.orderId, Number(c.n)]));
   const mmap = new Map(mechanics.map((m) => [m.id, m]));
   const amap = new Map(agents.map((a) => [a.id, a]));
@@ -111,7 +158,8 @@ async function hydrate(orders: (typeof ordersTable.$inferSelect)[]) {
 
   return orders.map((o) => ({
     ...o,
-    vendor: vmap.get(o.vendorId) ?? null,
+    vendor: o.vendorId ? (vmap.get(o.vendorId) ?? null) : null,
+    sellerCenter: o.sellerCenterId ? (scmap.get(o.sellerCenterId) ?? null) : null,
     mechanic: o.mechanicId ? (mmap.get(o.mechanicId) ?? null) : null,
     deliveryAgent: o.deliveryAgentId ? (amap.get(o.deliveryAgentId) ?? null) : null,
     bookingSummary: o.bookingId ? (bmap.get(o.bookingId) ?? null) : null,
@@ -128,17 +176,12 @@ router.get("/orders", async (req, res): Promise<void> => {
     res.status(400).json({ error: q.error.message });
     return;
   }
-  // `mine=true` is the auth-scoped buyer filter — replaces the legacy
-  // `buyerName` string lookup so two real users with the same display name
-  // never see each other's orders. Identity comes from the session phone,
-  // never the request body.
   if (q.data.mine) {
     if (!req.user) {
       res.status(401).json({ error: "Not authenticated" });
       return;
     }
     if (!req.user.phone) {
-      // No phone on the account => no orders could have been placed under it.
       res.json([]);
       return;
     }
@@ -170,28 +213,28 @@ router.post("/orders", async (req, res): Promise<void> => {
     return;
   }
 
-  const [vendor] = await db
-    .select()
-    .from(vendorsTable)
-    .where(eq(vendorsTable.id, parsed.data.vendorId));
-  if (!vendor) {
-    res.status(400).json({ error: "Vendor not found" });
+  // Exactly one seller hint may be set in the body. Server still re-derives
+  // the seller from the parts and cross-checks below.
+  const bodyVendorId = parsed.data.vendorId ?? null;
+  const bodyCenterId = parsed.data.sellerCenterId ?? null;
+  if (bodyVendorId && bodyCenterId) {
+    res.status(400).json({
+      error: "Provide either vendorId or sellerCenterId, not both.",
+    });
+    return;
+  }
+  if (!bodyVendorId && !bodyCenterId) {
+    res.status(400).json({ error: "vendorId or sellerCenterId is required." });
     return;
   }
 
-  // Mechanic-proposed orders skip the stock decrement until the owner approves.
   const isProposal = !!(parsed.data.bookingId && parsed.data.mechanicId);
 
-  // Direct-buy orders must be placed by a signed-in user — buyer identity
-  // (name + phone) is derived from the session, never the request body, so a
-  // signed-in user can't spoof someone else's name+phone (which would also
-  // make the order disappear from their own `mine=true` listing).
   if (!isProposal && (!req.user || !req.user.phone)) {
     res.status(401).json({ error: "Not authenticated" });
     return;
   }
 
-  // If a proposal, resolve the mechanic + their service center to derive the ship-to address.
   let mechanicCenter: typeof serviceCentersTable.$inferSelect | null = null;
   let mechanic: typeof mechanicsTable.$inferSelect | null = null;
   let booking: typeof bookingsTable.$inferSelect | null = null;
@@ -214,9 +257,6 @@ router.post("/orders", async (req, res): Promise<void> => {
       res.status(400).json({ error: "Booking not found" });
       return;
     }
-    // Proposals are only legal while work is actively underway, and the
-    // mechanic on the proposal must be the one assigned to the booking
-    // (and therefore implicitly belong to its service center).
     if (b.status !== "in_progress") {
       res.status(409).json({
         error: "Parts can only be proposed while the booking is in progress",
@@ -241,9 +281,6 @@ router.post("/orders", async (req, res): Promise<void> => {
       .from(serviceCentersTable)
       .where(eq(serviceCentersTable.id, m.serviceCenterId));
     mechanicCenter = c ?? null;
-    // Proposal buyer identity comes from the booking's vehicle owner, not
-    // the request body — the mechanic placing the proposal can't impersonate
-    // a different owner.
     const [v] = await db
       .select()
       .from(vehiclesTable)
@@ -254,8 +291,6 @@ router.post("/orders", async (req, res): Promise<void> => {
     }
     bookingVehicle = v;
   } else if (parsed.data.bookingId || parsed.data.mechanicId) {
-    // Half-specified link is never valid — both must be present for a proposal,
-    // and neither is allowed for a direct buy.
     res.status(400).json({
       error: "bookingId and mechanicId must be provided together to propose parts for a job",
     });
@@ -278,19 +313,73 @@ router.post("/orders", async (req, res): Promise<void> => {
         .where(inArray(partsTable.id, partIds));
       const partMap = new Map(parts.map((p) => [p.id, p]));
 
+      // Derive seller from the parts themselves.
+      const derivedVendorIds = new Set<string>();
+      const derivedCenterIds = new Set<string>();
       for (const item of items) {
         const part = partMap.get(item.partId);
         if (!part) throw new HttpError(400, `Part ${item.partId} not found`);
-        if (part.vendorId !== parsed.data.vendorId) {
-          throw new HttpError(
-            400,
-            `Part ${part.name} is not sold by this vendor — orders cannot span multiple vendors`,
-          );
-        }
         if (!part.active) throw new HttpError(409, `Part ${part.name} is not available`);
+        if (part.vendorId) derivedVendorIds.add(part.vendorId);
+        if (part.centerId) derivedCenterIds.add(part.centerId);
         if (!isProposal && part.stock < item.quantity) {
           throw new HttpError(409, `Insufficient stock for ${part.name}`);
         }
+      }
+      if (derivedVendorIds.size > 0 && derivedCenterIds.size > 0) {
+        throw new HttpError(
+          400,
+          "An order can't mix vendor parts and service-center parts.",
+        );
+      }
+      if (derivedVendorIds.size > 1 || derivedCenterIds.size > 1) {
+        throw new HttpError(
+          400,
+          "An order can't span multiple sellers.",
+        );
+      }
+      const derivedVendorId = [...derivedVendorIds][0] ?? null;
+      const derivedCenterId = [...derivedCenterIds][0] ?? null;
+
+      // Cross-check body hint against the derived seller — they must agree.
+      if (bodyVendorId && bodyVendorId !== derivedVendorId) {
+        throw new HttpError(
+          400,
+          "vendorId does not match the parts in this order.",
+        );
+      }
+      if (bodyCenterId && bodyCenterId !== derivedCenterId) {
+        throw new HttpError(
+          400,
+          "sellerCenterId does not match the parts in this order.",
+        );
+      }
+
+      const isCenterSourced = !!derivedCenterId;
+
+      // For center-sourced proposals the mechanic must belong to the same
+      // center that sells the part (otherwise the parts aren't "on hand").
+      if (isProposal && isCenterSourced && mechanic && derivedCenterId !== mechanic.serviceCenterId) {
+        throw new HttpError(
+          400,
+          "Center-shop parts must come from the same service center handling the job.",
+        );
+      }
+
+      // Validate vendor exists (for vendor orders) — keeps the legacy 400 path.
+      if (derivedVendorId) {
+        const [vendor] = await tx
+          .select({ id: vendorsTable.id })
+          .from(vendorsTable)
+          .where(eq(vendorsTable.id, derivedVendorId));
+        if (!vendor) throw new HttpError(400, "Vendor not found");
+      }
+      if (derivedCenterId) {
+        const [center] = await tx
+          .select({ id: serviceCentersTable.id })
+          .from(serviceCentersTable)
+          .where(eq(serviceCentersTable.id, derivedCenterId));
+        if (!center) throw new HttpError(400, "Service center not found");
       }
 
       // Stock is reserved only when the order actually goes live (direct buy now,
@@ -315,14 +404,11 @@ router.post("/orders", async (req, res): Promise<void> => {
         (sum, item) => sum + partMap.get(item.partId)!.price * item.quantity,
         0,
       );
-      const shippingFee = itemsTotal > 200 ? 0 : 12;
+      // Center-sourced orders are picked up at the center — no shipping fee.
+      const shippingFee = isCenterSourced ? 0 : itemsTotal > 200 ? 0 : 12;
       const total = +(itemsTotal + shippingFee).toFixed(2);
       const now = new Date();
 
-      // For direct buys, if the buyer picked a saved address book entry,
-      // confirm it belongs to the authenticated user before persisting the
-      // FK — never trust an id from the body alone. Proposals always ship
-      // to the booking's service center, so any incoming id is ignored.
       let shippingAddressId: string | null = null;
       if (!isProposal && parsed.data.shippingAddressId && req.user) {
         const [owned] = await tx
@@ -337,16 +423,28 @@ router.post("/orders", async (req, res): Promise<void> => {
         if (owned) shippingAddressId = owned.id;
       }
 
+      // Center-sourced direct-buy orders ship from / pickup at the seller center;
+      // proposals always ship to the mechanic's center.
+      let centerForAddress: typeof serviceCentersTable.$inferSelect | null = null;
+      if (isCenterSourced) {
+        const [c] = await tx
+          .select()
+          .from(serviceCentersTable)
+          .where(eq(serviceCentersTable.id, derivedCenterId!));
+        centerForAddress = c ?? null;
+      }
+      const fallbackCenter = isProposal ? mechanicCenter : centerForAddress;
       const shippingAddress =
-        isProposal && mechanicCenter ? mechanicCenter.address : parsed.data.shippingAddress;
+        (isProposal || isCenterSourced) && fallbackCenter
+          ? fallbackCenter.address
+          : parsed.data.shippingAddress;
       const deliveryCity =
-        parsed.data.deliveryCity ?? (isProposal && mechanicCenter ? mechanicCenter.city : "");
+        parsed.data.deliveryCity ??
+        ((isProposal || isCenterSourced) && fallbackCenter ? fallbackCenter.city : "");
       const deliveryRegion =
-        parsed.data.deliveryRegion ?? (isProposal && mechanicCenter ? mechanicCenter.region : "");
+        parsed.data.deliveryRegion ??
+        ((isProposal || isCenterSourced) && fallbackCenter ? fallbackCenter.region : "");
 
-      // Buyer identity is server-derived, never trusted from the body:
-      //  - proposal: comes from the booking's vehicle owner
-      //  - direct buy: comes from the authenticated session
       const buyerName = isProposal
         ? (bookingVehicle?.ownerName ?? "")
         : (req.user!.name ?? "");
@@ -354,10 +452,16 @@ router.post("/orders", async (req, res): Promise<void> => {
         ? (bookingVehicle?.ownerPhone ?? "")
         : (req.user!.phone ?? "");
 
+      // Direct buys of center-shop parts auto-deliver immediately since the
+      // parts are already at the center (no shipping/delivery hop).
+      const autoDeliverNow = !isProposal && isCenterSourced;
+
       const [order] = await tx
         .insert(ordersTable)
         .values({
-          vendorId: parsed.data.vendorId,
+          vendorId: derivedVendorId,
+          sellerCenterId: derivedCenterId,
+          fulfillmentKind: isCenterSourced ? "on_hand" : "delivery",
           bookingId: parsed.data.bookingId ?? null,
           mechanicId: parsed.data.mechanicId ?? null,
           buyerKind: parsed.data.buyerKind,
@@ -368,14 +472,15 @@ router.post("/orders", async (req, res): Promise<void> => {
           deliveryCity,
           deliveryRegion,
           notes: parsed.data.notes ?? null,
-          status: isProposal ? "proposed" : "placed",
+          status: isProposal ? "proposed" : autoDeliverNow ? "delivered" : "placed",
           proposedAt: isProposal ? now : null,
           placedAt: now,
+          confirmedAt: autoDeliverNow ? now : null,
+          shippedAt: autoDeliverNow ? now : null,
+          deliveredAt: autoDeliverNow ? now : null,
           itemsTotal: +itemsTotal.toFixed(2),
           shippingFee,
           total,
-          // Direct buys are implicitly paid by the buyer at checkout; proposals
-          // start unpaid and get resolved at the owner-approval step.
           paymentStatus: isProposal ? "unpaid" : "paid_by_owner",
           paidAt: isProposal ? null : now,
           paidByUserId: isProposal ? null : (req.user?.id ?? null),
@@ -405,7 +510,7 @@ router.post("/orders", async (req, res): Promise<void> => {
       return { order, lines };
     });
 
-    void booking; // touched for narrow typing only
+    void booking;
     const [hydrated] = await hydrate([result.order]);
     res.status(201).json({ ...hydrated, items: result.lines });
   } catch (err) {
@@ -450,10 +555,6 @@ router.patch("/orders/:orderId/status", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  // Allowed transitions. The legacy "proposed → placed" path is gone — the
-  // owner now picks a payment route (approve-and-pay OR authorize-center-pay)
-  // via the dedicated endpoints below, which both flip status to "placed"
-  // alongside the payment decision. Rejection still flows through here.
   const allowed: Record<string, string[]> = {
     proposed: ["cancelled"],
     placed: ["confirmed", "cancelled"],
@@ -479,7 +580,6 @@ router.patch("/orders/:orderId/status", async (req, res): Promise<void> => {
         );
       }
 
-      // confirmed → shipped requires a delivery agent assignment.
       if (current.status === "confirmed" && next === "shipped") {
         const agentId = parsed.data.deliveryAgentId ?? current.deliveryAgentId;
         if (!agentId) {
@@ -508,7 +608,6 @@ router.patch("/orders/:orderId/status", async (req, res): Promise<void> => {
         if (current.status === "proposed") updates.rejectedAt = now;
       }
 
-      // Status-guarded update: if another transaction beat us to it, returns 0 rows.
       const updated = await tx
         .update(ordersTable)
         .set(updates)
@@ -518,7 +617,6 @@ router.patch("/orders/:orderId/status", async (req, res): Promise<void> => {
         throw new HttpError(409, "Order status changed concurrently, please retry");
       }
 
-      // Restore stock only for orders that were stock-reserved (not proposals).
       if (next === "cancelled" && current.status !== "proposed") {
         const lines = await tx
           .select()
@@ -532,7 +630,6 @@ router.patch("/orders/:orderId/status", async (req, res): Promise<void> => {
         }
       }
 
-      // Delivered → bump the assigned agent's completedDeliveries counter.
       if (next === "delivered" && current.deliveryAgentId) {
         await tx
           .update(deliveryAgentsTable)
@@ -558,14 +655,14 @@ router.patch("/orders/:orderId/status", async (req, res): Promise<void> => {
 
 /**
  * Shared transition used by both owner-pay paths: marks a proposed order as
- * placed, stamps approval + payment fields, and atomically reserves stock
- * (rolling back the whole transition if any line is short). The caller has
- * already verified the booking relationship and the order/booking pairing.
+ * placed, stamps approval + payment fields, and atomically reserves stock.
+ * For center-sourced (on_hand) proposals also auto-stamps the delivered
+ * lifecycle since the parts are already at the center.
  */
 async function approveProposalAndReserveStock(
   orderId: string,
   options: {
-    paymentStatus: "paid_by_owner" | "unpaid";
+    paymentStatus: "paid_by_owner" | "paid_by_center" | "unpaid";
     centerPayAuthorized: boolean;
     paidByUserId: string | null;
   },
@@ -583,16 +680,23 @@ async function approveProposalAndReserveStock(
       );
     }
     const now = new Date();
+    const isCenterSourced = current.fulfillmentKind === "on_hand";
+    const paidNow =
+      options.paymentStatus === "paid_by_owner" ||
+      options.paymentStatus === "paid_by_center";
     const updated = await tx
       .update(ordersTable)
       .set({
-        status: "placed",
+        status: isCenterSourced ? "delivered" : "placed",
         approvedAt: now,
         placedAt: now,
+        confirmedAt: isCenterSourced ? now : null,
+        shippedAt: isCenterSourced ? now : null,
+        deliveredAt: isCenterSourced ? now : null,
         paymentStatus: options.paymentStatus,
         centerPayAuthorized: options.centerPayAuthorized,
-        paidAt: options.paymentStatus === "paid_by_owner" ? now : null,
-        paidByUserId: options.paymentStatus === "paid_by_owner" ? options.paidByUserId : null,
+        paidAt: paidNow ? now : null,
+        paidByUserId: paidNow ? options.paidByUserId : null,
       })
       .where(and(eq(ordersTable.id, current.id), eq(ordersTable.status, "proposed")))
       .returning();
@@ -622,13 +726,14 @@ async function approveProposalAndReserveStock(
 }
 
 /**
- * Guard for the three new proposal-payment endpoints. Returns the proposal
- * order + the resolved booking relationship, or null after sending an error
- * response. `requiredRelationship` lets the caller restrict to owner vs center.
+ * Guard for proposal-payment endpoints. Returns the proposal order + the
+ * resolved booking relationship, or null after sending an error response.
+ * For org-attached vehicles, an org admin/finance member (or a member with
+ * canCheckoutDirectly) is treated as "owner".
  */
 async function authorizeProposalAction(
-  req: Parameters<typeof authorizeServiceBooking>[0],
-  res: Parameters<typeof authorizeServiceBooking>[1],
+  req: Request,
+  res: Response,
   orderId: string,
   requiredRelationship: "owner" | "center",
 ): Promise<{
@@ -644,14 +749,56 @@ async function authorizeProposalAction(
     res.status(409).json({ error: "This action only applies to mechanic-proposed parts orders" });
     return null;
   }
-  const access = await authorizeServiceBooking(req, res, order.bookingId);
-  if (!access) return null;
-  const rel = access.relationship;
+  if (!req.user) {
+    res.status(401).json({ error: "Not authenticated" });
+    return null;
+  }
+  // We can't reuse authorizeServiceBooking here because its 403 path runs
+  // before we ever get a chance to promote an org admin/finance member to
+  // "owner" — that would block the fleet approval flow. Replicate the same
+  // checks inline, adding org-owner promotion as an additional acceptance.
+  const [booking] = await db
+    .select()
+    .from(bookingsTable)
+    .where(eq(bookingsTable.id, order.bookingId));
+  if (!booking) {
+    res.status(404).json({ error: "Booking not found" });
+    return null;
+  }
+  const [vehicle] = await db
+    .select()
+    .from(vehiclesTable)
+    .where(eq(vehiclesTable.id, booking.vehicleId));
+  if (!vehicle) {
+    res.status(404).json({ error: "Booking not found" });
+    return null;
+  }
+  const role = req.user.role;
+  let rel: "owner" | "center" | "admin" | null = null;
+  if (role === "admin" || role === "super_admin") {
+    rel = "admin";
+  } else {
+    const userPhone = (req.user.phone ?? "").trim();
+    if (userPhone && vehicle.ownerPhone && userPhone === vehicle.ownerPhone.trim()) {
+      rel = "owner";
+    } else if (vehicle.organizationId) {
+      const orgOwner = await callerActsAsOrgOwner(req, vehicle.organizationId);
+      if (orgOwner) rel = "owner";
+    }
+    if (!rel) {
+      const centerIds = await getCallerCenterIds(req);
+      if (centerIds.includes(booking.serviceCenterId)) rel = "center";
+    }
+  }
+  if (!rel) {
+    res.status(403).json({ error: "You don't have access to this order." });
+    return null;
+  }
   if (rel !== "admin" && rel !== requiredRelationship) {
     res.status(403).json({
       error:
         requiredRelationship === "owner"
-          ? "Only the vehicle owner can approve this parts request."
+          ? "Only the vehicle owner (or an authorized fleet finance member) can approve this parts request."
           : "Only the service center handling this job can settle this parts order.",
     });
     return null;
@@ -693,10 +840,14 @@ router.post("/orders/:orderId/authorize-center-pay", async (req, res): Promise<v
   try {
     const guard = await authorizeProposalAction(req, res, params.data.orderId, "owner");
     if (!guard) return;
+    // For center-sourced orders, the center is the seller — there's nothing
+    // to authorize the center to "pay to a vendor". We instead stamp
+    // paid_by_center directly so the cost rolls into the booking invoice.
+    const isCenterSourced = guard.order.fulfillmentKind === "on_hand";
     const row = await approveProposalAndReserveStock(guard.order.id, {
-      paymentStatus: "unpaid",
-      centerPayAuthorized: true,
-      paidByUserId: null,
+      paymentStatus: isCenterSourced ? "paid_by_center" : "unpaid",
+      centerPayAuthorized: !isCenterSourced,
+      paidByUserId: isCenterSourced ? (req.user?.id ?? null) : null,
     });
     const [hydrated] = await hydrate([row]);
     res.json(hydrated);

@@ -83,11 +83,15 @@ export default function OrderDetail() {
   const isDelivery = role === "delivery";
   const isMyDelivery = isDelivery && deliveryAgentId && order.deliveryAgentId === deliveryAgentId;
 
+  const isOnHand = order.fulfillmentKind === "on_hand";
+
   const invalidateAfterMutation = () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: getGetOrderQueryKey(order.id) }),
       queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() }),
-      queryClient.invalidateQueries({ queryKey: getGetVendorDashboardQueryKey(order.vendorId) }),
+      order.vendorId
+        ? queryClient.invalidateQueries({ queryKey: getGetVendorDashboardQueryKey(order.vendorId) })
+        : Promise.resolve(),
       order.bookingId
         ? queryClient.invalidateQueries({ queryKey: getGetBookingQueryKey(order.bookingId) })
         : Promise.resolve(),
@@ -139,7 +143,9 @@ export default function OrderDetail() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: getGetOrderQueryKey(order.id) }),
         queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() }),
-        queryClient.invalidateQueries({ queryKey: getGetVendorDashboardQueryKey(order.vendorId) }),
+        order.vendorId
+          ? queryClient.invalidateQueries({ queryKey: getGetVendorDashboardQueryKey(order.vendorId) })
+          : Promise.resolve(),
         order.bookingId
           ? queryClient.invalidateQueries({ queryKey: getGetBookingQueryKey(order.bookingId) })
           : Promise.resolve(),
@@ -283,54 +289,90 @@ export default function OrderDetail() {
         </div>
 
         <div className="space-y-6">
-          <Card>
-            <CardContent className="p-5 space-y-3 text-sm">
-              <div className="flex items-center gap-2 font-semibold">
-                <Store className="h-4 w-4 text-primary" />
-                Vendor
-              </div>
-              <p>{order.vendor?.name ?? "Vendor"}</p>
-              <p className="text-muted-foreground">{order.vendor?.phone}</p>
-              <p className="text-muted-foreground">{order.vendor?.address}</p>
-              {order.vendor?.city && (
-                <p className="text-xs text-muted-foreground">
-                  {order.vendor.city}{order.vendor.region ? `, ${order.vendor.region}` : ""}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-5 space-y-2 text-sm">
-              <div className="flex items-center justify-between mb-1 gap-2">
-                <p className="font-semibold">Ship to</p>
-                {order.shippingAddressLabel && (
-                  <span
-                    className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
-                    title="Picked from your saved addresses"
-                  >
-                    {order.shippingAddressLabel}
-                  </span>
-                )}
-              </div>
-              <p>{order.buyerName}</p>
-              <p className="text-muted-foreground">{order.buyerPhone}</p>
-              <p className="text-muted-foreground whitespace-pre-line">{order.shippingAddress}</p>
-              {(order.deliveryCity || order.deliveryRegion) && (
-                <p className="text-xs text-muted-foreground">
-                  {order.deliveryCity}{order.deliveryRegion ? `, ${order.deliveryRegion}` : ""}
-                </p>
-              )}
-              {order.notes && (
-                <div className="pt-2 mt-2 border-t">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Notes</p>
-                  <p className="text-sm">{order.notes}</p>
+          {isOnHand ? (
+            <Card>
+              <CardContent className="p-5 space-y-3 text-sm">
+                <div className="flex items-center gap-2 font-semibold">
+                  <Building2 className="h-4 w-4 text-primary" />
+                  Service-center shop
                 </div>
-              )}
-            </CardContent>
-          </Card>
+                <p>{order.sellerCenter?.name ?? "Service center"}</p>
+                <p className="text-muted-foreground">{order.sellerCenter?.phone}</p>
+                <p className="text-muted-foreground whitespace-pre-line">
+                  {order.sellerCenter?.address}
+                </p>
+                {order.sellerCenter?.city && (
+                  <p className="text-xs text-muted-foreground">
+                    {order.sellerCenter.city}
+                    {order.sellerCenter.region ? `, ${order.sellerCenter.region}` : ""}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground pt-2 border-t">
+                  Parts are on hand at the service center — no shipping or delivery.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-5 space-y-3 text-sm">
+                <div className="flex items-center gap-2 font-semibold">
+                  <Store className="h-4 w-4 text-primary" />
+                  Vendor
+                </div>
+                <p>{order.vendor?.name ?? "Vendor"}</p>
+                <p className="text-muted-foreground">{order.vendor?.phone}</p>
+                <p className="text-muted-foreground">{order.vendor?.address}</p>
+                {order.vendor?.city && (
+                  <p className="text-xs text-muted-foreground">
+                    {order.vendor.city}{order.vendor.region ? `, ${order.vendor.region}` : ""}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
-          {order.deliveryAgent && (
+          {!isOnHand && (
+            <Card>
+              <CardContent className="p-5 space-y-2 text-sm">
+                <div className="flex items-center justify-between mb-1 gap-2">
+                  <p className="font-semibold">Ship to</p>
+                  {order.shippingAddressLabel && (
+                    <span
+                      className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+                      title="Picked from your saved addresses"
+                    >
+                      {order.shippingAddressLabel}
+                    </span>
+                  )}
+                </div>
+                <p>{order.buyerName}</p>
+                <p className="text-muted-foreground">{order.buyerPhone}</p>
+                <p className="text-muted-foreground whitespace-pre-line">{order.shippingAddress}</p>
+                {(order.deliveryCity || order.deliveryRegion) && (
+                  <p className="text-xs text-muted-foreground">
+                    {order.deliveryCity}{order.deliveryRegion ? `, ${order.deliveryRegion}` : ""}
+                  </p>
+                )}
+                {order.notes && (
+                  <div className="pt-2 mt-2 border-t">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Notes</p>
+                    <p className="text-sm">{order.notes}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {isOnHand && order.notes && (
+            <Card>
+              <CardContent className="p-5 space-y-1 text-sm">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Notes</p>
+                <p>{order.notes}</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {!isOnHand && order.deliveryAgent && (
             <Card>
               <CardContent className="p-5 space-y-1 text-sm">
                 <div className="flex items-center gap-2 font-semibold">
@@ -351,7 +393,9 @@ export default function OrderDetail() {
               <CardContent className="p-5 space-y-3">
                 <p className="font-semibold">Approve parts request</p>
                 <p className="text-xs text-muted-foreground">
-                  Your mechanic proposed these parts for the job. Pick how you want the vendor paid.
+                  {isOnHand
+                    ? "Your mechanic proposed parts the service center has on hand. Pick how you want them paid for."
+                    : "Your mechanic proposed these parts for the job. Pick how you want the vendor paid."}
                 </p>
                 <div className="flex flex-col gap-2">
                   <Button
@@ -361,7 +405,9 @@ export default function OrderDetail() {
                   >
                     <CreditCard className="h-4 w-4" />
                     <span className="flex-1 text-left">
-                      Approve & pay vendor — {formatCurrency(order.total)}
+                      {isOnHand
+                        ? `Approve & pay center — ${formatCurrency(order.total)}`
+                        : `Approve & pay vendor — ${formatCurrency(order.total)}`}
                     </span>
                   </Button>
                   <Button
@@ -372,7 +418,9 @@ export default function OrderDetail() {
                   >
                     <Building2 className="h-4 w-4" />
                     <span className="flex-1 text-left">
-                      Let service center pay — added to final invoice
+                      {isOnHand
+                        ? "Add to final invoice — pay with the job"
+                        : "Let service center pay — added to final invoice"}
                     </span>
                   </Button>
                   <Button
@@ -388,8 +436,12 @@ export default function OrderDetail() {
             </Card>
           )}
 
-          {/* Service center: pay the vendor on the owner's behalf */}
+          {/* Service center: pay the vendor on the owner's behalf.
+              Center-sourced (on_hand) orders never enter this state — the
+              authorize-center-pay endpoint stamps paid_by_center directly
+              because the center IS the seller. */}
           {isCenter &&
+            !isOnHand &&
             order.centerPayAuthorized &&
             order.paymentStatus === "unpaid" &&
             order.status !== "cancelled" && (
@@ -446,8 +498,8 @@ export default function OrderDetail() {
             </Card>
           )}
 
-          {/* Vendor fulfillment */}
-          {isVendor && (order.status === "placed" || order.status === "confirmed") && (
+          {/* Vendor fulfillment — never shown for on_hand orders. */}
+          {isVendor && !isOnHand && (order.status === "placed" || order.status === "confirmed") && (
             <Card>
               <CardContent className="p-5 space-y-3">
                 <p className="font-semibold">Fulfillment</p>

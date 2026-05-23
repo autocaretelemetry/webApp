@@ -2,6 +2,7 @@ import { pgTable, uuid, text, real, integer, timestamp, jsonb, boolean } from "d
 import { vendorsTable } from "./vendors";
 import { partsTable } from "./parts";
 import { bookingsTable } from "./bookings";
+import { serviceCentersTable } from "./serviceCenters";
 import { mechanicsTable } from "./mechanics";
 import { deliveryAgentsTable } from "./deliveryAgents";
 import { userAddressesTable } from "./userAddresses";
@@ -17,9 +18,20 @@ export type OrderItemSnapshot = {
 
 export const ordersTable = pgTable("orders", {
   id: uuid("id").primaryKey().defaultRandom(),
-  vendorId: uuid("vendor_id")
-    .notNull()
-    .references(() => vendorsTable.id, { onDelete: "cascade" }),
+  // Either vendorId or sellerCenterId is set (mutually exclusive). vendorId
+  // is the classic third-party parts vendor (delivery required); sellerCenterId
+  // marks an order fulfilled from a service center's own on-hand shop
+  // (no shipping, no delivery agent).
+  vendorId: uuid("vendor_id").references(() => vendorsTable.id, {
+    onDelete: "cascade",
+  }),
+  sellerCenterId: uuid("seller_center_id").references(
+    () => serviceCentersTable.id,
+    { onDelete: "cascade" },
+  ),
+  // 'delivery' (vendor-fulfilled, ships through a delivery agent) or
+  // 'on_hand' (center-fulfilled from its own shop; auto-ready, no shipping).
+  fulfillmentKind: text("fulfillment_kind").notNull().default("delivery"),
   bookingId: uuid("booking_id").references(() => bookingsTable.id, {
     onDelete: "set null",
   }),

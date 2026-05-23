@@ -40,7 +40,7 @@ import { ArrowLeft, Loader2, ShieldCheck, Wrench } from "lucide-react";
 
 export default function Checkout() {
   const { role } = useRole();
-  const { lines, vendorIds, subtotal, scope } = useCart();
+  const { lines, sellerGroups, subtotal, scope } = useCart();
   const isProposal = !!scope;
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
@@ -225,11 +225,9 @@ export default function Checkout() {
     );
   }
 
-  const linesByVendor = vendorIds.map((vid) => ({
-    vendorId: vid,
-    vendorName: lines.find((l) => l.vendorId === vid)?.vendorName ?? "Vendor",
-    lines: lines.filter((l) => l.vendorId === vid),
-  }));
+  // Group cart lines by seller (vendor OR service-center shop). One order
+  // per seller; center-sourced groups skip shipping entirely.
+  const linesBySeller = sellerGroups;
 
   const placeOrders = async () => {
     if (!buyerName.trim() || !buyerPhone.trim() || !shippingAddress.trim()) {
@@ -278,18 +276,30 @@ export default function Checkout() {
         // Single fleet parts order rolls up all cart lines; finance/admin
         // (or a member with the direct-checkout override) can pay now,
         // everyone else submits for approval.
-        await createFleetOrder.mutateAsync({
-          items: lines.map((l) => ({
+        // Fleet API recomputes totalAmount strictly as sum(unitPrice * qty)
+        // over the submitted items and rejects mismatches, so we exclude
+        // shipping AND any center-sourced lines (those still go through the
+        // per-seller direct-order flow below in non-fleet mode and aren't
+        // supported on the fleet finance-approval path).
+        const fleetItems = lines
+          .filter((l) => l.sellerKind === "vendor")
+          .map((l) => ({
             partId: l.partId,
-            vendorId: l.vendorId,
-            vendorName: l.vendorName,
+            vendorId: l.sellerId,
+            vendorName: l.sellerName,
             name: l.name,
             sku: l.sku,
             unitPrice: l.unitPrice,
             quantity: l.quantity,
             imageUrl: l.imageUrl,
-          })),
-          totalAmount: totalAcrossVendors,
+          }));
+        const fleetTotal = fleetItems.reduce(
+          (s, it) => s + it.unitPrice * it.quantity,
+          0,
+        );
+        await createFleetOrder.mutateAsync({
+          items: fleetItems,
+          totalAmount: fleetTotal,
           shippingAddress: shippingAddress.trim(),
           deliveryCity: deliveryCity.trim() || null,
           deliveryRegion: deliveryRegion.trim() || null,
@@ -338,10 +348,11 @@ export default function Checkout() {
         }
       }
       const results = [];
-      for (const group of linesByVendor) {
+      for (const group of linesBySeller) {
         const order = await createOrder.mutateAsync({
           data: {
-            vendorId: group.vendorId,
+            vendorId: group.sellerKind === "vendor" ? group.sellerId : null,
+            sellerCenterId: group.sellerKind === "center" ? group.sellerId : null,
             buyerKind,
             buyerName: buyerName.trim(),
             buyerPhone: buyerPhone.trim(),
@@ -399,9 +410,10 @@ export default function Checkout() {
     }
   };
 
-  const totalAcrossVendors = linesByVendor.reduce((sum, g) => {
+  const totalAcrossVendors = linesBySeller.reduce((sum: number, g) => {
     const itemsTotal = g.lines.reduce((s, l) => s + l.unitPrice * l.quantity, 0);
-    const shipping = itemsTotal > 200 ? 0 : 12;
+    const shipping =
+      g.sellerKind === "center" ? 0 : itemsTotal > 200 ? 0 : 12;
     return sum + itemsTotal + shipping;
   }, 0);
 
@@ -570,14 +582,22 @@ export default function Checkout() {
             </CardContent>
           </Card>
 
-          {linesByVendor.map((group) => {
+          {linesBySeller.map((group) => {
             const itemsTotal = group.lines.reduce((s, l) => s + l.unitPrice * l.quantity, 0);
-            const shipping = itemsTotal > 200 ? 0 : 12;
+            const shipping =
+              group.sellerKind === "center" ? 0 : itemsTotal > 200 ? 0 : 12;
             return (
-              <Card key={group.vendorId}>
+              <Card key={group.sellerKey}>
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between mb-3 pb-3 border-b">
-                    <p className="font-semibold">{group.vendorName}</p>
+                    <p className="font-semibold">
+                      {group.sellerName}
+                      {group.sellerKind === "center" && (
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">
+                          (on-hand at service center)
+                        </span>
+                      )}
+                    </p>
                     <span className="text-xs text-muted-foreground">{group.lines.length} item{group.lines.length === 1 ? "" : "s"}</span>
                   </div>
                   <div className="space-y-2 text-sm">
@@ -591,11 +611,11 @@ export default function Checkout() {
                       </div>
                     ))}
                     <div className="pt-2 mt-2 border-t flex justify-between text-muted-foreground">
-                      <span>Shipping</span>
+                      <span>{group.sellerKind === "center" ? "Pickup" : "Shipping"}</span>
                       <span>{shipping === 0 ? "Free" : formatCurrency(shipping)}</span>
                     </div>
                     <div className="flex justify-between font-semibold pt-1">
-                      <span>Vendor total</span>
+                      <span>Seller total</span>
                       <span>{formatCurrency(itemsTotal + shipping)}</span>
                     </div>
                   </div>
@@ -609,8 +629,8 @@ export default function Checkout() {
           <CardContent className="p-5 space-y-4">
             <h2 className="font-semibold text-lg">
               {isProposal
-                ? `Send ${linesByVendor.length === 1 ? "request" : `${linesByVendor.length} requests`}`
-                : `Place ${linesByVendor.length === 1 ? "order" : `${linesByVendor.length} orders`}`}
+                ? `Send ${linesBySeller.length === 1 ? "request" : `${linesBySeller.length} requests`}`
+                : `Place ${linesBySeller.length === 1 ? "order" : `${linesBySeller.length} orders`}`}
             </h2>
             <div className="space-y-1.5 text-sm">
               <div className="flex justify-between">

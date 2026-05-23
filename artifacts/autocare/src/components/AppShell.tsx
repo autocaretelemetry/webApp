@@ -114,6 +114,7 @@ const CENTER_NAV: NavSection[] = [
     label: "Business",
     items: [
       { href: "/center/retainer-plans", label: "Retainer Plans", icon: ShieldCheck },
+      { href: "/center/shop", label: "My Shop", icon: Building2 },
       { href: "/marketplace", label: "Parts Marketplace", icon: ShoppingBag },
       { href: "/orders", label: "Parts Orders", icon: Package },
     ],

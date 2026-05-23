@@ -42,6 +42,7 @@ import CenterDashboard from "@/pages/center/Dashboard";
 import Jobs from "@/pages/center/Jobs";
 import Mechanics from "@/pages/center/Mechanics";
 import CenterRetainerPlans from "@/pages/center/RetainerPlans";
+import CenterShop from "@/pages/center/Shop";
 
 // Vendor Pages
 import VendorDashboard from "@/pages/vendor/Dashboard";
@@ -200,6 +201,7 @@ function AppRouter() {
         <Route path="/jobs" component={centerOnly(Jobs)} />
         <Route path="/mechanics" component={centerOnly(Mechanics)} />
         <Route path="/center/retainer-plans" component={centerOnly(CenterRetainerPlans)} />
+        <Route path="/center/shop" component={centerOnly(CenterShop)} />
 
         {/* Vendor Routes */}
         <Route path="/vendor/parts/new" component={vendorOnly(NewPart)} />

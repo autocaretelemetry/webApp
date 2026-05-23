@@ -9,7 +9,8 @@ import type { CreateOrderInputBuyerKind } from './createOrderInputBuyerKind';
 import type { CreateOrderItemInput } from './createOrderItemInput';
 
 export interface CreateOrderInput {
-  vendorId: string;
+  vendorId?: string | null;
+  sellerCenterId?: string | null;
   bookingId?: string | null;
   mechanicId?: string | null;
   buyerKind: CreateOrderInputBuyerKind;

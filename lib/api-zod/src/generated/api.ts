@@ -1188,7 +1188,8 @@ export const ListPartsForVendorParams = zod.object({
 
 export const ListPartsForVendorResponseItem = zod.object({
   "id": zod.string(),
-  "vendorId": zod.string(),
+  "vendorId": zod.string().nullish(),
+  "centerId": zod.string().nullish(),
   "name": zod.string(),
   "description": zod.string(),
   "category": zod.string(),
@@ -1215,6 +1216,23 @@ export const ListPartsForVendorResponseItem = zod.object({
   "active": zod.boolean().optional(),
   "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).'),
   "createdAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "sellerCenter": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "address": zod.string(),
+  "city": zod.string().optional(),
+  "region": zod.string().optional(),
+  "phone": zod.string(),
+  "specialties": zod.array(zod.string()),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "openJobs": zod.number(),
+  "imageUrl": zod.string().nullish(),
+  "bio": zod.string().nullish(),
+  "active": zod.boolean().optional(),
+  "whatsappOptIn": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).')
 }),zod.null()]).optional()
 })
 export const ListPartsForVendorResponse = zod.array(ListPartsForVendorResponseItem)
@@ -1422,7 +1440,8 @@ export const ListPartsQueryParams = zod.object({
 
 export const ListPartsResponseItem = zod.object({
   "id": zod.string(),
-  "vendorId": zod.string(),
+  "vendorId": zod.string().nullish(),
+  "centerId": zod.string().nullish(),
   "name": zod.string(),
   "description": zod.string(),
   "category": zod.string(),
@@ -1449,6 +1468,23 @@ export const ListPartsResponseItem = zod.object({
   "active": zod.boolean().optional(),
   "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).'),
   "createdAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "sellerCenter": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "address": zod.string(),
+  "city": zod.string().optional(),
+  "region": zod.string().optional(),
+  "phone": zod.string(),
+  "specialties": zod.array(zod.string()),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "openJobs": zod.number(),
+  "imageUrl": zod.string().nullish(),
+  "bio": zod.string().nullish(),
+  "active": zod.boolean().optional(),
+  "whatsappOptIn": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).')
 }),zod.null()]).optional()
 })
 export const ListPartsResponse = zod.array(ListPartsResponseItem)
@@ -1463,7 +1499,8 @@ export const GetPartParams = zod.object({
 
 export const GetPartResponse = zod.object({
   "id": zod.string(),
-  "vendorId": zod.string(),
+  "vendorId": zod.string().nullish(),
+  "centerId": zod.string().nullish(),
   "name": zod.string(),
   "description": zod.string(),
   "category": zod.string(),
@@ -1490,6 +1527,23 @@ export const GetPartResponse = zod.object({
   "active": zod.boolean().optional(),
   "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).'),
   "createdAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "sellerCenter": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "address": zod.string(),
+  "city": zod.string().optional(),
+  "region": zod.string().optional(),
+  "phone": zod.string(),
+  "specialties": zod.array(zod.string()),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "openJobs": zod.number(),
+  "imageUrl": zod.string().nullish(),
+  "bio": zod.string().nullish(),
+  "active": zod.boolean().optional(),
+  "whatsappOptIn": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).')
 }),zod.null()]).optional()
 })
 
@@ -1522,7 +1576,8 @@ export const UpdatePartBody = zod.object({
 
 export const UpdatePartResponse = zod.object({
   "id": zod.string(),
-  "vendorId": zod.string(),
+  "vendorId": zod.string().nullish(),
+  "centerId": zod.string().nullish(),
   "name": zod.string(),
   "description": zod.string(),
   "category": zod.string(),
@@ -1549,6 +1604,23 @@ export const UpdatePartResponse = zod.object({
   "active": zod.boolean().optional(),
   "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).'),
   "createdAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "sellerCenter": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "address": zod.string(),
+  "city": zod.string().optional(),
+  "region": zod.string().optional(),
+  "phone": zod.string(),
+  "specialties": zod.array(zod.string()),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "openJobs": zod.number(),
+  "imageUrl": zod.string().nullish(),
+  "bio": zod.string().nullish(),
+  "active": zod.boolean().optional(),
+  "whatsappOptIn": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).')
 }),zod.null()]).optional()
 })
 
@@ -1578,7 +1650,9 @@ export const ListOrdersQueryParams = zod.object({
 
 export const ListOrdersResponseItem = zod.object({
   "id": zod.string(),
-  "vendorId": zod.string(),
+  "vendorId": zod.string().nullish(),
+  "sellerCenterId": zod.string().nullish(),
+  "fulfillmentKind": zod.enum(['delivery', 'on_hand']),
   "bookingId": zod.string().nullish(),
   "mechanicId": zod.string().nullish(),
   "deliveryAgentId": zod.string().nullish(),
@@ -1624,6 +1698,23 @@ export const ListOrdersResponseItem = zod.object({
   "active": zod.boolean().optional(),
   "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).'),
   "createdAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "sellerCenter": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "address": zod.string(),
+  "city": zod.string().optional(),
+  "region": zod.string().optional(),
+  "phone": zod.string(),
+  "specialties": zod.array(zod.string()),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "openJobs": zod.number(),
+  "imageUrl": zod.string().nullish(),
+  "bio": zod.string().nullish(),
+  "active": zod.boolean().optional(),
+  "whatsappOptIn": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).')
 }),zod.null()]).optional(),
   "mechanic": zod.union([zod.object({
   "id": zod.string(),
@@ -1677,7 +1768,8 @@ export const ListOrdersResponse = zod.array(ListOrdersResponseItem)
 
 
 export const CreateOrderBody = zod.object({
-  "vendorId": zod.string(),
+  "vendorId": zod.string().nullish(),
+  "sellerCenterId": zod.string().nullish(),
   "bookingId": zod.string().nullish(),
   "mechanicId": zod.string().nullish(),
   "buyerKind": zod.enum(['owner', 'center']),
@@ -1704,7 +1796,9 @@ export const GetOrderParams = zod.object({
 
 export const GetOrderResponse = zod.object({
   "id": zod.string(),
-  "vendorId": zod.string(),
+  "vendorId": zod.string().nullish(),
+  "sellerCenterId": zod.string().nullish(),
+  "fulfillmentKind": zod.enum(['delivery', 'on_hand']),
   "bookingId": zod.string().nullish(),
   "mechanicId": zod.string().nullish(),
   "deliveryAgentId": zod.string().nullish(),
@@ -1750,6 +1844,23 @@ export const GetOrderResponse = zod.object({
   "active": zod.boolean().optional(),
   "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).'),
   "createdAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "sellerCenter": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "address": zod.string(),
+  "city": zod.string().optional(),
+  "region": zod.string().optional(),
+  "phone": zod.string(),
+  "specialties": zod.array(zod.string()),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "openJobs": zod.number(),
+  "imageUrl": zod.string().nullish(),
+  "bio": zod.string().nullish(),
+  "active": zod.boolean().optional(),
+  "whatsappOptIn": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).')
 }),zod.null()]).optional(),
   "mechanic": zod.union([zod.object({
   "id": zod.string(),
@@ -1823,7 +1934,9 @@ export const UpdateOrderStatusBody = zod.object({
 
 export const UpdateOrderStatusResponse = zod.object({
   "id": zod.string(),
-  "vendorId": zod.string(),
+  "vendorId": zod.string().nullish(),
+  "sellerCenterId": zod.string().nullish(),
+  "fulfillmentKind": zod.enum(['delivery', 'on_hand']),
   "bookingId": zod.string().nullish(),
   "mechanicId": zod.string().nullish(),
   "deliveryAgentId": zod.string().nullish(),
@@ -1869,6 +1982,23 @@ export const UpdateOrderStatusResponse = zod.object({
   "active": zod.boolean().optional(),
   "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).'),
   "createdAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "sellerCenter": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "address": zod.string(),
+  "city": zod.string().optional(),
+  "region": zod.string().optional(),
+  "phone": zod.string(),
+  "specialties": zod.array(zod.string()),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "openJobs": zod.number(),
+  "imageUrl": zod.string().nullish(),
+  "bio": zod.string().nullish(),
+  "active": zod.boolean().optional(),
+  "whatsappOptIn": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).')
 }),zod.null()]).optional(),
   "mechanic": zod.union([zod.object({
   "id": zod.string(),
@@ -1919,7 +2049,9 @@ export const ApproveAndPayOrderParams = zod.object({
 
 export const ApproveAndPayOrderResponse = zod.object({
   "id": zod.string(),
-  "vendorId": zod.string(),
+  "vendorId": zod.string().nullish(),
+  "sellerCenterId": zod.string().nullish(),
+  "fulfillmentKind": zod.enum(['delivery', 'on_hand']),
   "bookingId": zod.string().nullish(),
   "mechanicId": zod.string().nullish(),
   "deliveryAgentId": zod.string().nullish(),
@@ -1965,6 +2097,23 @@ export const ApproveAndPayOrderResponse = zod.object({
   "active": zod.boolean().optional(),
   "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).'),
   "createdAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "sellerCenter": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "address": zod.string(),
+  "city": zod.string().optional(),
+  "region": zod.string().optional(),
+  "phone": zod.string(),
+  "specialties": zod.array(zod.string()),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "openJobs": zod.number(),
+  "imageUrl": zod.string().nullish(),
+  "bio": zod.string().nullish(),
+  "active": zod.boolean().optional(),
+  "whatsappOptIn": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).')
 }),zod.null()]).optional(),
   "mechanic": zod.union([zod.object({
   "id": zod.string(),
@@ -2015,7 +2164,9 @@ export const AuthorizeCenterPayOrderParams = zod.object({
 
 export const AuthorizeCenterPayOrderResponse = zod.object({
   "id": zod.string(),
-  "vendorId": zod.string(),
+  "vendorId": zod.string().nullish(),
+  "sellerCenterId": zod.string().nullish(),
+  "fulfillmentKind": zod.enum(['delivery', 'on_hand']),
   "bookingId": zod.string().nullish(),
   "mechanicId": zod.string().nullish(),
   "deliveryAgentId": zod.string().nullish(),
@@ -2061,6 +2212,23 @@ export const AuthorizeCenterPayOrderResponse = zod.object({
   "active": zod.boolean().optional(),
   "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).'),
   "createdAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "sellerCenter": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "address": zod.string(),
+  "city": zod.string().optional(),
+  "region": zod.string().optional(),
+  "phone": zod.string(),
+  "specialties": zod.array(zod.string()),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "openJobs": zod.number(),
+  "imageUrl": zod.string().nullish(),
+  "bio": zod.string().nullish(),
+  "active": zod.boolean().optional(),
+  "whatsappOptIn": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).')
 }),zod.null()]).optional(),
   "mechanic": zod.union([zod.object({
   "id": zod.string(),
@@ -2111,7 +2279,9 @@ export const CenterPayOrderParams = zod.object({
 
 export const CenterPayOrderResponse = zod.object({
   "id": zod.string(),
-  "vendorId": zod.string(),
+  "vendorId": zod.string().nullish(),
+  "sellerCenterId": zod.string().nullish(),
+  "fulfillmentKind": zod.enum(['delivery', 'on_hand']),
   "bookingId": zod.string().nullish(),
   "mechanicId": zod.string().nullish(),
   "deliveryAgentId": zod.string().nullish(),
@@ -2157,6 +2327,23 @@ export const CenterPayOrderResponse = zod.object({
   "active": zod.boolean().optional(),
   "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).'),
   "createdAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "sellerCenter": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "address": zod.string(),
+  "city": zod.string().optional(),
+  "region": zod.string().optional(),
+  "phone": zod.string(),
+  "specialties": zod.array(zod.string()),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "openJobs": zod.number(),
+  "imageUrl": zod.string().nullish(),
+  "bio": zod.string().nullish(),
+  "active": zod.boolean().optional(),
+  "whatsappOptIn": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).')
 }),zod.null()]).optional(),
   "mechanic": zod.union([zod.object({
   "id": zod.string(),
@@ -2317,7 +2504,9 @@ export const GetAdminOverviewResponse = zod.object({
 })),
   "recentOrders": zod.array(zod.object({
   "id": zod.string(),
-  "vendorId": zod.string(),
+  "vendorId": zod.string().nullish(),
+  "sellerCenterId": zod.string().nullish(),
+  "fulfillmentKind": zod.enum(['delivery', 'on_hand']),
   "bookingId": zod.string().nullish(),
   "mechanicId": zod.string().nullish(),
   "deliveryAgentId": zod.string().nullish(),
@@ -2363,6 +2552,23 @@ export const GetAdminOverviewResponse = zod.object({
   "active": zod.boolean().optional(),
   "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).'),
   "createdAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "sellerCenter": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "address": zod.string(),
+  "city": zod.string().optional(),
+  "region": zod.string().optional(),
+  "phone": zod.string(),
+  "specialties": zod.array(zod.string()),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "openJobs": zod.number(),
+  "imageUrl": zod.string().nullish(),
+  "bio": zod.string().nullish(),
+  "active": zod.boolean().optional(),
+  "whatsappOptIn": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).')
 }),zod.null()]).optional(),
   "mechanic": zod.union([zod.object({
   "id": zod.string(),

@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import type { Part } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Package, Store } from "lucide-react";
+import { Package, Store, Building2 } from "lucide-react";
 import { formatCurrency, resolveImageUrl } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +26,11 @@ export function PartCard({ part }: { part: Part }) {
           )}
           <div className="absolute top-2 left-2 flex gap-1.5">
             <Badge variant="secondary" className="text-xs">{part.category}</Badge>
+            {part.sellerCenter && (
+              <Badge className="text-xs bg-primary text-primary-foreground gap-1">
+                <Building2 className="h-3 w-3" /> On hand
+              </Badge>
+            )}
           </div>
           {(lowStock || outOfStock) && (
             <div className="absolute top-2 right-2">
@@ -48,8 +53,14 @@ export function PartCard({ part }: { part: Part }) {
           </div>
           <p className="text-xs text-muted-foreground line-clamp-2">{part.description}</p>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Store className="h-3 w-3" />
-            <span className="truncate">{part.vendor?.name ?? "Vendor"}</span>
+            {part.sellerCenter ? (
+              <Building2 className="h-3 w-3" />
+            ) : (
+              <Store className="h-3 w-3" />
+            )}
+            <span className="truncate">
+              {part.sellerCenter?.name ?? part.vendor?.name ?? "Seller"}
+            </span>
             <span>·</span>
             <span className="font-mono">{part.sku}</span>
           </div>

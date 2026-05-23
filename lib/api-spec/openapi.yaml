@@ -2823,10 +2823,14 @@ components:
 
     Part:
       type: object
-      required: [id, vendorId, name, description, category, brand, sku, price, stock, compatibleBrands, active, createdAt]
+      required: [id, name, description, category, brand, sku, price, stock, compatibleBrands, active, createdAt]
       properties:
         id: { type: string }
-        vendorId: { type: string }
+        # Exactly one of vendorId / centerId is set. Vendor parts go through
+        # the delivery workflow; center parts are sold from a service center's
+        # own on-hand shop and skip delivery entirely.
+        vendorId: { type: string, nullable: true }
+        centerId: { type: string, nullable: true }
         name: { type: string }
         description: { type: string }
         category: { type: string }
@@ -2843,6 +2847,10 @@ components:
         vendor:
           oneOf:
             - { $ref: "#/components/schemas/Vendor" }
+            - { type: "null" }
+        sellerCenter:
+          oneOf:
+            - { $ref: "#/components/schemas/ServiceCenter" }
             - { type: "null" }
 
     CreatePartInput:
@@ -2886,10 +2894,17 @@ components:
 
     Order:
       type: object
-      required: [id, vendorId, buyerKind, buyerName, buyerPhone, shippingAddress, status, itemsTotal, shippingFee, total, placedAt]
+      required: [id, buyerKind, buyerName, buyerPhone, shippingAddress, status, itemsTotal, shippingFee, total, placedAt, fulfillmentKind]
       properties:
         id: { type: string }
-        vendorId: { type: string }
+        # Exactly one of vendorId / sellerCenterId is set. Center-sourced
+        # orders skip delivery (fulfillmentKind=on_hand, no shipping fee,
+        # no delivery agent).
+        vendorId: { type: string, nullable: true }
+        sellerCenterId: { type: string, nullable: true }
+        fulfillmentKind:
+          type: string
+          enum: [delivery, on_hand]
         bookingId: { type: string, nullable: true }
         mechanicId: { type: string, nullable: true }
         deliveryAgentId: { type: string, nullable: true }
@@ -2934,6 +2949,10 @@ components:
         vendor:
           oneOf:
             - { $ref: "#/components/schemas/Vendor" }
+            - { type: "null" }
+        sellerCenter:
+          oneOf:
+            - { $ref: "#/components/schemas/ServiceCenter" }
             - { type: "null" }
         mechanic:
           oneOf:
@@ -2997,9 +3016,13 @@ components:
 
     CreateOrderInput:
       type: object
-      required: [vendorId, buyerKind, buyerName, buyerPhone, shippingAddress, items]
+      required: [buyerKind, buyerName, buyerPhone, shippingAddress, items]
       properties:
-        vendorId: { type: string }
+        # Provide vendorId for a vendor order, or sellerCenterId for a
+        # center-shop order. Server derives the seller from the parts and
+        # cross-checks against the body — they must agree.
+        vendorId: { type: string, nullable: true }
+        sellerCenterId: { type: string, nullable: true }
         # If bookingId + mechanicId are provided, the order is created in the "proposed" state
         # and goes to the car owner for approval before being placed and stock-reserved.
         bookingId: { type: string, nullable: true }

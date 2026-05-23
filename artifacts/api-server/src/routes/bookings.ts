@@ -33,7 +33,7 @@ export type BookingRelationship = "admin" | "owner" | "center";
  * Empty array for owners, renters, etc. Cached briefly on `req` to avoid
  * re-querying within a single request.
  */
-async function getCallerCenterIds(req: Request): Promise<string[]> {
+export async function getCallerCenterIds(req: Request): Promise<string[]> {
   const cache = (req as unknown as { _centerIds?: string[] })._centerIds;
   if (cache) return cache;
   const userId = req.user?.id;

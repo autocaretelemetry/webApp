@@ -4,20 +4,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useCart, updateQuantity, removeFromCart, setCartScope } from "@/lib/cart";
 import { formatCurrency } from "@/lib/format";
-import { ShoppingCart, Trash2, Plus, Minus, Package, Store, Wrench, X } from "lucide-react";
+import { ShoppingCart, Trash2, Plus, Minus, Package, Store, Wrench, X, Building2 } from "lucide-react";
 
 export default function Cart() {
-  const { lines, subtotal, vendorIds, scope } = useCart();
+  const { lines, subtotal, sellerGroups, scope } = useCart();
   const [, navigate] = useLocation();
 
-  const shippingFee = subtotal > 200 ? 0 : subtotal > 0 ? 12 : 0;
+  // Center-shop lines never incur shipping; only vendor lines do.
+  const vendorSubtotal = sellerGroups
+    .filter((g) => g.sellerKind === "vendor")
+    .reduce((s, g) => s + g.lines.reduce((ls, l) => ls + l.unitPrice * l.quantity, 0), 0);
+  const shippingFee = vendorSubtotal > 200 ? 0 : vendorSubtotal > 0 ? 12 : 0;
   const total = subtotal + shippingFee;
-
-  const linesByVendor = vendorIds.map((vid) => ({
-    vendorId: vid,
-    vendorName: lines.find((l) => l.vendorId === vid)?.vendorName ?? "Vendor",
-    lines: lines.filter((l) => l.vendorId === vid),
-  }));
+  const sellerCount = sellerGroups.length;
 
   if (lines.length === 0) {
     return (
@@ -45,7 +44,7 @@ export default function Cart() {
     <div className="space-y-6 animate-in fade-in-50 duration-500">
       <PageHeader
         title={scope ? "Job parts cart" : "Your Cart"}
-        description={`${lines.length} item${lines.length === 1 ? "" : "s"} from ${vendorIds.length} vendor${vendorIds.length === 1 ? "" : "s"}.`}
+        description={`${lines.length} item${lines.length === 1 ? "" : "s"} from ${sellerCount} seller${sellerCount === 1 ? "" : "s"}.`}
       />
 
       {scope && (
@@ -75,22 +74,31 @@ export default function Cart() {
         </Card>
       )}
 
-      {vendorIds.length > 1 && (
+      {sellerCount > 1 && (
         <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900">
           <CardContent className="p-4 text-sm">
-            <strong>Heads up:</strong> Each vendor ships its own order. You'll see one order per vendor at checkout.
+            <strong>Heads up:</strong> Each seller fulfils its own order. You'll see one order per seller at checkout. Service-center parts are picked up on site (no delivery).
           </CardContent>
         </Card>
       )}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-6">
-          {linesByVendor.map((group) => (
-            <Card key={group.vendorId}>
+          {sellerGroups.map((group) => (
+            <Card key={group.sellerKey}>
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 text-sm font-semibold mb-3 pb-3 border-b">
-                  <Store className="h-4 w-4 text-primary" />
-                  {group.vendorName}
+                  {group.sellerKind === "center" ? (
+                    <Building2 className="h-4 w-4 text-primary" />
+                  ) : (
+                    <Store className="h-4 w-4 text-primary" />
+                  )}
+                  {group.sellerName}
+                  {group.sellerKind === "center" && (
+                    <span className="ml-auto text-xs font-normal text-muted-foreground">
+                      On-hand · no delivery
+                    </span>
+                  )}
                 </div>
                 <div className="space-y-4">
                   {group.lines.map((line) => (
