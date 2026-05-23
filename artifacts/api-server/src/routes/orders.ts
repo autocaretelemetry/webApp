@@ -22,6 +22,7 @@ import {
   UpdateOrderStatusBody,
 } from "@workspace/api-zod";
 import { requireAuth } from "../lib/auth";
+import { authorizeServiceBooking } from "./bookings";
 
 const router: IRouter = Router();
 
@@ -373,6 +374,11 @@ router.post("/orders", async (req, res): Promise<void> => {
           itemsTotal: +itemsTotal.toFixed(2),
           shippingFee,
           total,
+          // Direct buys are implicitly paid by the buyer at checkout; proposals
+          // start unpaid and get resolved at the owner-approval step.
+          paymentStatus: isProposal ? "unpaid" : "paid_by_owner",
+          paidAt: isProposal ? null : now,
+          paidByUserId: isProposal ? null : (req.user?.id ?? null),
         })
         .returning();
 
@@ -444,10 +450,12 @@ router.patch("/orders/:orderId/status", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  // Allowed transitions. "placed" is reachable from "proposed" (owner approval)
-  // or as a starting state for direct buys.
+  // Allowed transitions. The legacy "proposed → placed" path is gone — the
+  // owner now picks a payment route (approve-and-pay OR authorize-center-pay)
+  // via the dedicated endpoints below, which both flip status to "placed"
+  // alongside the payment decision. Rejection still flows through here.
   const allowed: Record<string, string[]> = {
-    proposed: ["placed", "cancelled"],
+    proposed: ["cancelled"],
     placed: ["confirmed", "cancelled"],
     confirmed: ["shipped", "cancelled"],
     shipped: ["delivered"],
@@ -488,10 +496,6 @@ router.patch("/orders/:orderId/status", async (req, res): Promise<void> => {
 
       const now = new Date();
       const updates: Partial<typeof ordersTable.$inferInsert> = { status: next };
-      if (next === "placed" && current.status === "proposed") {
-        updates.approvedAt = now;
-        updates.placedAt = now;
-      }
       if (next === "confirmed") updates.confirmedAt = now;
       if (next === "shipped") {
         updates.shippedAt = now;
@@ -512,29 +516,6 @@ router.patch("/orders/:orderId/status", async (req, res): Promise<void> => {
         .returning();
       if (updated.length === 0) {
         throw new HttpError(409, "Order status changed concurrently, please retry");
-      }
-
-      // Reserve stock at owner approval (proposed → placed). Atomic per-line.
-      if (current.status === "proposed" && next === "placed") {
-        const lines = await tx
-          .select()
-          .from(orderItemsTable)
-          .where(eq(orderItemsTable.orderId, current.id));
-        for (const line of lines) {
-          const dec = await tx
-            .update(partsTable)
-            .set({ stock: sql`${partsTable.stock} - ${line.quantity}` })
-            .where(
-              and(eq(partsTable.id, line.partId), gte(partsTable.stock, line.quantity)),
-            )
-            .returning({ id: partsTable.id });
-          if (dec.length === 0) {
-            throw new HttpError(
-              409,
-              `Insufficient stock for ${line.snapshot.name} — owner cannot approve this proposal`,
-            );
-          }
-        }
       }
 
       // Restore stock only for orders that were stock-reserved (not proposals).
@@ -564,6 +545,216 @@ router.patch("/orders/:orderId/status", async (req, res): Promise<void> => {
       return updated[0];
     });
 
+    const [hydrated] = await hydrate([row]);
+    res.json(hydrated);
+  } catch (err) {
+    if (err instanceof HttpError) {
+      res.status(err.status).json({ error: err.message });
+      return;
+    }
+    throw err;
+  }
+});
+
+/**
+ * Shared transition used by both owner-pay paths: marks a proposed order as
+ * placed, stamps approval + payment fields, and atomically reserves stock
+ * (rolling back the whole transition if any line is short). The caller has
+ * already verified the booking relationship and the order/booking pairing.
+ */
+async function approveProposalAndReserveStock(
+  orderId: string,
+  options: {
+    paymentStatus: "paid_by_owner" | "unpaid";
+    centerPayAuthorized: boolean;
+    paidByUserId: string | null;
+  },
+): Promise<typeof ordersTable.$inferSelect> {
+  return db.transaction(async (tx) => {
+    const [current] = await tx
+      .select()
+      .from(ordersTable)
+      .where(eq(ordersTable.id, orderId));
+    if (!current) throw new HttpError(404, "Order not found");
+    if (current.status !== "proposed") {
+      throw new HttpError(
+        409,
+        `Only proposed orders can be approved (current status: ${current.status})`,
+      );
+    }
+    const now = new Date();
+    const updated = await tx
+      .update(ordersTable)
+      .set({
+        status: "placed",
+        approvedAt: now,
+        placedAt: now,
+        paymentStatus: options.paymentStatus,
+        centerPayAuthorized: options.centerPayAuthorized,
+        paidAt: options.paymentStatus === "paid_by_owner" ? now : null,
+        paidByUserId: options.paymentStatus === "paid_by_owner" ? options.paidByUserId : null,
+      })
+      .where(and(eq(ordersTable.id, current.id), eq(ordersTable.status, "proposed")))
+      .returning();
+    if (updated.length === 0) {
+      throw new HttpError(409, "Order status changed concurrently, please retry");
+    }
+
+    const lines = await tx
+      .select()
+      .from(orderItemsTable)
+      .where(eq(orderItemsTable.orderId, current.id));
+    for (const line of lines) {
+      const dec = await tx
+        .update(partsTable)
+        .set({ stock: sql`${partsTable.stock} - ${line.quantity}` })
+        .where(and(eq(partsTable.id, line.partId), gte(partsTable.stock, line.quantity)))
+        .returning({ id: partsTable.id });
+      if (dec.length === 0) {
+        throw new HttpError(
+          409,
+          `Insufficient stock for ${line.snapshot.name} — owner cannot approve this proposal`,
+        );
+      }
+    }
+    return updated[0];
+  });
+}
+
+/**
+ * Guard for the three new proposal-payment endpoints. Returns the proposal
+ * order + the resolved booking relationship, or null after sending an error
+ * response. `requiredRelationship` lets the caller restrict to owner vs center.
+ */
+async function authorizeProposalAction(
+  req: Parameters<typeof authorizeServiceBooking>[0],
+  res: Parameters<typeof authorizeServiceBooking>[1],
+  orderId: string,
+  requiredRelationship: "owner" | "center",
+): Promise<{
+  order: typeof ordersTable.$inferSelect;
+  relationship: "owner" | "center" | "admin";
+} | null> {
+  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId));
+  if (!order) {
+    res.status(404).json({ error: "Order not found" });
+    return null;
+  }
+  if (!order.bookingId) {
+    res.status(409).json({ error: "This action only applies to mechanic-proposed parts orders" });
+    return null;
+  }
+  const access = await authorizeServiceBooking(req, res, order.bookingId);
+  if (!access) return null;
+  const rel = access.relationship;
+  if (rel !== "admin" && rel !== requiredRelationship) {
+    res.status(403).json({
+      error:
+        requiredRelationship === "owner"
+          ? "Only the vehicle owner can approve this parts request."
+          : "Only the service center handling this job can settle this parts order.",
+    });
+    return null;
+  }
+  return { order, relationship: rel };
+}
+
+router.post("/orders/:orderId/approve-and-pay", async (req, res): Promise<void> => {
+  const params = GetOrderParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  try {
+    const guard = await authorizeProposalAction(req, res, params.data.orderId, "owner");
+    if (!guard) return;
+    const row = await approveProposalAndReserveStock(guard.order.id, {
+      paymentStatus: "paid_by_owner",
+      centerPayAuthorized: false,
+      paidByUserId: req.user?.id ?? null,
+    });
+    const [hydrated] = await hydrate([row]);
+    res.json(hydrated);
+  } catch (err) {
+    if (err instanceof HttpError) {
+      res.status(err.status).json({ error: err.message });
+      return;
+    }
+    throw err;
+  }
+});
+
+router.post("/orders/:orderId/authorize-center-pay", async (req, res): Promise<void> => {
+  const params = GetOrderParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  try {
+    const guard = await authorizeProposalAction(req, res, params.data.orderId, "owner");
+    if (!guard) return;
+    const row = await approveProposalAndReserveStock(guard.order.id, {
+      paymentStatus: "unpaid",
+      centerPayAuthorized: true,
+      paidByUserId: null,
+    });
+    const [hydrated] = await hydrate([row]);
+    res.json(hydrated);
+  } catch (err) {
+    if (err instanceof HttpError) {
+      res.status(err.status).json({ error: err.message });
+      return;
+    }
+    throw err;
+  }
+});
+
+router.post("/orders/:orderId/center-pay", async (req, res): Promise<void> => {
+  const params = GetOrderParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  try {
+    const guard = await authorizeProposalAction(req, res, params.data.orderId, "center");
+    if (!guard) return;
+    const current = guard.order;
+    if (!current.centerPayAuthorized) {
+      res.status(409).json({
+        error:
+          "The vehicle owner has not authorized the service center to pay for this order.",
+      });
+      return;
+    }
+    if (current.paymentStatus !== "unpaid") {
+      res.status(409).json({
+        error: `This order is already settled (payment status: ${current.paymentStatus}).`,
+      });
+      return;
+    }
+    if (current.status === "cancelled") {
+      res.status(409).json({ error: "Cannot settle a cancelled order." });
+      return;
+    }
+    const now = new Date();
+    const [row] = await db
+      .update(ordersTable)
+      .set({
+        paymentStatus: "paid_by_center",
+        paidAt: now,
+        paidByUserId: req.user?.id ?? null,
+      })
+      .where(
+        and(
+          eq(ordersTable.id, current.id),
+          eq(ordersTable.paymentStatus, "unpaid"),
+        ),
+      )
+      .returning();
+    if (!row) {
+      res.status(409).json({ error: "Order payment changed concurrently, please retry" });
+      return;
+    }
     const [hydrated] = await hydrate([row]);
     res.json(hydrated);
   } catch (err) {

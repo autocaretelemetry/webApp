@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, real, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, real, integer, timestamp, jsonb, boolean } from "drizzle-orm/pg-core";
 import { vendorsTable } from "./vendors";
 import { partsTable } from "./parts";
 import { bookingsTable } from "./bookings";
@@ -63,6 +63,22 @@ export const ordersTable = pgTable("orders", {
   deliveredAt: timestamp("delivered_at", { withTimezone: true }),
   cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
   trackingCode: text("tracking_code"),
+  // Payment for the order itself (the part cost paid to the vendor). For
+  // direct buys this is implicitly `paid_by_owner` at checkout; for
+  // mechanic-proposed orders the owner decides at approval time whether
+  // they pay the vendor directly or authorize the service center to pay
+  // and bill them back via the booking's invoice.
+  //   unpaid          — proposed orders before owner action
+  //   paid_by_owner   — owner approved & paid the vendor directly
+  //   paid_by_center  — owner authorized + center settled with vendor;
+  //                     cost will roll into the service invoice
+  paymentStatus: text("payment_status").notNull().default("unpaid"),
+  centerPayAuthorized: boolean("center_pay_authorized").notNull().default(false),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
+  paidByUserId: uuid("paid_by_user_id"),
+  // Set when the line items have been folded into a booking invoice so the
+  // same parts aren't billed twice if a second invoice is ever created.
+  invoicedAt: timestamp("invoiced_at", { withTimezone: true }),
 });
 
 export const orderItemsTable = pgTable("order_items", {

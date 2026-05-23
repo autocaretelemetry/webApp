@@ -936,6 +936,48 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Order" }
 
+  /orders/{orderId}/approve-and-pay:
+    post:
+      operationId: approveAndPayOrder
+      tags: [orders]
+      summary: Owner approves a proposed parts order and pays the vendor directly
+      parameters:
+        - { name: orderId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+
+  /orders/{orderId}/authorize-center-pay:
+    post:
+      operationId: authorizeCenterPayOrder
+      tags: [orders]
+      summary: Owner approves a proposed parts order and authorizes the service center to pay the vendor (cost will roll into the booking invoice)
+      parameters:
+        - { name: orderId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+
+  /orders/{orderId}/center-pay:
+    post:
+      operationId: centerPayOrder
+      tags: [orders]
+      summary: Service center settles a parts order with the vendor on the owner's behalf (only when the owner has authorized center-pay)
+      parameters:
+        - { name: orderId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+
   /dashboard/vendor/{vendorId}:
     get:
       operationId: getVendorDashboard
@@ -2882,6 +2924,12 @@ components:
         deliveredAt: { type: string, format: date-time, nullable: true }
         cancelledAt: { type: string, format: date-time, nullable: true }
         trackingCode: { type: string, nullable: true }
+        paymentStatus:
+          type: string
+          enum: [unpaid, paid_by_owner, paid_by_center]
+        centerPayAuthorized: { type: boolean }
+        paidAt: { type: string, format: date-time, nullable: true }
+        invoicedAt: { type: string, format: date-time, nullable: true }
         itemsCount: { type: integer }
         vendor:
           oneOf:

@@ -1,11 +1,14 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import {
   db,
   bookingsTable,
   bookingEventsTable,
   invoicesTable,
   vehiclesTable,
+  ordersTable,
+  orderItemsTable,
+  type InvoiceItem,
 } from "@workspace/db";
 import {
   CreateInvoiceBody,
@@ -82,10 +85,49 @@ router.post("/bookings/:bookingId/invoice", requireAuth, async (req, res): Promi
     return;
   }
 
-  const laborTotal = parsed.data.items
+  // Pull in any parts orders the service center paid for on the owner's behalf
+  // (after the owner authorized center-pay). Those costs are billed back to
+  // the owner through this invoice, so we automatically append them as
+  // part-line items. We exclude anything already invoiced or cancelled.
+  const centerPaidOrders = await db
+    .select()
+    .from(ordersTable)
+    .where(
+      and(
+        eq(ordersTable.bookingId, booking.id),
+        eq(ordersTable.paymentStatus, "paid_by_center"),
+        isNull(ordersTable.invoicedAt),
+      ),
+    );
+  const centerPaidIds = centerPaidOrders
+    .filter((o) => o.status !== "cancelled")
+    .map((o) => o.id);
+  const centerPaidLines = centerPaidIds.length
+    ? await db
+        .select()
+        .from(orderItemsTable)
+        .where(eq(orderItemsTable.orderId, centerPaidIds[0]))
+        .union(
+          ...centerPaidIds.slice(1).map((id) =>
+            db
+              .select()
+              .from(orderItemsTable)
+              .where(eq(orderItemsTable.orderId, id)),
+          ),
+        )
+    : [];
+  const autoPartItems: InvoiceItem[] = centerPaidLines.map((line) => ({
+    description: `Part: ${line.snapshot.name} (paid by service center)`,
+    quantity: line.quantity,
+    unitPrice: line.unitPrice,
+    kind: "part" as const,
+  }));
+  const allItems: InvoiceItem[] = [...parsed.data.items, ...autoPartItems];
+
+  const laborTotal = allItems
     .filter((i) => i.kind === "labor")
     .reduce((s, i) => s + i.quantity * i.unitPrice, 0);
-  const partsTotal = parsed.data.items
+  const partsTotal = allItems
     .filter((i) => i.kind === "part")
     .reduce((s, i) => s + i.quantity * i.unitPrice, 0);
   const subtotal = laborTotal + partsTotal;
