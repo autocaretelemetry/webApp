@@ -1,10 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   getCurrentUser,
@@ -13,16 +7,10 @@ import {
   type AuthedUser,
 } from "@workspace/api-client-react";
 import { getRole, setRole, type Role } from "@/lib/role";
+import { AuthContext, useAuth } from "@/lib/auth-context";
 
-type AuthState = {
-  user: AuthedUser | null;
-  loading: boolean;
-  login: (email: string, password: string) => Promise<AuthedUser>;
-  logout: () => Promise<void>;
-  refresh: () => Promise<void>;
-};
-
-const AuthContext = createContext<AuthState | null>(null);
+// Re-export so existing `import { useAuth } from "@/lib/auth"` keeps working.
+export { useAuth };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthedUser | null>(null);
@@ -100,8 +88,3 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useAuth(): AuthState {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
-  return ctx;
-}
