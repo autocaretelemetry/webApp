@@ -39,6 +39,7 @@ import {
   CreditCard,
   Banknote,
   ShieldAlert,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -256,6 +257,22 @@ function RentalRow({
             {canCancel && (
               <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={onCancel} disabled={pending}>
                 Cancel
+              </Button>
+            )}
+            {b.status === "completed" && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                asChild
+              >
+                <a
+                  href={`/api/rental-bookings/${b.id}/receipt.pdf`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Download className="h-3.5 w-3.5" /> Download receipt
+                </a>
               </Button>
             )}
           </div>

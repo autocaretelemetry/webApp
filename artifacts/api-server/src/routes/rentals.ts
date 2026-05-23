@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import PDFDocument from "pdfkit";
 import { and, count, desc, eq, gt, inArray, lt, or } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../lib/auth";
 import {
@@ -1457,6 +1458,135 @@ router.get("/tracked-trips", requireAdmin, async (_req, res): Promise<void> => {
   }
   res.json([]);
 });
+
+/**
+ * Per-trip receipt download. Available once the booking has reached
+ * `completed`; `cancelled`/`rejected` rows are intentionally excluded
+ * (no money exchanged in those terminals). Auth reuses the shared
+ * `authorizeBookingAccess` helper so admin, the renter, and the car
+ * owner can all pull a copy.
+ */
+router.get(
+  "/rental-bookings/:rentalBookingId/receipt.pdf",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    const params = UpdateRentalBookingParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+    const access = await authorizeBookingAccess(req, res, params.data.rentalBookingId);
+    if (!access) return;
+
+    const [b] = await db
+      .select()
+      .from(rentalBookingsTable)
+      .where(eq(rentalBookingsTable.id, params.data.rentalBookingId));
+    if (!b) {
+      res.status(404).json({ error: "Rental booking not found" });
+      return;
+    }
+    if (b.status !== "completed") {
+      res.status(409).json({ error: "Receipt is only available after the trip is completed." });
+      return;
+    }
+    const [car] = await db
+      .select()
+      .from(rentalCarsTable)
+      .where(eq(rentalCarsTable.id, b.carId));
+
+    const safeId = b.id.slice(0, 8);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="autocare-receipt-${safeId}.pdf"`,
+    );
+    // Receipt contains PII (renter name/phone/email, owner contact);
+    // make sure intermediate caches and the browser back/forward cache
+    // never persist a downloaded copy.
+    res.setHeader("Cache-Control", "private, no-store, max-age=0");
+    res.setHeader("Pragma", "no-cache");
+
+    const doc = new PDFDocument({ size: "A4", margin: 50 });
+    doc.pipe(res);
+
+    doc.fillColor("#1a1a1a").fontSize(22).text("AutoCare Rental Receipt", { align: "left" });
+    doc.moveDown(0.2);
+    doc.fontSize(10).fillColor("#888").text(`Booking #${safeId}`);
+    doc.text(`Issued ${new Date().toISOString().slice(0, 10)}`);
+    doc.moveDown(0.8);
+    doc
+      .strokeColor("#cccccc")
+      .lineWidth(1)
+      .moveTo(doc.x, doc.y)
+      .lineTo(doc.page.width - doc.page.margins.right, doc.y)
+      .stroke();
+    doc.moveDown(0.6);
+
+    const line = (label: string, value: string) => {
+      doc.fontSize(10).fillColor("#666").text(label, { continued: true });
+      doc.fillColor("#1a1a1a").text(`  ${value}`);
+    };
+
+    doc.fontSize(13).fillColor("#1a1a1a").text("Vehicle");
+    doc.moveDown(0.2);
+    line(
+      "Car",
+      car ? `${car.year} ${car.brand} ${car.model}` : "Unknown vehicle",
+    );
+    if (car?.plateNumber) line("Plate", car.plateNumber);
+    if (car?.ownerName) line("Owner", car.ownerName);
+    doc.moveDown(0.6);
+
+    doc.fontSize(13).fillColor("#1a1a1a").text("Renter");
+    doc.moveDown(0.2);
+    line("Name", b.renterName);
+    line("Phone", b.renterPhone);
+    if (b.renterEmail) line("Email", b.renterEmail);
+    doc.moveDown(0.6);
+
+    doc.fontSize(13).fillColor("#1a1a1a").text("Trip");
+    doc.moveDown(0.2);
+    line("Start", b.startDate.toISOString().slice(0, 10));
+    line("End", b.endDate.toISOString().slice(0, 10));
+    line("Days", String(b.days));
+    line("Mode", b.rentalMode === "with_driver" ? "With driver" : "Self-drive");
+    if (b.completedAt) line("Completed", b.completedAt.toISOString().slice(0, 10));
+    doc.moveDown(0.6);
+
+    doc.fontSize(13).fillColor("#1a1a1a").text("Charges");
+    doc.moveDown(0.2);
+    line("Daily rate", `GHS ${b.dailyRate.toFixed(2)}`);
+    line("Days", String(b.days));
+    doc.moveDown(0.3);
+    doc.fontSize(12).fillColor("#1a1a1a").text(`Total paid: GHS ${b.total.toFixed(2)}`, { underline: true });
+    doc.moveDown(0.2);
+    line(
+      "Payment method",
+      b.paymentMethod === "online"
+        ? "Online"
+        : b.paymentMethod === "cash_on_pickup"
+          ? "Cash on pickup"
+          : "—",
+    );
+    line(
+      "Payment status",
+      b.paymentStatus === "paid" ? "Paid" : b.paymentStatus,
+    );
+    if (b.paidAt) line("Paid on", b.paidAt.toISOString().slice(0, 10));
+    doc.moveDown(1.5);
+
+    doc
+      .fontSize(9)
+      .fillColor("#888")
+      .text(
+        "This receipt is generated automatically by AutoCare. Keep it for your records.",
+        { align: "center" },
+      );
+
+    doc.end();
+  },
+);
 
 // Suppress unused import lint
 void or;
