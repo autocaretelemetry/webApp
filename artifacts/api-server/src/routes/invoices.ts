@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import {
   db,
   bookingsTable,
@@ -106,15 +106,7 @@ router.post("/bookings/:bookingId/invoice", requireAuth, async (req, res): Promi
     ? await db
         .select()
         .from(orderItemsTable)
-        .where(eq(orderItemsTable.orderId, centerPaidIds[0]))
-        .union(
-          ...centerPaidIds.slice(1).map((id) =>
-            db
-              .select()
-              .from(orderItemsTable)
-              .where(eq(orderItemsTable.orderId, id)),
-          ),
-        )
+        .where(inArray(orderItemsTable.orderId, centerPaidIds))
     : [];
   const autoPartItems: InvoiceItem[] = centerPaidLines.map((line) => ({
     description: `Part: ${line.snapshot.name} (paid by service center)`,
@@ -134,31 +126,60 @@ router.post("/bookings/:bookingId/invoice", requireAuth, async (req, res): Promi
   const tax = +(subtotal * parsed.data.taxRate).toFixed(2);
   const total = +(subtotal + tax).toFixed(2);
 
-  const [invoice] = await db
-    .insert(invoicesTable)
-    .values({
-      bookingId: booking.id,
-      items: parsed.data.items,
-      laborTotal: +laborTotal.toFixed(2),
-      partsTotal: +partsTotal.toFixed(2),
-      tax,
-      total,
-      notes: parsed.data.notes ?? null,
-      status: "pending_approval",
-    })
-    .returning();
-
-  await db
-    .update(bookingsTable)
-    .set({ invoiceId: invoice.id, status: "awaiting_approval" })
-    .where(eq(bookingsTable.id, booking.id));
-
-  await db.insert(bookingEventsTable).values({
-    bookingId: booking.id,
-    label: `Invoice issued — total $${total.toFixed(2)}`,
-    actor: "Service Center",
-    kind: "invoice_created",
-  });
+  // Atomically: insert invoice, CAS the booking to attach it (so concurrent
+  // requests can't both create one), stamp invoicedAt on the included
+  // center-paid orders, and write the timeline event.
+  const now = new Date();
+  let invoice: typeof invoicesTable.$inferSelect;
+  try {
+    invoice = await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(invoicesTable)
+        .values({
+          bookingId: booking.id,
+          items: allItems,
+          laborTotal: +laborTotal.toFixed(2),
+          partsTotal: +partsTotal.toFixed(2),
+          tax,
+          total,
+          notes: parsed.data.notes ?? null,
+          status: "pending_approval",
+        })
+        .returning();
+      const claimed = await tx
+        .update(bookingsTable)
+        .set({ invoiceId: created.id, status: "awaiting_approval" })
+        .where(and(eq(bookingsTable.id, booking.id), isNull(bookingsTable.invoiceId)))
+        .returning({ id: bookingsTable.id });
+      if (claimed.length === 0) {
+        throw new Error("invoice_race");
+      }
+      if (centerPaidIds.length) {
+        await tx
+          .update(ordersTable)
+          .set({ invoicedAt: now })
+          .where(
+            and(
+              inArray(ordersTable.id, centerPaidIds),
+              isNull(ordersTable.invoicedAt),
+            ),
+          );
+      }
+      await tx.insert(bookingEventsTable).values({
+        bookingId: booking.id,
+        label: `Invoice issued — total $${total.toFixed(2)}`,
+        actor: "Service Center",
+        kind: "invoice_created",
+      });
+      return created;
+    });
+  } catch (err) {
+    if (err instanceof Error && err.message === "invoice_race") {
+      res.status(409).json({ error: "This booking already has an invoice" });
+      return;
+    }
+    throw err;
+  }
 
   res.status(201).json(invoice);
 });

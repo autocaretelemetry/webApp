@@ -747,6 +747,15 @@ export const OrderStatus = {
   cancelled: 'cancelled',
 } as const;
 
+export type OrderPaymentStatus = typeof OrderPaymentStatus[keyof typeof OrderPaymentStatus];
+
+
+export const OrderPaymentStatus = {
+  unpaid: 'unpaid',
+  paid_by_owner: 'paid_by_owner',
+  paid_by_center: 'paid_by_center',
+} as const;
+
 export interface DeliveryAgent {
   id: string;
   name: string;
@@ -802,6 +811,10 @@ export interface Order {
   deliveredAt?: string | null;
   cancelledAt?: string | null;
   trackingCode?: string | null;
+  paymentStatus?: OrderPaymentStatus;
+  centerPayAuthorized?: boolean;
+  paidAt?: string | null;
+  invoicedAt?: string | null;
   itemsCount?: number;
   vendor?: Vendor | null;
   mechanic?: Mechanic | null;

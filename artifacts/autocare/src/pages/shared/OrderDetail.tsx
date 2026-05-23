@@ -4,6 +4,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetOrder,
   useUpdateOrderStatus,
+  useApproveAndPayOrder,
+  useAuthorizeCenterPayOrder,
+  useCenterPayOrder,
   useListDeliveryAgents,
   type UpdateOrderStatusInputStatus,
 } from "@workspace/api-client-react";
@@ -16,6 +19,7 @@ import {
 } from "@/lib/queryKeys";
 import { PageHeader } from "@/components/PageHeader";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
+import { PaymentBadge } from "@/components/PaymentBadge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,9 +35,11 @@ import {
   X,
   Store,
   Wrench,
-  ThumbsUp,
   ThumbsDown,
   User,
+  CreditCard,
+  Building2,
+  Receipt,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -50,6 +56,9 @@ export default function OrderDetail() {
     query: { enabled: !!id, queryKey: getGetOrderQueryKey(id ?? "") },
   });
   const updateStatus = useUpdateOrderStatus();
+  const approveAndPay = useApproveAndPayOrder();
+  const authorizeCenterPay = useAuthorizeCenterPayOrder();
+  const centerPay = useCenterPayOrder();
 
   // Delivery agents near the delivery city/region, fetched only when needed.
   const needsAgents =
@@ -70,8 +79,52 @@ export default function OrderDetail() {
 
   const isOwner = role === "owner";
   const isVendor = role === "vendor";
+  const isCenter = role === "center";
   const isDelivery = role === "delivery";
   const isMyDelivery = isDelivery && deliveryAgentId && order.deliveryAgentId === deliveryAgentId;
+
+  const invalidateAfterMutation = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: getGetOrderQueryKey(order.id) }),
+      queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() }),
+      queryClient.invalidateQueries({ queryKey: getGetVendorDashboardQueryKey(order.vendorId) }),
+      order.bookingId
+        ? queryClient.invalidateQueries({ queryKey: getGetBookingQueryKey(order.bookingId) })
+        : Promise.resolve(),
+    ]);
+
+  const handleApproveAndPay = async () => {
+    try {
+      await approveAndPay.mutateAsync({ orderId: order.id });
+      await invalidateAfterMutation();
+      toast.success("Payment sent to the vendor. Stock reserved.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to approve and pay.");
+    }
+  };
+
+  const handleAuthorizeCenterPay = async () => {
+    try {
+      await authorizeCenterPay.mutateAsync({ orderId: order.id });
+      await invalidateAfterMutation();
+      toast.success("Authorized — the service center will settle with the vendor and bill you.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to authorize center payment.");
+    }
+  };
+
+  const handleCenterPay = async () => {
+    try {
+      await centerPay.mutateAsync({ orderId: order.id });
+      await invalidateAfterMutation();
+      toast.success("Vendor paid. Cost will be added to the service invoice.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to pay vendor.");
+    }
+  };
+
+  const paymentBusy =
+    approveAndPay.isPending || authorizeCenterPay.isPending || centerPay.isPending;
 
   const advance = async (next: UpdateOrderStatusInputStatus, extra: { trackingCode?: string | null; deliveryAgentId?: string | null } = {}) => {
     try {
@@ -127,9 +180,13 @@ export default function OrderDetail() {
       <PageHeader
         title={
           (
-            <span className="flex items-center gap-3">
+            <span className="flex items-center gap-3 flex-wrap">
               <span>Order #{order.id.slice(0, 8)}</span>
               <OrderStatusBadge status={order.status} />
+              <PaymentBadge
+                status={order.paymentStatus ?? "unpaid"}
+                authorized={order.centerPayAuthorized}
+              />
             </span>
           ) as unknown as string
         }
@@ -288,27 +345,103 @@ export default function OrderDetail() {
             </Card>
           )}
 
-          {/* Owner approval for proposed orders */}
+          {/* Owner approval for proposed orders — pick a payment route */}
           {isOwner && order.status === "proposed" && (
             <Card className="border-primary/40">
               <CardContent className="p-5 space-y-3">
                 <p className="font-semibold">Approve parts request</p>
                 <p className="text-xs text-muted-foreground">
-                  Your mechanic proposed these parts for your service. Approving places the order with the vendor and reserves stock.
+                  Your mechanic proposed these parts for the job. Pick how you want the vendor paid.
                 </p>
                 <div className="flex flex-col gap-2">
-                  <Button onClick={() => advance("placed")} disabled={updateStatus.isPending} className="gap-2 justify-start">
-                    <ThumbsUp className="h-4 w-4" /> Approve and place order
+                  <Button
+                    onClick={handleApproveAndPay}
+                    disabled={paymentBusy || updateStatus.isPending}
+                    className="gap-2 justify-start"
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    <span className="flex-1 text-left">
+                      Approve & pay vendor — {formatCurrency(order.total)}
+                    </span>
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={() => advance("cancelled")}
-                    disabled={updateStatus.isPending}
+                    onClick={handleAuthorizeCenterPay}
+                    disabled={paymentBusy || updateStatus.isPending}
                     className="gap-2 justify-start"
                   >
-                    <ThumbsDown className="h-4 w-4" /> Reject
+                    <Building2 className="h-4 w-4" />
+                    <span className="flex-1 text-left">
+                      Let service center pay — added to final invoice
+                    </span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => advance("cancelled")}
+                    disabled={paymentBusy || updateStatus.isPending}
+                    className="gap-2 justify-start text-muted-foreground hover:text-destructive"
+                  >
+                    <ThumbsDown className="h-4 w-4" /> Reject this request
                   </Button>
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Service center: pay the vendor on the owner's behalf */}
+          {isCenter &&
+            order.centerPayAuthorized &&
+            order.paymentStatus === "unpaid" &&
+            order.status !== "cancelled" && (
+              <Card className="border-primary/40">
+                <CardContent className="p-5 space-y-3">
+                  <p className="font-semibold flex items-center gap-2">
+                    <Receipt className="h-4 w-4 text-primary" /> Settle with vendor
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    The vehicle owner authorized you to pay the vendor for this order. The
+                    cost is rolled into the service invoice you'll bill them for at job
+                    completion.
+                  </p>
+                  <Button
+                    onClick={handleCenterPay}
+                    disabled={paymentBusy}
+                    className="gap-2 justify-start w-full"
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    Pay vendor — {formatCurrency(order.total)}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+          {/* Center: order is settled, will appear on the invoice */}
+          {isCenter &&
+            order.paymentStatus === "paid_by_center" &&
+            !order.invoicedAt && (
+              <Card>
+                <CardContent className="p-5 space-y-1 text-sm">
+                  <p className="font-semibold flex items-center gap-2">
+                    <Receipt className="h-4 w-4 text-primary" /> Will appear on invoice
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatCurrency(order.total)} paid to vendor. These parts are
+                    automatically added to the service invoice when you issue it.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+          {/* Center: already invoiced */}
+          {isCenter && order.invoicedAt && (
+            <Card>
+              <CardContent className="p-5 space-y-1 text-sm">
+                <p className="font-semibold flex items-center gap-2">
+                  <Receipt className="h-4 w-4 text-primary" /> Billed on invoice
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Parts cost included on the invoice issued {formatDateTime(order.invoicedAt)}.
+                </p>
               </CardContent>
             </Card>
           )}

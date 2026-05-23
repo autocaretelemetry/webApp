@@ -129,6 +129,7 @@ export * from './orderBuyerKind';
 export * from './orderDetail';
 export * from './orderLine';
 export * from './orderLineSnapshot';
+export * from './orderPaymentStatus';
 export * from './orderStatus';
 export * from './ownerDashboard';
 export * from './part';

@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
+import { PaymentBadge } from "@/components/PaymentBadge";
 import { Timeline } from "@/components/Timeline";
 import { InvoiceSummary } from "@/components/InvoiceSummary";
 import { Button } from "@/components/ui/button";
@@ -270,7 +271,13 @@ export default function BookingDetail() {
                           {o.mechanic ? ` · proposed by ${o.mechanic.name}` : ""}
                         </p>
                       </div>
-                      <OrderStatusBadge status={o.status} />
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <OrderStatusBadge status={o.status} />
+                        <PaymentBadge
+                          status={o.paymentStatus ?? "unpaid"}
+                          authorized={o.centerPayAuthorized}
+                        />
+                      </div>
                     </div>
                   </Link>
                 ))}

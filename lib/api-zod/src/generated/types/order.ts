@@ -9,6 +9,7 @@ import type { DeliveryAgent } from './deliveryAgent';
 import type { Mechanic } from './mechanic';
 import type { OrderBookingSummary } from './orderBookingSummary';
 import type { OrderBuyerKind } from './orderBuyerKind';
+import type { OrderPaymentStatus } from './orderPaymentStatus';
 import type { OrderStatus } from './orderStatus';
 import type { Vendor } from './vendor';
 
@@ -40,6 +41,10 @@ export interface Order {
   deliveredAt?: Date | null;
   cancelledAt?: Date | null;
   trackingCode?: string | null;
+  paymentStatus?: OrderPaymentStatus;
+  centerPayAuthorized?: boolean;
+  paidAt?: Date | null;
+  invoicedAt?: Date | null;
   itemsCount?: number;
   vendor?: Vendor | null;
   mechanic?: Mechanic | null;

@@ -1604,6 +1604,10 @@ export const ListOrdersResponseItem = zod.object({
   "deliveredAt": zod.coerce.date().nullish(),
   "cancelledAt": zod.coerce.date().nullish(),
   "trackingCode": zod.string().nullish(),
+  "paymentStatus": zod.enum(['unpaid', 'paid_by_owner', 'paid_by_center']).optional(),
+  "centerPayAuthorized": zod.boolean().optional(),
+  "paidAt": zod.coerce.date().nullish(),
+  "invoicedAt": zod.coerce.date().nullish(),
   "itemsCount": zod.number().optional(),
   "vendor": zod.union([zod.object({
   "id": zod.string(),
@@ -1726,6 +1730,10 @@ export const GetOrderResponse = zod.object({
   "deliveredAt": zod.coerce.date().nullish(),
   "cancelledAt": zod.coerce.date().nullish(),
   "trackingCode": zod.string().nullish(),
+  "paymentStatus": zod.enum(['unpaid', 'paid_by_owner', 'paid_by_center']).optional(),
+  "centerPayAuthorized": zod.boolean().optional(),
+  "paidAt": zod.coerce.date().nullish(),
+  "invoicedAt": zod.coerce.date().nullish(),
   "itemsCount": zod.number().optional(),
   "vendor": zod.union([zod.object({
   "id": zod.string(),
@@ -1841,6 +1849,298 @@ export const UpdateOrderStatusResponse = zod.object({
   "deliveredAt": zod.coerce.date().nullish(),
   "cancelledAt": zod.coerce.date().nullish(),
   "trackingCode": zod.string().nullish(),
+  "paymentStatus": zod.enum(['unpaid', 'paid_by_owner', 'paid_by_center']).optional(),
+  "centerPayAuthorized": zod.boolean().optional(),
+  "paidAt": zod.coerce.date().nullish(),
+  "invoicedAt": zod.coerce.date().nullish(),
+  "itemsCount": zod.number().optional(),
+  "vendor": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "bio": zod.string().nullish(),
+  "address": zod.string(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "phone": zod.string(),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "logoUrl": zod.string().nullish(),
+  "partsCount": zod.number().optional(),
+  "active": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).'),
+  "createdAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "mechanic": zod.union([zod.object({
+  "id": zod.string(),
+  "serviceCenterId": zod.string(),
+  "name": zod.string(),
+  "yearsExperience": zod.number(),
+  "specialization": zod.string(),
+  "certifications": zod.array(zod.string()).optional(),
+  "rating": zod.number(),
+  "completedJobs": zod.number(),
+  "avatarUrl": zod.string().nullish(),
+  "active": zod.boolean().optional()
+}),zod.null()]).optional(),
+  "deliveryAgent": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "vehicleType": zod.string(),
+  "bio": zod.string().nullish(),
+  "photoUrl": zod.string().nullish(),
+  "passportUrl": zod.string().nullish(),
+  "ghanaCardUrl": zod.string().nullish(),
+  "licenseUrl": zod.string().nullish(),
+  "vendorId": zod.string().nullish(),
+  "vendorCertified": zod.boolean(),
+  "rating": zod.number(),
+  "completedDeliveries": zod.number(),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "bookingSummary": zod.union([zod.object({
+  "id": zod.string(),
+  "serviceType": zod.string(),
+  "status": zod.string(),
+  "vehicleLabel": zod.string()
+}),zod.null()]).optional()
+})
+
+
+/**
+ * @summary Owner approves a proposed parts order and pays the vendor directly
+ */
+export const ApproveAndPayOrderParams = zod.object({
+  "orderId": zod.coerce.string()
+})
+
+export const ApproveAndPayOrderResponse = zod.object({
+  "id": zod.string(),
+  "vendorId": zod.string(),
+  "bookingId": zod.string().nullish(),
+  "mechanicId": zod.string().nullish(),
+  "deliveryAgentId": zod.string().nullish(),
+  "buyerKind": zod.enum(['owner', 'center']),
+  "buyerName": zod.string(),
+  "buyerPhone": zod.string(),
+  "shippingAddress": zod.string(),
+  "shippingAddressId": zod.string().nullish(),
+  "shippingAddressLabel": zod.string().nullish(),
+  "deliveryCity": zod.string().optional(),
+  "deliveryRegion": zod.string().optional(),
+  "notes": zod.string().nullish(),
+  "status": zod.enum(['proposed', 'placed', 'confirmed', 'shipped', 'delivered', 'cancelled']),
+  "itemsTotal": zod.number(),
+  "shippingFee": zod.number(),
+  "total": zod.number(),
+  "proposedAt": zod.coerce.date().nullish(),
+  "placedAt": zod.coerce.date(),
+  "approvedAt": zod.coerce.date().nullish(),
+  "rejectedAt": zod.coerce.date().nullish(),
+  "confirmedAt": zod.coerce.date().nullish(),
+  "shippedAt": zod.coerce.date().nullish(),
+  "deliveredAt": zod.coerce.date().nullish(),
+  "cancelledAt": zod.coerce.date().nullish(),
+  "trackingCode": zod.string().nullish(),
+  "paymentStatus": zod.enum(['unpaid', 'paid_by_owner', 'paid_by_center']).optional(),
+  "centerPayAuthorized": zod.boolean().optional(),
+  "paidAt": zod.coerce.date().nullish(),
+  "invoicedAt": zod.coerce.date().nullish(),
+  "itemsCount": zod.number().optional(),
+  "vendor": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "bio": zod.string().nullish(),
+  "address": zod.string(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "phone": zod.string(),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "logoUrl": zod.string().nullish(),
+  "partsCount": zod.number().optional(),
+  "active": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).'),
+  "createdAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "mechanic": zod.union([zod.object({
+  "id": zod.string(),
+  "serviceCenterId": zod.string(),
+  "name": zod.string(),
+  "yearsExperience": zod.number(),
+  "specialization": zod.string(),
+  "certifications": zod.array(zod.string()).optional(),
+  "rating": zod.number(),
+  "completedJobs": zod.number(),
+  "avatarUrl": zod.string().nullish(),
+  "active": zod.boolean().optional()
+}),zod.null()]).optional(),
+  "deliveryAgent": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "vehicleType": zod.string(),
+  "bio": zod.string().nullish(),
+  "photoUrl": zod.string().nullish(),
+  "passportUrl": zod.string().nullish(),
+  "ghanaCardUrl": zod.string().nullish(),
+  "licenseUrl": zod.string().nullish(),
+  "vendorId": zod.string().nullish(),
+  "vendorCertified": zod.boolean(),
+  "rating": zod.number(),
+  "completedDeliveries": zod.number(),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "bookingSummary": zod.union([zod.object({
+  "id": zod.string(),
+  "serviceType": zod.string(),
+  "status": zod.string(),
+  "vehicleLabel": zod.string()
+}),zod.null()]).optional()
+})
+
+
+/**
+ * @summary Owner approves a proposed parts order and authorizes the service center to pay the vendor (cost will roll into the booking invoice)
+ */
+export const AuthorizeCenterPayOrderParams = zod.object({
+  "orderId": zod.coerce.string()
+})
+
+export const AuthorizeCenterPayOrderResponse = zod.object({
+  "id": zod.string(),
+  "vendorId": zod.string(),
+  "bookingId": zod.string().nullish(),
+  "mechanicId": zod.string().nullish(),
+  "deliveryAgentId": zod.string().nullish(),
+  "buyerKind": zod.enum(['owner', 'center']),
+  "buyerName": zod.string(),
+  "buyerPhone": zod.string(),
+  "shippingAddress": zod.string(),
+  "shippingAddressId": zod.string().nullish(),
+  "shippingAddressLabel": zod.string().nullish(),
+  "deliveryCity": zod.string().optional(),
+  "deliveryRegion": zod.string().optional(),
+  "notes": zod.string().nullish(),
+  "status": zod.enum(['proposed', 'placed', 'confirmed', 'shipped', 'delivered', 'cancelled']),
+  "itemsTotal": zod.number(),
+  "shippingFee": zod.number(),
+  "total": zod.number(),
+  "proposedAt": zod.coerce.date().nullish(),
+  "placedAt": zod.coerce.date(),
+  "approvedAt": zod.coerce.date().nullish(),
+  "rejectedAt": zod.coerce.date().nullish(),
+  "confirmedAt": zod.coerce.date().nullish(),
+  "shippedAt": zod.coerce.date().nullish(),
+  "deliveredAt": zod.coerce.date().nullish(),
+  "cancelledAt": zod.coerce.date().nullish(),
+  "trackingCode": zod.string().nullish(),
+  "paymentStatus": zod.enum(['unpaid', 'paid_by_owner', 'paid_by_center']).optional(),
+  "centerPayAuthorized": zod.boolean().optional(),
+  "paidAt": zod.coerce.date().nullish(),
+  "invoicedAt": zod.coerce.date().nullish(),
+  "itemsCount": zod.number().optional(),
+  "vendor": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "bio": zod.string().nullish(),
+  "address": zod.string(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "phone": zod.string(),
+  "rating": zod.number(),
+  "reviewsCount": zod.number(),
+  "logoUrl": zod.string().nullish(),
+  "partsCount": zod.number().optional(),
+  "active": zod.boolean().optional(),
+  "featured": zod.boolean().optional().describe('Subscription-driven featured placement (sorted to top of directory).'),
+  "createdAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "mechanic": zod.union([zod.object({
+  "id": zod.string(),
+  "serviceCenterId": zod.string(),
+  "name": zod.string(),
+  "yearsExperience": zod.number(),
+  "specialization": zod.string(),
+  "certifications": zod.array(zod.string()).optional(),
+  "rating": zod.number(),
+  "completedJobs": zod.number(),
+  "avatarUrl": zod.string().nullish(),
+  "active": zod.boolean().optional()
+}),zod.null()]).optional(),
+  "deliveryAgent": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "vehicleType": zod.string(),
+  "bio": zod.string().nullish(),
+  "photoUrl": zod.string().nullish(),
+  "passportUrl": zod.string().nullish(),
+  "ghanaCardUrl": zod.string().nullish(),
+  "licenseUrl": zod.string().nullish(),
+  "vendorId": zod.string().nullish(),
+  "vendorCertified": zod.boolean(),
+  "rating": zod.number(),
+  "completedDeliveries": zod.number(),
+  "active": zod.boolean(),
+  "createdAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "bookingSummary": zod.union([zod.object({
+  "id": zod.string(),
+  "serviceType": zod.string(),
+  "status": zod.string(),
+  "vehicleLabel": zod.string()
+}),zod.null()]).optional()
+})
+
+
+/**
+ * @summary Service center settles a parts order with the vendor on the owner's behalf (only when the owner has authorized center-pay)
+ */
+export const CenterPayOrderParams = zod.object({
+  "orderId": zod.coerce.string()
+})
+
+export const CenterPayOrderResponse = zod.object({
+  "id": zod.string(),
+  "vendorId": zod.string(),
+  "bookingId": zod.string().nullish(),
+  "mechanicId": zod.string().nullish(),
+  "deliveryAgentId": zod.string().nullish(),
+  "buyerKind": zod.enum(['owner', 'center']),
+  "buyerName": zod.string(),
+  "buyerPhone": zod.string(),
+  "shippingAddress": zod.string(),
+  "shippingAddressId": zod.string().nullish(),
+  "shippingAddressLabel": zod.string().nullish(),
+  "deliveryCity": zod.string().optional(),
+  "deliveryRegion": zod.string().optional(),
+  "notes": zod.string().nullish(),
+  "status": zod.enum(['proposed', 'placed', 'confirmed', 'shipped', 'delivered', 'cancelled']),
+  "itemsTotal": zod.number(),
+  "shippingFee": zod.number(),
+  "total": zod.number(),
+  "proposedAt": zod.coerce.date().nullish(),
+  "placedAt": zod.coerce.date(),
+  "approvedAt": zod.coerce.date().nullish(),
+  "rejectedAt": zod.coerce.date().nullish(),
+  "confirmedAt": zod.coerce.date().nullish(),
+  "shippedAt": zod.coerce.date().nullish(),
+  "deliveredAt": zod.coerce.date().nullish(),
+  "cancelledAt": zod.coerce.date().nullish(),
+  "trackingCode": zod.string().nullish(),
+  "paymentStatus": zod.enum(['unpaid', 'paid_by_owner', 'paid_by_center']).optional(),
+  "centerPayAuthorized": zod.boolean().optional(),
+  "paidAt": zod.coerce.date().nullish(),
+  "invoicedAt": zod.coerce.date().nullish(),
   "itemsCount": zod.number().optional(),
   "vendor": zod.union([zod.object({
   "id": zod.string(),
@@ -2043,6 +2343,10 @@ export const GetAdminOverviewResponse = zod.object({
   "deliveredAt": zod.coerce.date().nullish(),
   "cancelledAt": zod.coerce.date().nullish(),
   "trackingCode": zod.string().nullish(),
+  "paymentStatus": zod.enum(['unpaid', 'paid_by_owner', 'paid_by_center']).optional(),
+  "centerPayAuthorized": zod.boolean().optional(),
+  "paidAt": zod.coerce.date().nullish(),
+  "invoicedAt": zod.coerce.date().nullish(),
   "itemsCount": zod.number().optional(),
   "vendor": zod.union([zod.object({
   "id": zod.string(),

@@ -4372,6 +4372,216 @@ export const useUpdateOrderStatus = <TError = ErrorType<unknown>,
       return useMutation(getUpdateOrderStatusMutationOptions(options));
     }
 
+export const getApproveAndPayOrderUrl = (orderId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}/approve-and-pay`
+}
+
+/**
+ * @summary Owner approves a proposed parts order and pays the vendor directly
+ */
+export const approveAndPayOrder = async (orderId: string, options?: RequestInit): Promise<Order> => {
+
+  return customFetch<Order>(getApproveAndPayOrderUrl(orderId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getApproveAndPayOrderMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveAndPayOrder>>, TError,{orderId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approveAndPayOrder>>, TError,{orderId: string}, TContext> => {
+
+const mutationKey = ['approveAndPayOrder'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approveAndPayOrder>>, {orderId: string}> = (props) => {
+          const {orderId} = props ?? {};
+
+          return  approveAndPayOrder(orderId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApproveAndPayOrderMutationResult = NonNullable<Awaited<ReturnType<typeof approveAndPayOrder>>>
+
+    export type ApproveAndPayOrderMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Owner approves a proposed parts order and pays the vendor directly
+ */
+export const useApproveAndPayOrder = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveAndPayOrder>>, TError,{orderId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof approveAndPayOrder>>,
+        TError,
+        {orderId: string},
+        TContext
+      > => {
+      return useMutation(getApproveAndPayOrderMutationOptions(options));
+    }
+
+export const getAuthorizeCenterPayOrderUrl = (orderId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}/authorize-center-pay`
+}
+
+/**
+ * @summary Owner approves a proposed parts order and authorizes the service center to pay the vendor (cost will roll into the booking invoice)
+ */
+export const authorizeCenterPayOrder = async (orderId: string, options?: RequestInit): Promise<Order> => {
+
+  return customFetch<Order>(getAuthorizeCenterPayOrderUrl(orderId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getAuthorizeCenterPayOrderMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authorizeCenterPayOrder>>, TError,{orderId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof authorizeCenterPayOrder>>, TError,{orderId: string}, TContext> => {
+
+const mutationKey = ['authorizeCenterPayOrder'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof authorizeCenterPayOrder>>, {orderId: string}> = (props) => {
+          const {orderId} = props ?? {};
+
+          return  authorizeCenterPayOrder(orderId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AuthorizeCenterPayOrderMutationResult = NonNullable<Awaited<ReturnType<typeof authorizeCenterPayOrder>>>
+
+    export type AuthorizeCenterPayOrderMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Owner approves a proposed parts order and authorizes the service center to pay the vendor (cost will roll into the booking invoice)
+ */
+export const useAuthorizeCenterPayOrder = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof authorizeCenterPayOrder>>, TError,{orderId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof authorizeCenterPayOrder>>,
+        TError,
+        {orderId: string},
+        TContext
+      > => {
+      return useMutation(getAuthorizeCenterPayOrderMutationOptions(options));
+    }
+
+export const getCenterPayOrderUrl = (orderId: string,) => {
+
+
+
+
+  return `/api/orders/${orderId}/center-pay`
+}
+
+/**
+ * @summary Service center settles a parts order with the vendor on the owner's behalf (only when the owner has authorized center-pay)
+ */
+export const centerPayOrder = async (orderId: string, options?: RequestInit): Promise<Order> => {
+
+  return customFetch<Order>(getCenterPayOrderUrl(orderId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getCenterPayOrderMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof centerPayOrder>>, TError,{orderId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof centerPayOrder>>, TError,{orderId: string}, TContext> => {
+
+const mutationKey = ['centerPayOrder'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof centerPayOrder>>, {orderId: string}> = (props) => {
+          const {orderId} = props ?? {};
+
+          return  centerPayOrder(orderId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CenterPayOrderMutationResult = NonNullable<Awaited<ReturnType<typeof centerPayOrder>>>
+
+    export type CenterPayOrderMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Service center settles a parts order with the vendor on the owner's behalf (only when the owner has authorized center-pay)
+ */
+export const useCenterPayOrder = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof centerPayOrder>>, TError,{orderId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof centerPayOrder>>,
+        TError,
+        {orderId: string},
+        TContext
+      > => {
+      return useMutation(getCenterPayOrderMutationOptions(options));
+    }
+
 export const getGetVendorDashboardUrl = (vendorId: string,) => {
 
 
