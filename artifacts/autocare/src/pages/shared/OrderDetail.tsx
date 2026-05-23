@@ -27,6 +27,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { useRole, useDeliveryAgentId } from "@/lib/role";
+import { useMyFleetOrgs } from "@/lib/fleet-api";
 import {
   ArrowLeft,
   Package,
@@ -77,15 +78,28 @@ export default function OrderDetail() {
   if (isLoading) return <div className="p-8">Loading...</div>;
   if (!order) return <div className="p-8">Order not found.</div>;
 
-  // "Owner" gating for the proposal-approval card: includes platform admin
-  // and fleet role (org admin/finance, or override member). Server-side
-  // authorizeProposalAction is the actual gate — UI just surfaces the card
-  // to plausibly-eligible viewers and lets the server 403 ineligible ones.
+  // "Owner" gating for the proposal-approval card. Fleet members are
+  // refined by their org membership: admin/finance always qualify, and a
+  // manager/driver only when their canCheckoutDirectly override is on.
+  // Other fleet members see a read-only notice instead of action buttons.
+  // Server-side authorizeProposalAction remains the final gate.
+  const { data: fleetOrgsData } = useMyFleetOrgs();
+  const fleetMembership = fleetOrgsData?.organizations?.[0];
+  const fleetCanApprove =
+    !!fleetMembership &&
+    (fleetMembership.myRole === "admin" ||
+      fleetMembership.myRole === "finance" ||
+      // canCheckoutDirectly is the per-member override exposed via the org
+      fleetOrgsData?.organizations?.[0]?.myRole !== undefined &&
+        (fleetMembership as { canCheckoutDirectly?: boolean })
+          .canCheckoutDirectly === true);
+  const fleetNeedsApproval =
+    role === "fleet" && !!fleetMembership && !fleetCanApprove;
   const isOwner =
     role === "owner" ||
-    role === "fleet" ||
     role === "admin" ||
-    role === "super_admin";
+    role === "super_admin" ||
+    (role === "fleet" && fleetCanApprove);
   const isVendor = role === "vendor";
   const isCenter = role === "center";
   const isDelivery = role === "delivery";
@@ -390,6 +404,22 @@ export default function OrderDetail() {
                 <p className="text-muted-foreground">{order.deliveryAgent.phone}</p>
                 <p className="text-xs text-muted-foreground">
                   {order.deliveryAgent.vehicleType} · {order.deliveryAgent.city}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Fleet manager/driver without override — read-only notice */}
+          {fleetNeedsApproval && order.status === "proposed" && (
+            <Card className="border-muted">
+              <CardContent className="p-5 space-y-2">
+                <p className="font-semibold flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  Requires finance approval
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  This parts request is waiting for a fleet admin or finance
+                  member to approve and pick a payment route.
                 </p>
               </CardContent>
             </Card>
