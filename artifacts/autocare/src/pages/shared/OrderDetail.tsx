@@ -77,7 +77,15 @@ export default function OrderDetail() {
   if (isLoading) return <div className="p-8">Loading...</div>;
   if (!order) return <div className="p-8">Order not found.</div>;
 
-  const isOwner = role === "owner";
+  // "Owner" gating for the proposal-approval card: includes platform admin
+  // and fleet role (org admin/finance, or override member). Server-side
+  // authorizeProposalAction is the actual gate — UI just surfaces the card
+  // to plausibly-eligible viewers and lets the server 403 ineligible ones.
+  const isOwner =
+    role === "owner" ||
+    role === "fleet" ||
+    role === "admin" ||
+    role === "super_admin";
   const isVendor = role === "vendor";
   const isCenter = role === "center";
   const isDelivery = role === "delivery";

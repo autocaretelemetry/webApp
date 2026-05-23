@@ -241,6 +241,17 @@ export default function Checkout() {
     setSubmitting(true);
     try {
       if (isFleet) {
+        // Fleet checkout doesn't yet support center-sourced (on-hand) parts —
+        // those flow through per-seller direct buy. Refuse a mixed cart up
+        // front instead of silently dropping the center lines.
+        if (lines.some((l) => l.sellerKind === "center")) {
+          toast.error(
+            "Fleet checkout doesn't support service-center on-hand parts yet. " +
+              "Please remove those items (they can be purchased directly from the part page).",
+          );
+          setSubmitting(false);
+          return;
+        }
         // Persist a brand-new entry to the org book BEFORE submitting, so
         // a subsequent crash doesn't leave the fleet without the entry.
         // Mutation gate matches the server: admin/finance/manager only.
