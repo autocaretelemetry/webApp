@@ -1,11 +1,20 @@
 import { pgTable, uuid, text, real, integer, timestamp, boolean } from "drizzle-orm/pg-core";
 import { vendorsTable } from "./vendors";
+import { serviceCentersTable } from "./serviceCenters";
 
+// A part is sold by exactly one of: a vendor OR a service center's own shop.
+// Center-owned parts (tyres, lubricants, etc.) skip the delivery workflow at
+// order time because they are already on-site at the center. The mutual
+// exclusion is enforced at the application layer (route handlers + the
+// seller-derivation in POST /orders).
 export const partsTable = pgTable("parts", {
   id: uuid("id").primaryKey().defaultRandom(),
-  vendorId: uuid("vendor_id")
-    .notNull()
-    .references(() => vendorsTable.id, { onDelete: "cascade" }),
+  vendorId: uuid("vendor_id").references(() => vendorsTable.id, {
+    onDelete: "cascade",
+  }),
+  centerId: uuid("center_id").references(() => serviceCentersTable.id, {
+    onDelete: "cascade",
+  }),
   name: text("name").notNull(),
   description: text("description").notNull(),
   category: text("category").notNull(),
