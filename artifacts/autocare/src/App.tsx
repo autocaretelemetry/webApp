@@ -131,7 +131,13 @@ function RoleGuard({
   component: ComponentType;
 }) {
   const { role } = useRole();
-  if (!allow.includes(role)) {
+  const { user } = useAuth();
+  // Super admins (and platform admins, for admin-scoped pages) keep access
+  // to their tooling even while impersonating another role from the top bar.
+  const accountOverride =
+    (user?.role === "super_admin" && (allow.includes("super_admin") || allow.includes("admin"))) ||
+    (user?.role === "admin" && allow.includes("admin"));
+  if (!allow.includes(role) && !accountOverride) {
     return (
       <div className="py-20 text-center space-y-4 animate-in fade-in-50">
         <p className="text-lg font-medium">This page isn't available for your current role.</p>

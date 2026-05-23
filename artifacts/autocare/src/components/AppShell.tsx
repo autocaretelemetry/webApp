@@ -263,14 +263,18 @@ function navFor(
     if (role === "super_admin") return SUPER_ADMIN_NAV;
     return DELIVERY_NAV;
   })();
-  // The Landing Page editor is a super-admin tool that should be reachable
-  // no matter which role the super admin is currently impersonating.
+  // Super-admin tooling should be reachable no matter which role the super
+  // admin is currently impersonating from the top bar.
   if (isSuperAdmin && role !== "super_admin") {
     return [
       ...base,
       {
         label: "Site",
         items: [
+          { href: "/super-admin/approvals", label: "Approvals", icon: ShieldCheck },
+          { href: "/super-admin/onboard", label: "Onboard Account", icon: UserPlus },
+          { href: "/super-admin/organizations", label: "Institutions & Fleets", icon: Building2 },
+          { href: "/super-admin/commissions", label: "Commissions", icon: Percent },
           { href: "/super-admin/landing", label: "Landing Page", icon: Paintbrush },
         ],
       },
