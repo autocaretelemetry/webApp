@@ -291,11 +291,7 @@ function NewPartForm({
             className="mt-1.5"
           />
         </div>
-        <div className="grid sm:grid-cols-3 gap-4">
-          <div>
-            <Label htmlFor="cat">Category</Label>
-            <CategoryPicker value={category} onChange={setCategory} />
-          </div>
+        <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <Label htmlFor="brand">Brand</Label>
             <Input
@@ -314,6 +310,10 @@ function NewPartForm({
               className="mt-1.5"
             />
           </div>
+        </div>
+        <div>
+          <Label htmlFor="cat">Category</Label>
+          <CategoryPicker value={category} onChange={setCategory} />
         </div>
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
