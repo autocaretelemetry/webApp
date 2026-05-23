@@ -28,6 +28,7 @@ import organizationsRouter from "./organizations";
 import onboardingRouter, { requireKycVerified } from "./onboarding";
 import addressesRouter from "./addresses";
 import publicCatalogRouter from "./publicCatalog";
+import commissionsRouter from "./commissions";
 
 const router: IRouter = Router();
 
@@ -71,5 +72,6 @@ router.use(notificationsRouter);
 router.use(pushRouter);
 router.use(organizationsRouter);
 router.use(addressesRouter);
+router.use(commissionsRouter);
 
 export default router;

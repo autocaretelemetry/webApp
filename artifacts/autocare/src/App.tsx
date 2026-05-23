@@ -73,6 +73,7 @@ import SuperAdminLandingEditor from "@/pages/super_admin/LandingEditor";
 import SuperAdminApprovals from "@/pages/super_admin/Approvals";
 import SuperAdminOrganizations from "@/pages/super_admin/Organizations";
 import SuperAdminOnboard from "@/pages/super_admin/Onboard";
+import SuperAdminCommissions from "@/pages/super_admin/Commissions";
 import AdminRentals from "@/pages/admin/Rentals";
 import AdminRenters from "@/pages/admin/Renters";
 import AdminOwners from "@/pages/admin/Owners";
@@ -243,6 +244,7 @@ function AppRouter() {
         <Route path="/super-admin/approvals" component={superAdminOnly(SuperAdminApprovals)} />
         <Route path="/super-admin/organizations" component={superAdminOnly(SuperAdminOrganizations)} />
         <Route path="/super-admin/onboard" component={superAdminOnly(SuperAdminOnboard)} />
+        <Route path="/super-admin/commissions" component={superAdminOnly(SuperAdminCommissions)} />
 
         {/* Rentals Routes (owners + admins can browse; bookings open to any role using owner shell) */}
         <Route path="/rentals" component={RentalsBrowse} />

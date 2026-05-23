@@ -23,6 +23,7 @@ import {
 } from "../lib/centerAlerts";
 import { requireAuth } from "../lib/auth";
 import { authorizeServiceBooking, type BookingRelationship } from "./bookings";
+import { recordCommission } from "../lib/commissions";
 
 const router: IRouter = Router();
 
@@ -269,6 +270,22 @@ router.post("/invoices/:invoiceId/pay", requireAuth, async (req, res): Promise<v
     .set({ status: "paid", paidAt: new Date() })
     .where(eq(invoicesTable.id, params.data.invoiceId))
     .returning();
+  // Platform commission: deduct super-admin-configured % from the
+  // service center's effective payout. Fire-and-forget; ledger insert
+  // is idempotent so retries can't double-charge.
+  const [bookingForCommission] = await db
+    .select({ centerId: bookingsTable.serviceCenterId })
+    .from(bookingsTable)
+    .where(eq(bookingsTable.id, row.bookingId));
+  if (bookingForCommission) {
+    await recordCommission({
+      saleKind: "service_invoice",
+      saleId: row.id,
+      sellerKind: "service_center",
+      sellerId: bookingForCommission.centerId,
+      grossAmount: row.total,
+    });
+  }
   const completedAt = new Date();
   const [bookingRow] = await db
     .update(bookingsTable)

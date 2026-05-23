@@ -30,3 +30,4 @@ export * from "./fleetTracking";
 export * from "./fleetPartsOrders";
 export * from "./approvalEvents";
 export * from "./reminderRuns";
+export * from "./platformCommissions";

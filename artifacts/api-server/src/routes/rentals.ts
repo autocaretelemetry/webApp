@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import PDFDocument from "pdfkit";
 import { and, count, desc, eq, gt, inArray, lt, or } from "drizzle-orm";
+import { recordCommission } from "../lib/commissions";
 import { requireAuth, requireAdmin } from "../lib/auth";
 import {
   db,
@@ -1119,6 +1120,29 @@ router.patch("/rental-bookings/:rentalBookingId", requireAuth, async (req, res):
     .set(patch)
     .where(eq(rentalBookingsTable.id, params.data.rentalBookingId))
     .returning();
+
+  // Commission: record once the booking flips to paid (either online
+  // mark-paid above, or cash-on-pickup at trip-start). Seller is the
+  // car owner (matched by phone). Ledger is idempotent.
+  if (
+    row &&
+    row.paymentStatus === "paid" &&
+    existing.paymentStatus !== "paid"
+  ) {
+    const [car] = await db
+      .select({ ownerPhone: rentalCarsTable.ownerPhone })
+      .from(rentalCarsTable)
+      .where(eq(rentalCarsTable.id, row.carId));
+    if (car?.ownerPhone) {
+      await recordCommission({
+        saleKind: "rental_booking",
+        saleId: row.id,
+        sellerKind: "owner",
+        sellerId: car.ownerPhone,
+        grossAmount: row.total,
+      });
+    }
+  }
 
   // Race-safe dual-signature promotion: if either signer just persisted and
   // the freshly-read row now has both signatures, move to awaiting_payment.

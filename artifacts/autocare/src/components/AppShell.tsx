@@ -36,6 +36,7 @@ import {
   PanelLeftOpen,
   ChevronRight,
   Paintbrush,
+  Percent,
   BellRing,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -241,6 +242,7 @@ const SUPER_ADMIN_NAV: NavSection[] = [
       { href: "/super-admin/approvals", label: "Approvals", icon: ShieldCheck },
       { href: "/super-admin/onboard", label: "Onboard Account", icon: UserPlus },
       { href: "/super-admin/organizations", label: "Institutions & Fleets", icon: Building2 },
+      { href: "/super-admin/commissions", label: "Commissions", icon: Percent },
       { href: "/super-admin/landing", label: "Landing Page", icon: Paintbrush },
     ],
   },

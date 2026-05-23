@@ -25,6 +25,28 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth } from "../lib/auth";
 import { authorizeServiceBooking, getCallerCenterIds } from "./bookings";
+import { recordCommission } from "../lib/commissions";
+
+/**
+ * Centralises the seller-side commission record for a parts order. Pulls
+ * the seller identity from whichever of `vendorId`/`sellerCenterId` is
+ * set on the order row. The ledger insert itself is idempotent so this
+ * is safe to call from every payment-flip path.
+ */
+async function recordPartsOrderCommission(
+  order: typeof ordersTable.$inferSelect,
+): Promise<void> {
+  const sellerKind = order.vendorId ? "vendor" : "service_center";
+  const sellerId = order.vendorId ?? order.sellerCenterId;
+  if (!sellerId) return;
+  await recordCommission({
+    saleKind: "parts_order",
+    saleId: order.id,
+    sellerKind,
+    sellerId,
+    grossAmount: order.itemsTotal,
+  });
+}
 
 const router: IRouter = Router();
 
@@ -511,6 +533,10 @@ router.post("/orders", async (req, res): Promise<void> => {
     });
 
     void booking;
+    // Direct buys (non-proposals) land here already paid_by_owner.
+    // Center-sourced proposals that hit the auto-paid branch will record
+    // their commission via approveProposalAndReserveStock's callers.
+    if (!isProposal) await recordPartsOrderCommission(result.order);
     const [hydrated] = await hydrate([result.order]);
     res.status(201).json({ ...hydrated, items: result.lines });
   } catch (err) {
@@ -820,6 +846,7 @@ router.post("/orders/:orderId/approve-and-pay", async (req, res): Promise<void> 
       centerPayAuthorized: false,
       paidByUserId: req.user?.id ?? null,
     });
+    await recordPartsOrderCommission(row);
     const [hydrated] = await hydrate([row]);
     res.json(hydrated);
   } catch (err) {
@@ -849,6 +876,9 @@ router.post("/orders/:orderId/authorize-center-pay", async (req, res): Promise<v
       centerPayAuthorized: !isCenterSourced,
       paidByUserId: isCenterSourced ? (req.user?.id ?? null) : null,
     });
+    // Only the center-sourced branch is paid at this step; vendor-sourced
+    // orders stay unpaid until the center settles via /center-pay below.
+    if (isCenterSourced) await recordPartsOrderCommission(row);
     const [hydrated] = await hydrate([row]);
     res.json(hydrated);
   } catch (err) {
@@ -906,6 +936,7 @@ router.post("/orders/:orderId/center-pay", async (req, res): Promise<void> => {
       res.status(409).json({ error: "Order payment changed concurrently, please retry" });
       return;
     }
+    await recordPartsOrderCommission(row);
     const [hydrated] = await hydrate([row]);
     res.json(hydrated);
   } catch (err) {
