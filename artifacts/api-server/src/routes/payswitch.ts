@@ -177,8 +177,25 @@ router.get("/me/subscriber-options", requireAuth, async (req, res): Promise<void
     .from(centerStaffTable)
     .innerJoin(serviceCentersTable, eq(serviceCentersTable.id, centerStaffTable.centerId))
     .where(and(eq(centerStaffTable.userId, user.id), eq(centerStaffTable.active, true)));
+  const centerIds = new Set<string>();
   for (const c of centerRows) {
     opts.push({ kind: "center", subscriberId: c.id, name: c.name });
+    centerIds.add(c.id);
+  }
+  // Fallback: if no center_staff row exists, match by phone on the
+  // service_centers directory. This covers demo accounts (and any owner
+  // who registered a center directly) where staff linkage was never wired.
+  if (user.phone) {
+    const centerByPhone = await db
+      .select({ id: serviceCentersTable.id, name: serviceCentersTable.name })
+      .from(serviceCentersTable)
+      .where(eq(serviceCentersTable.phone, user.phone));
+    for (const c of centerByPhone) {
+      if (!centerIds.has(c.id)) {
+        opts.push({ kind: "center", subscriberId: c.id, name: c.name });
+        centerIds.add(c.id);
+      }
+    }
   }
   const vendorRows = await db
     .select({
@@ -188,8 +205,22 @@ router.get("/me/subscriber-options", requireAuth, async (req, res): Promise<void
     .from(vendorStaffTable)
     .innerJoin(vendorsTable, eq(vendorsTable.id, vendorStaffTable.vendorId))
     .where(and(eq(vendorStaffTable.userId, user.id), eq(vendorStaffTable.active, true)));
+  const vendorIds = new Set<string>();
   for (const v of vendorRows) {
     opts.push({ kind: "vendor", subscriberId: v.id, name: v.name });
+    vendorIds.add(v.id);
+  }
+  if (user.phone) {
+    const vendorByPhone = await db
+      .select({ id: vendorsTable.id, name: vendorsTable.name })
+      .from(vendorsTable)
+      .where(eq(vendorsTable.phone, user.phone));
+    for (const v of vendorByPhone) {
+      if (!vendorIds.has(v.id)) {
+        opts.push({ kind: "vendor", subscriberId: v.id, name: v.name });
+        vendorIds.add(v.id);
+      }
+    }
   }
   if (user.phone) {
     const orgRows = await db
@@ -215,9 +246,9 @@ router.get("/me/subscriber-options", requireAuth, async (req, res): Promise<void
   // see the (always-prepended) "owner" option pre-selected and end up looking
   // at owner plans instead of plans for their actual business identity.
   const preferred: Opt["kind"] | null =
-    user.role === "vendor_staff"
+    user.role === "vendor" || user.role === "vendor_staff"
       ? "vendor"
-      : user.role === "center_staff"
+      : user.role === "center" || user.role === "center_staff"
         ? "center"
         : user.role === "fleet"
           ? "organization"

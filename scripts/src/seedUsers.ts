@@ -10,7 +10,14 @@ import {
   scryptSync,
 } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { db, usersTable } from "@workspace/db";
+import {
+  db,
+  usersTable,
+  serviceCentersTable,
+  vendorsTable,
+  centerStaffTable,
+  vendorStaffTable,
+} from "@workspace/db";
 
 function hashPassword(password: string): string {
   const salt = randomBytes(16).toString("hex");
@@ -133,6 +140,91 @@ async function main() {
         },
       });
     console.log(`Seeded ${s.role} -> ${s.email}`);
+
+    // Link demo center/vendor accounts into the staff tables so
+    // self-service subscription (and any other staff-scoped lookup) can
+    // resolve their business identity. Without this they only show as
+    // "owner" (phone-based) on /billing/subscribe and end up subscribing to
+    // the wrong audience's plans.
+    const [seededUser] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.email, s.email.toLowerCase()));
+    if (!seededUser) continue;
+
+    if (s.role === "center") {
+      // Prefer a center whose name matches the user's name; otherwise fall
+      // back to the first seeded center so the demo never dead-ends.
+      let [center] = await db
+        .select({ id: serviceCentersTable.id, name: serviceCentersTable.name })
+        .from(serviceCentersTable)
+        .where(eq(serviceCentersTable.name, s.name));
+      if (!center) {
+        [center] = await db
+          .select({ id: serviceCentersTable.id, name: serviceCentersTable.name })
+          .from(serviceCentersTable)
+          .limit(1);
+      }
+      if (center) {
+        await db
+          .insert(centerStaffTable)
+          .values({
+            centerId: center.id,
+            userId: seededUser.id,
+            name: s.name,
+            email: s.email.toLowerCase(),
+            phone: s.phone ?? null,
+            role: "owner",
+            active: true,
+          })
+          .onConflictDoUpdate({
+            target: [centerStaffTable.centerId, centerStaffTable.email],
+            set: {
+              userId: seededUser.id,
+              name: s.name,
+              phone: s.phone ?? null,
+              role: "owner",
+              active: true,
+            },
+          });
+        console.log(`  linked ${s.email} -> center ${center.name}`);
+      }
+    } else if (s.role === "vendor") {
+      let [vendor] = await db
+        .select({ id: vendorsTable.id, name: vendorsTable.name })
+        .from(vendorsTable)
+        .where(eq(vendorsTable.name, s.name));
+      if (!vendor) {
+        [vendor] = await db
+          .select({ id: vendorsTable.id, name: vendorsTable.name })
+          .from(vendorsTable)
+          .limit(1);
+      }
+      if (vendor) {
+        await db
+          .insert(vendorStaffTable)
+          .values({
+            vendorId: vendor.id,
+            userId: seededUser.id,
+            name: s.name,
+            email: s.email.toLowerCase(),
+            phone: s.phone ?? null,
+            role: "owner",
+            active: true,
+          })
+          .onConflictDoUpdate({
+            target: [vendorStaffTable.vendorId, vendorStaffTable.email],
+            set: {
+              userId: seededUser.id,
+              name: s.name,
+              phone: s.phone ?? null,
+              role: "owner",
+              active: true,
+            },
+          });
+        console.log(`  linked ${s.email} -> vendor ${vendor.name}`);
+      }
+    }
   }
   // Backfill: before `renter` became a first-class role, applicants who
   // applied as renters were stored as `role=owner`. Promote any such rows
