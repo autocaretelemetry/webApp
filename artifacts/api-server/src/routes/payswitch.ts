@@ -210,6 +210,27 @@ router.get("/me/subscriber-options", requireAuth, async (req, res): Promise<void
       }
     }
   }
+  // Sort so the option matching the signed-in user's primary role comes
+  // first. Otherwise a vendor/center user who happens to have a phone would
+  // see the (always-prepended) "owner" option pre-selected and end up looking
+  // at owner plans instead of plans for their actual business identity.
+  const preferred: Opt["kind"] | null =
+    user.role === "vendor_staff"
+      ? "vendor"
+      : user.role === "center_staff"
+        ? "center"
+        : user.role === "fleet"
+          ? "organization"
+          : user.role === "owner"
+            ? "owner"
+            : null;
+  if (preferred) {
+    opts.sort((a, b) => {
+      if (a.kind === preferred && b.kind !== preferred) return -1;
+      if (b.kind === preferred && a.kind !== preferred) return 1;
+      return 0;
+    });
+  }
   res.json({ options: opts });
 });
 
