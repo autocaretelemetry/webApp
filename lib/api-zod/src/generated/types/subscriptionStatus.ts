@@ -13,4 +13,5 @@ export const SubscriptionStatus = {
   active: 'active',
   cancelled: 'cancelled',
   past_due: 'past_due',
+  pending_payment: 'pending_payment',
 } as const;

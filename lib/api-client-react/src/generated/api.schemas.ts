@@ -1244,6 +1244,7 @@ export const SubscriptionSubscriberKind = {
   center: 'center',
   vendor: 'vendor',
   owner: 'owner',
+  organization: 'organization',
 } as const;
 
 export type SubscriptionStatus = typeof SubscriptionStatus[keyof typeof SubscriptionStatus];
@@ -1253,6 +1254,7 @@ export const SubscriptionStatus = {
   active: 'active',
   cancelled: 'cancelled',
   past_due: 'past_due',
+  pending_payment: 'pending_payment',
 } as const;
 
 export interface Subscription {
@@ -1277,6 +1279,7 @@ export const CreateSubscriptionInputSubscriberKind = {
   center: 'center',
   vendor: 'vendor',
   owner: 'owner',
+  organization: 'organization',
 } as const;
 
 export interface CreateSubscriptionInput {
@@ -1295,6 +1298,7 @@ export const UpdateSubscriptionInputStatus = {
   active: 'active',
   cancelled: 'cancelled',
   past_due: 'past_due',
+  pending_payment: 'pending_payment',
 } as const;
 
 export interface UpdateSubscriptionInput {

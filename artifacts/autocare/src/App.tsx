@@ -103,6 +103,10 @@ import Orders from "@/pages/shared/Orders";
 import OrderDetail from "@/pages/shared/OrderDetail";
 import Settings from "@/pages/Settings";
 
+// Billing
+import Subscribe from "@/pages/billing/Subscribe";
+import PaymentResult from "@/pages/billing/PaymentResult";
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -281,6 +285,8 @@ function AppRouter() {
         <Route path="/bookings" component={Bookings} />
         <Route path="/bookings/:id" component={BookingDetail} />
         <Route path="/invoices/:id" component={InvoiceDetail} />
+        <Route path="/billing/subscribe" component={Subscribe} />
+        <Route path="/billing/result" component={PaymentResult} />
         <Route path="/settings" component={Settings} />
         <Route path="/profile" component={ProfilePage} />
         <Route path="/center/staff" component={centerOnly(CenterStaffPage)} />

@@ -99,6 +99,10 @@ const OWNER_NAV: NavSection[] = [
       { href: "/orders", label: "My Orders", icon: Package },
     ],
   },
+  {
+    label: "Billing",
+    items: [{ href: "/billing/subscribe", label: "Subscription", icon: CreditCard }],
+  },
 ];
 
 const CENTER_NAV: NavSection[] = [
@@ -126,6 +130,10 @@ const CENTER_NAV: NavSection[] = [
       { href: "/center/staff", label: "Staff", icon: UserCog },
     ],
   },
+  {
+    label: "Billing",
+    items: [{ href: "/billing/subscribe", label: "Subscription", icon: CreditCard }],
+  },
 ];
 
 const VENDOR_NAV: NavSection[] = [
@@ -139,6 +147,10 @@ const VENDOR_NAV: NavSection[] = [
       { href: "/vendor/staff", label: "Staff", icon: UserCog },
       { href: "/marketplace", label: "Browse", icon: Store },
     ],
+  },
+  {
+    label: "Billing",
+    items: [{ href: "/billing/subscribe", label: "Subscription", icon: CreditCard }],
   },
 ];
 
@@ -178,10 +190,19 @@ function fleetNavFor(role: FleetMemberRoleNav | undefined): NavSection[] {
     { href: "/fleet/orders", label: "Parts Orders", icon: Package },
   ];
 
-  return [
+  const sections: NavSection[] = [
     { label: "Fleet", items: fleetItems },
     { label: "Parts", items: partsItems },
   ];
+  // Only org admins/finance can manage the org subscription. Drivers and
+  // managers don't see the billing entry to avoid 403 dead-ends.
+  if (isAdmin || isFinance) {
+    sections.push({
+      label: "Billing",
+      items: [{ href: "/billing/subscribe", label: "Subscription", icon: CreditCard }],
+    });
+  }
+  return sections;
 }
 
 const DELIVERY_NAV: NavSection[] = [

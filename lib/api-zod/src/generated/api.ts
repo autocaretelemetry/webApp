@@ -2946,13 +2946,13 @@ export const ListSubscriptionsQueryParams = zod.object({
 
 export const ListSubscriptionsResponseItem = zod.object({
   "id": zod.string(),
-  "subscriberKind": zod.enum(['center', 'vendor', 'owner']),
+  "subscriberKind": zod.enum(['center', 'vendor', 'owner', 'organization']),
   "subscriberId": zod.string(),
   "subscriberName": zod.string(),
   "planId": zod.string().nullish(),
   "planName": zod.string().nullish(),
   "priceMonthly": zod.number().nullish(),
-  "status": zod.enum(['active', 'cancelled', 'past_due']),
+  "status": zod.enum(['active', 'cancelled', 'past_due', 'pending_payment']),
   "startedAt": zod.coerce.date(),
   "currentPeriodEnd": zod.coerce.date(),
   "cancelledAt": zod.coerce.date().nullish(),
@@ -2966,7 +2966,7 @@ export const ListSubscriptionsResponse = zod.array(ListSubscriptionsResponseItem
 
 
 export const CreateSubscriptionBody = zod.object({
-  "subscriberKind": zod.enum(['center', 'vendor', 'owner']),
+  "subscriberKind": zod.enum(['center', 'vendor', 'owner', 'organization']),
   "subscriberId": zod.string().min(1),
   "subscriberName": zod.string().min(1),
   "planId": zod.string()
@@ -2979,18 +2979,18 @@ export const UpdateSubscriptionParams = zod.object({
 
 export const UpdateSubscriptionBody = zod.object({
   "planId": zod.string().optional(),
-  "status": zod.enum(['active', 'cancelled', 'past_due']).optional()
+  "status": zod.enum(['active', 'cancelled', 'past_due', 'pending_payment']).optional()
 })
 
 export const UpdateSubscriptionResponse = zod.object({
   "id": zod.string(),
-  "subscriberKind": zod.enum(['center', 'vendor', 'owner']),
+  "subscriberKind": zod.enum(['center', 'vendor', 'owner', 'organization']),
   "subscriberId": zod.string(),
   "subscriberName": zod.string(),
   "planId": zod.string().nullish(),
   "planName": zod.string().nullish(),
   "priceMonthly": zod.number().nullish(),
-  "status": zod.enum(['active', 'cancelled', 'past_due']),
+  "status": zod.enum(['active', 'cancelled', 'past_due', 'pending_payment']),
   "startedAt": zod.coerce.date(),
   "currentPeriodEnd": zod.coerce.date(),
   "cancelledAt": zod.coerce.date().nullish(),

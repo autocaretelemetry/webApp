@@ -3371,13 +3371,13 @@ components:
         [id, subscriberKind, subscriberId, subscriberName, status, startedAt, currentPeriodEnd, createdAt]
       properties:
         id: { type: string }
-        subscriberKind: { type: string, enum: [center, vendor, owner] }
+        subscriberKind: { type: string, enum: [center, vendor, owner, organization] }
         subscriberId: { type: string }
         subscriberName: { type: string }
         planId: { type: string, nullable: true }
         planName: { type: string, nullable: true }
         priceMonthly: { type: number, nullable: true }
-        status: { type: string, enum: [active, cancelled, past_due] }
+        status: { type: string, enum: [active, cancelled, past_due, pending_payment] }
         startedAt: { type: string, format: date-time }
         currentPeriodEnd: { type: string, format: date-time }
         cancelledAt: { type: string, format: date-time, nullable: true }
@@ -3387,7 +3387,7 @@ components:
       type: object
       required: [subscriberKind, subscriberId, subscriberName, planId]
       properties:
-        subscriberKind: { type: string, enum: [center, vendor, owner] }
+        subscriberKind: { type: string, enum: [center, vendor, owner, organization] }
         subscriberId: { type: string, minLength: 1 }
         subscriberName: { type: string, minLength: 1 }
         planId: { type: string }
@@ -3396,7 +3396,7 @@ components:
       type: object
       properties:
         planId: { type: string }
-        status: { type: string, enum: [active, cancelled, past_due] }
+        status: { type: string, enum: [active, cancelled, past_due, pending_payment] }
 
     RevenueOverview:
       type: object

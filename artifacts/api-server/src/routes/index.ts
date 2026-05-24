@@ -29,6 +29,7 @@ import onboardingRouter, { requireKycVerified } from "./onboarding";
 import addressesRouter from "./addresses";
 import publicCatalogRouter from "./publicCatalog";
 import commissionsRouter from "./commissions";
+import payswitchRouter from "./payswitch";
 
 const router: IRouter = Router();
 
@@ -44,6 +45,10 @@ router.use(onboardingRouter);
 // middleware fires for every request entering the sub-router (not just
 // for routes that match inside it).
 router.use(publicCatalogRouter);
+// Payment provider routes mount before the KYC gate so the PaySwitch
+// redirect callback (no session, no KYC) can settle the transaction. The
+// authenticated initiation endpoint applies `requireAuth` inline.
+router.use(payswitchRouter);
 
 // Global KYC gate: signed-in users whose KYC isn't verified get 403 on
 // anything below. Anonymous traffic and admins pass through.
