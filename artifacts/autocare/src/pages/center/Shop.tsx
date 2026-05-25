@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   useListPartCategories,
-  useListServiceCenters,
   useUpdatePart,
   type Part,
 } from "@workspace/api-client-react";
@@ -460,22 +459,54 @@ function StockEditor({ part, centerId }: { part: Part; centerId: string }) {
   );
 }
 
+type SubscriberOption = {
+  kind: "owner" | "center" | "vendor" | "organization";
+  subscriberId: string;
+  name: string;
+};
+
+function useMyCenter() {
+  return useQuery<{ id: string; name: string } | null>({
+    queryKey: ["me/subscriber-options", "center"],
+    queryFn: async () => {
+      const r = await fetch("/api/me/subscriber-options", {
+        credentials: "include",
+      });
+      if (!r.ok) throw new Error(`Request failed (${r.status})`);
+      const body = (await r.json()) as { options: SubscriberOption[] };
+      const first = body.options.find((o) => o.kind === "center");
+      return first ? { id: first.subscriberId, name: first.name } : null;
+    },
+  });
+}
+
 export default function CenterShop() {
-  // Mirrors the rest of the center workspace — pick the first listed center
-  // for the active staffer. The server still enforces center-staff membership
-  // on every endpoint we hit here.
-  const { data: centers, isLoading: centersLoading } = useListServiceCenters();
-  const center = centers?.[0];
-  const { data: parts, isLoading } = useCenterShopParts(center?.id);
+  // Resolve the staffer's OWN service center via /me/subscriber-options,
+  // which is membership-scoped (returns the centers this user is staff for).
+  // The global directory hook would land on whatever rated highest and 403
+  // every shop call.
+  const { data: center, isLoading: centersLoading, error: centerError } =
+    useMyCenter();
+  const { data: parts, isLoading, error: partsError } = useCenterShopParts(
+    center?.id,
+  );
   const [adding, setAdding] = useState(false);
 
   if (centersLoading) {
     return <div className="p-8">Loading…</div>;
   }
+  if (centerError) {
+    return (
+      <div className="p-8 text-sm text-destructive">
+        Couldn't look up your service center: {centerError.message}
+      </div>
+    );
+  }
   if (!center) {
     return (
       <div className="p-8 text-sm text-muted-foreground">
-        You aren't associated with a service center yet.
+        You aren't associated with a service center yet. Ask your super admin
+        to link your account to your center.
       </div>
     );
   }
@@ -511,7 +542,11 @@ export default function CenterShop() {
         <NewPartForm centerId={center.id} onClose={() => setAdding(false)} />
       )}
 
-      {isLoading ? (
+      {partsError ? (
+        <div className="py-12 text-center bg-destructive/5 rounded-lg border border-destructive/30 text-sm text-destructive">
+          Couldn't load your shop inventory: {partsError.message}
+        </div>
+      ) : isLoading ? (
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => (
             <div key={i} className="h-24 bg-muted animate-pulse rounded-lg" />
