@@ -122,7 +122,7 @@ export default function OrderDetail() {
 
   const [payingOnline, setPayingOnline] = useState(false);
   const checkoutOnline = async (
-    endpoint: "approve-and-pay" | "center-pay",
+    endpoint: "approve-and-pay" | "center-pay" | "direct-buy",
     successMsg: string,
   ) => {
     setPayingOnline(true);
@@ -146,6 +146,7 @@ export default function OrderDetail() {
     }
   };
   const handleApproveAndPay = () => checkoutOnline("approve-and-pay", "Payment sent");
+  const handleDirectBuyPay = () => checkoutOnline("direct-buy", "Payment sent");
   void approveAndPay;
 
   const handleAuthorizeCenterPay = async () => {
@@ -434,6 +435,39 @@ export default function OrderDetail() {
                   This parts request is waiting for a fleet admin or finance
                   member to approve and pick a payment route.
                 </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Direct-buy awaiting payment — buyer completes PaySwitch checkout
+              or cancels (which refunds reserved stock server-side). */}
+          {order.status === "awaiting_payment" && !order.bookingId && (
+            <Card className="border-primary/40">
+              <CardContent className="p-5 space-y-3">
+                <p className="font-semibold flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-primary" /> Complete payment
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Your order is reserved. Pay now to send it to the {isOnHand ? "service center" : "vendor"} for fulfilment.
+                </p>
+                <div className="flex flex-col gap-2">
+                  <Button
+                    onClick={handleDirectBuyPay}
+                    disabled={paymentBusy || updateStatus.isPending}
+                    className="gap-2 justify-start"
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    Pay {formatCurrency(order.total)}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => advance("cancelled")}
+                    disabled={paymentBusy || updateStatus.isPending}
+                    className="gap-2 justify-start text-muted-foreground hover:text-destructive"
+                  >
+                    <X className="h-4 w-4" /> Cancel order
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}

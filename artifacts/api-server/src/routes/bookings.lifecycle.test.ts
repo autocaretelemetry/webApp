@@ -263,12 +263,21 @@ describe("Service booking lifecycle — happy path", () => {
       .where(eq(bookingsTable.id, bookingId));
     expect(bookingAfterApprove?.status).toBe("approved");
 
-    // 9. Owner pays the invoice (booking → completed, vehicle snapshot updated).
-    const payRes = await request(app)
-      .post(`/api/invoices/${invoiceId}/pay`)
-      .set("Cookie", ownerCookie);
-    expect(payRes.status, payRes.text).toBe(200);
-    expect(payRes.body.status).toBe("paid");
+    // 9. Owner pays the invoice. In production this goes through PaySwitch
+    //    (POST /payments/payswitch/service-invoices/:id then async callback);
+    //    here we simulate the callback's terminal effect by invoking
+    //    closeInvoiceAsPaid directly, which is exactly what the callback
+    //    handler does on a successful charge.
+    const { closeInvoiceAsPaid } = await import("./invoices");
+    const fakeReq = { log: { warn: () => {} } } as unknown as Parameters<typeof closeInvoiceAsPaid>[0];
+    const paid = await closeInvoiceAsPaid(
+      fakeReq,
+      invoiceId,
+      "online",
+      "Owner",
+      "Payment received — job marked complete",
+    );
+    expect(paid.status).toBe("paid");
 
     const [finalBooking] = await db
       .select()

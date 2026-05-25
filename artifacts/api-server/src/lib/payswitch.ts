@@ -147,6 +147,76 @@ export async function initiateCheckout(
   return { ok: true, checkoutUrl: url, raw: json };
 }
 
+export interface StatusCheckResult {
+  ok: boolean;
+  /** Provider status code (e.g. "000" on success). */
+  code: string;
+  /** Lowercased provider status ("approved" / "successful" / "failed" / ...). */
+  status: string;
+  reason: string;
+  raw: unknown;
+}
+
+/**
+ * Server-to-server transaction status check. The browser-side callback is
+ * untrusted (any authenticated caller could forge a `code=000&status=successful`
+ * query string against the public callback URL), so before we settle a sale
+ * we re-fetch the canonical status from PaySwitch with our merchant
+ * credentials. TheTeller endpoint:
+ *   GET /v1.1/users/transactions/{transaction_id}/status
+ * Returns `{ status: "approved", code: "000", ... }` for a real settlement.
+ */
+export async function checkTransactionStatus(
+  transactionId: string,
+): Promise<StatusCheckResult> {
+  const { apiUser, apiKey } = requireCreds();
+  const base = payswitchEnv() === "live" ? LIVE_BASE : TEST_BASE;
+  const auth = Buffer.from(`${apiUser}:${apiKey}`).toString("base64");
+  let resp: Response;
+  try {
+    resp = await fetch(`${base}/v1.1/users/transactions/${encodeURIComponent(transactionId)}/status`, {
+      method: "GET",
+      headers: {
+        "Cache-Control": "no-cache",
+        Accept: "application/json",
+        Authorization: `Basic ${auth}`,
+      },
+    });
+  } catch (err) {
+    logger.error({ err, transactionId }, "payswitch status fetch failed");
+    return { ok: false, code: "", status: "network_error", reason: String(err), raw: null };
+  }
+  const text = await resp.text();
+  let json: unknown = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    // leave json null
+  }
+  if (!resp.ok) {
+    logger.warn({ status: resp.status, body: text, transactionId }, "payswitch status non-2xx");
+    return {
+      ok: false,
+      code: "",
+      status: `http_${resp.status}`,
+      reason: `Provider returned ${resp.status}`,
+      raw: json ?? text,
+    };
+  }
+  const obj = (json ?? {}) as Record<string, unknown>;
+  const code = typeof obj["code"] === "string" ? (obj["code"] as string) : "";
+  const rawStatus =
+    typeof obj["status"] === "string" ? (obj["status"] as string).toLowerCase() : "";
+  const reason =
+    (typeof obj["reason"] === "string" && (obj["reason"] as string)) ||
+    (typeof obj["message"] === "string" && (obj["message"] as string)) ||
+    "";
+  // TheTeller marks a settled charge with code "000" and status one of
+  // "approved" | "successful". Anything else is non-success.
+  const success = code === "000" && (rawStatus === "approved" || rawStatus === "successful");
+  return { ok: success, code, status: rawStatus, reason, raw: json };
+}
+
 /**
  * Build the publicly-reachable origin for redirect URLs. Falls back to the
  * Replit dev domain when running on the workspace; in published deployments

@@ -23,6 +23,7 @@ import {
 import { requireAuth } from "../lib/auth";
 import {
   generateTxnId,
+  checkTransactionStatus,
   initiateCheckout,
   payswitchConfigured,
   publicOrigin,
@@ -530,6 +531,60 @@ router.post(
   },
 );
 
+// ---------------------- Direct-buy parts order (non-proposal) ----------------------
+
+router.post(
+  "/payments/payswitch/parts-orders/:orderId/direct-buy",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    const params = OrderIdParam.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+    const user = req.user!;
+    const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, params.data.orderId));
+    if (!order) {
+      res.status(404).json({ error: "Order not found" });
+      return;
+    }
+    // Only direct buys (no bookingId) sit in awaiting_payment. Proposals
+    // have their own approve-and-pay / center-pay init paths.
+    if (order.bookingId) {
+      res.status(409).json({ error: "Use approve-and-pay for mechanic-proposed orders." });
+      return;
+    }
+    if (order.status !== "awaiting_payment") {
+      res.status(409).json({
+        error: `Only orders awaiting payment can be paid (current status: ${order.status})`,
+      });
+      return;
+    }
+    if (user.role !== "admin" && user.role !== "super_admin") {
+      const callerPhone = (user.phone ?? "").trim();
+      if (!callerPhone || order.buyerPhone.trim() !== callerPhone) {
+        res.status(403).json({ error: "Only the buyer can pay for this order." });
+        return;
+      }
+    }
+    const init = await initPaySwitchCheckout({
+      user,
+      amountPesewas: Math.round(order.total * 100),
+      purpose: "parts_order_direct_buy",
+      purposeRef: order.id,
+      description: `Parts order ${order.id.slice(0, 8)} — direct buy`,
+      ...(user.name ? { customerName: user.name } : {}),
+      successRedirect: `/billing/result?status=success&purpose=parts_order&order=${order.id}`,
+      failureRedirect: `/billing/result?status=failed&purpose=parts_order&order=${order.id}`,
+    });
+    if (!init.ok) {
+      res.status(init.status).json({ error: init.error });
+      return;
+    }
+    res.status(201).json({ checkoutUrl: init.checkoutUrl, transactionId: init.transactionId });
+  },
+);
+
 // ---------------------- Parts proposal: center settles with vendor ----------------------
 
 router.post(
@@ -688,9 +743,37 @@ router.get("/payments/payswitch/callback", async (req, res): Promise<void> => {
     res.redirect(txn.failureRedirect);
     return;
   }
-  const success = code === "000" && status === "successful";
-  if (!success) {
-    await handleFailure(txn, code, reason || status || "declined");
+  // Trust nothing in the query string. The browser-facing redirect is
+  // reachable by anyone who knows a `txn` value, so we MUST verify with
+  // PaySwitch server-to-server before settling the sale. The query-string
+  // status is only used as a fast-path failure reason when verification
+  // also reports non-success.
+  const verified = await checkTransactionStatus(qTxn);
+  if (!verified.ok) {
+    const finalCode = verified.code || code || "";
+    const finalReason =
+      verified.reason || reason || verified.status || status || "declined";
+    req.log.info(
+      { txn: txn.id, providerStatus: verified.status, providerCode: verified.code },
+      "payswitch callback failed verification",
+    );
+    await handleFailure(txn, finalCode, finalReason);
+    res.redirect(txn.failureRedirect);
+    return;
+  }
+  // Defence-in-depth: the verified amount must match what we charged for.
+  const verifiedAmount =
+    typeof (verified.raw as Record<string, unknown> | null)?.["amount"] === "string"
+      ? Number((verified.raw as Record<string, string>)["amount"])
+      : typeof (verified.raw as Record<string, unknown> | null)?.["amount"] === "number"
+        ? ((verified.raw as Record<string, number>)["amount"] as number)
+        : null;
+  if (verifiedAmount !== null && Number.isFinite(verifiedAmount) && verifiedAmount !== txn.amount) {
+    req.log.warn(
+      { txn: txn.id, expected: txn.amount, verifiedAmount },
+      "payswitch callback amount mismatch — refusing to settle",
+    );
+    await handleFailure(txn, verified.code, "amount_mismatch");
     res.redirect(txn.failureRedirect);
     return;
   }
@@ -800,6 +883,44 @@ async function handleSuccess(
     await recordPartsOrderCommission(row);
     const seller = await resolvePartsOrderSeller(row.id);
     if (seller) await createPayoutForSale(seller);
+    return;
+  }
+
+  if (txn.purpose === "parts_order_direct_buy") {
+    // Flip the order from awaiting_payment → delivered (center-shop, on-hand)
+    // or placed (vendor, needs fulfilment) and stamp paid_by_owner. Stock is
+    // already reserved at order creation, so payment success just settles.
+    const [existing] = await db.select().from(ordersTable).where(eq(ordersTable.id, txn.purposeRef));
+    if (!existing) return;
+    if (existing.status !== "awaiting_payment") {
+      // Idempotency: already settled by a previous callback.
+      return;
+    }
+    const isCenterSourced = !!existing.sellerCenterId;
+    const now = new Date();
+    const [updated] = await db
+      .update(ordersTable)
+      .set({
+        status: isCenterSourced ? "delivered" : "placed",
+        paymentStatus: "paid_by_owner",
+        paidAt: now,
+        paidByUserId: txn.initiatedByUserId,
+        ...(isCenterSourced
+          ? { confirmedAt: now, shippedAt: now, deliveredAt: now }
+          : {}),
+      })
+      .where(
+        and(
+          eq(ordersTable.id, existing.id),
+          eq(ordersTable.status, "awaiting_payment"),
+        ),
+      )
+      .returning();
+    if (updated) {
+      await recordPartsOrderCommission(updated);
+      const seller = await resolvePartsOrderSeller(updated.id);
+      if (seller) await createPayoutForSale(seller);
+    }
     return;
   }
 

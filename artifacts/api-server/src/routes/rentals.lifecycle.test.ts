@@ -231,14 +231,25 @@ describe("Rental booking lifecycle — happy path", () => {
       expect(ownerSign.body.status).toBe("awaiting_payment");
       expect(ownerSign.body.ownerSignedAt).toBeTruthy();
 
-      // 5. Renter pays online → confirmed.
-      const payRes = await request(app)
-        .patch(`/api/rental-bookings/${bookingId}`)
-        .set("Cookie", renterCookie)
-        .send({ payment: { method: "online", markPaid: true } });
-      expect(payRes.status, payRes.text).toBe(200);
-      expect(payRes.body.status).toBe("confirmed");
-      expect(payRes.body.paymentStatus).toBe("paid");
+      // 5. Renter pays online → confirmed. In production this goes through
+      //    PaySwitch (POST /payments/payswitch/rental-bookings/:id then async
+      //    callback). Here we simulate the callback's terminal effect by
+      //    directly stamping paymentStatus=paid + status=confirmed on the
+      //    row, which is what the callback's `markPaid` branch does.
+      const now = new Date();
+      const [paidRow] = await db
+        .update(rentalBookingsTable)
+        .set({
+          paymentMethod: "online",
+          paymentStatus: "paid",
+          paidAt: now,
+          status: "confirmed",
+          confirmedAt: now,
+        })
+        .where(eq(rentalBookingsTable.id, bookingId))
+        .returning();
+      expect(paidRow?.status).toBe("confirmed");
+      expect(paidRow?.paymentStatus).toBe("paid");
 
       // 6. Owner marks trip active.
       const activeRes = await request(app)

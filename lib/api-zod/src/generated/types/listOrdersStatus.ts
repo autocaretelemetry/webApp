@@ -11,6 +11,7 @@ export type ListOrdersStatus = typeof ListOrdersStatus[keyof typeof ListOrdersSt
 
 export const ListOrdersStatus = {
   proposed: 'proposed',
+  awaiting_payment: 'awaiting_payment',
   placed: 'placed',
   confirmed: 'confirmed',
   shipped: 'shipped',

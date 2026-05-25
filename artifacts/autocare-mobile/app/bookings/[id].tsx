@@ -3,9 +3,9 @@ import React from "react";
 import { Alert, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Linking } from "react-native";
 import {
   useApproveInvoice,
-  usePayInvoice,
   useUpdateBookingStatus,
 } from "@workspace/api-client-react";
 
@@ -75,7 +75,7 @@ export default function BookingDetailScreen() {
 
   const setStatus = useUpdateBookingStatus();
   const approveInvoice = useApproveInvoice();
-  const payInvoice = usePayInvoice();
+  const [payingOnline, setPayingOnline] = React.useState(false);
 
   if (booking.isLoading) return <LoadingScreen />;
   if (booking.error || !booking.data) {
@@ -116,13 +116,21 @@ export default function BookingDetailScreen() {
 
   async function pay() {
     if (!b.invoiceId) return;
+    setPayingOnline(true);
     try {
-      await payInvoice.mutateAsync({ invoiceId: b.invoiceId });
-      await qc.invalidateQueries({ queryKey: ["mobile-invoice", b.invoiceId] });
-      await qc.invalidateQueries({ queryKey: ["mobile-booking", id] });
-      Alert.alert("Paid", "Payment recorded.");
+      const r = await apiFetch<{ checkoutUrl?: string; error?: string }>(
+        `/api/payments/payswitch/service-invoices/${b.invoiceId}`,
+        { method: "POST" },
+      );
+      if (!r.ok || !r.data?.checkoutUrl) {
+        Alert.alert("Couldn't start payment", r.error ?? "Try again.");
+        return;
+      }
+      await Linking.openURL(r.data.checkoutUrl);
     } catch (e) {
       Alert.alert("Couldn't pay", e instanceof Error ? e.message : "Try again.");
+    } finally {
+      setPayingOnline(false);
     }
   }
 
@@ -189,7 +197,7 @@ export default function BookingDetailScreen() {
             ) : null}
             {isOwner && invoice.data.status === "approved" ? (
               <View style={{ marginTop: 14 }}>
-                <Button label="Pay invoice" tone="secondary" onPress={pay} loading={payInvoice.isPending} />
+                <Button label="Pay invoice" tone="secondary" onPress={pay} loading={payingOnline} />
               </View>
             ) : null}
           </Card>

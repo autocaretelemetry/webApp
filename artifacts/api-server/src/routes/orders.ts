@@ -474,10 +474,11 @@ router.post("/orders", async (req, res): Promise<void> => {
         ? (bookingVehicle?.ownerPhone ?? "")
         : (req.user!.phone ?? "");
 
-      // Direct buys of center-shop parts auto-deliver immediately since the
-      // parts are already at the center (no shipping/delivery hop).
-      const autoDeliverNow = !isProposal && isCenterSourced;
-
+      // Direct buys (non-proposal) now land in `awaiting_payment` and only
+      // flip to `placed` / `delivered` after the PaySwitch callback confirms
+      // the charge. Stock is still reserved up-front (lines 414+) so the
+      // shelf can't be oversold while the buyer is in checkout; the cancel
+      // path refunds stock if the payment is abandoned.
       const [order] = await tx
         .insert(ordersTable)
         .values({
@@ -494,18 +495,15 @@ router.post("/orders", async (req, res): Promise<void> => {
           deliveryCity,
           deliveryRegion,
           notes: parsed.data.notes ?? null,
-          status: isProposal ? "proposed" : autoDeliverNow ? "delivered" : "placed",
+          status: isProposal ? "proposed" : "awaiting_payment",
           proposedAt: isProposal ? now : null,
           placedAt: now,
-          confirmedAt: autoDeliverNow ? now : null,
-          shippedAt: autoDeliverNow ? now : null,
-          deliveredAt: autoDeliverNow ? now : null,
           itemsTotal: +itemsTotal.toFixed(2),
           shippingFee,
           total,
-          paymentStatus: isProposal ? "unpaid" : "paid_by_owner",
-          paidAt: isProposal ? null : now,
-          paidByUserId: isProposal ? null : (req.user?.id ?? null),
+          paymentStatus: "unpaid",
+          paidAt: null,
+          paidByUserId: null,
         })
         .returning();
 
@@ -533,10 +531,10 @@ router.post("/orders", async (req, res): Promise<void> => {
     });
 
     void booking;
-    // Direct buys (non-proposals) land here already paid_by_owner.
-    // Center-sourced proposals that hit the auto-paid branch will record
-    // their commission via approveProposalAndReserveStock's callers.
-    if (!isProposal) await recordPartsOrderCommission(result.order);
+    // Commission + payout for direct buys is recorded in the PaySwitch
+    // callback (parts_order_direct_buy purpose) once payment is confirmed,
+    // not at creation time. Proposals record at approve-and-pay time the
+    // same way they always have.
     const [hydrated] = await hydrate([result.order]);
     res.status(201).json({ ...hydrated, items: result.lines });
   } catch (err) {
@@ -583,6 +581,10 @@ router.patch("/orders/:orderId/status", async (req, res): Promise<void> => {
   }
   const allowed: Record<string, string[]> = {
     proposed: ["cancelled"],
+    // Direct buys sit in awaiting_payment until PaySwitch confirms — the
+    // buyer can still cancel here (refunds reserved stock); the success
+    // callback moves it to placed / delivered via a separate code path.
+    awaiting_payment: ["cancelled"],
     placed: ["confirmed", "cancelled"],
     confirmed: ["shipped", "cancelled"],
     shipped: ["delivered"],
@@ -832,7 +834,18 @@ export async function authorizeProposalAction(
   return { order, relationship: rel };
 }
 
+// LEGACY back-office settlement path: marks an order paid_by_owner without
+// going through PaySwitch. Now admin-only — public buyers must use
+// POST /payments/payswitch/parts-orders/:orderId/approve-and-pay which
+// redirects to the real payment provider and only stamps paid in the
+// callback. This route is kept for super-admin manual settlement.
 router.post("/orders/:orderId/approve-and-pay", async (req, res): Promise<void> => {
+  if (req.user?.role !== "admin" && req.user?.role !== "super_admin") {
+    res.status(403).json({
+      error: "Use the PaySwitch checkout endpoint to approve and pay for parts.",
+    });
+    return;
+  }
   const params = GetOrderParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -890,7 +903,16 @@ router.post("/orders/:orderId/authorize-center-pay", async (req, res): Promise<v
   }
 });
 
+// LEGACY back-office settlement: stamps paid_by_center without PaySwitch.
+// Centers must use POST /payments/payswitch/parts-orders/:id/center-pay for
+// the real flow; this is gated to platform admin for manual settlement only.
 router.post("/orders/:orderId/center-pay", async (req, res): Promise<void> => {
+  if (req.user?.role !== "admin" && req.user?.role !== "super_admin") {
+    res.status(403).json({
+      error: "Use the PaySwitch checkout endpoint to settle this order with the vendor.",
+    });
+    return;
+  }
   const params = GetOrderParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });

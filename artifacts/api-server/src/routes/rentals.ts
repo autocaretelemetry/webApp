@@ -1075,13 +1075,20 @@ router.patch("/rental-bookings/:rentalBookingId", requireAuth, async (req, res):
     const { method, markPaid } = body.data.payment;
     patch.paymentMethod = method;
     if (method === "online") {
-      if (markPaid) {
+      // `markPaid` on the online path is a legacy mock-payment switch — only
+      // platform admin/super_admin may use it for off-PaySwitch manual
+      // settlement. Renters must complete checkout via
+      // POST /payments/payswitch/rental-bookings/:id which only stamps paid
+      // in the callback. Without admin role we keep the booking in
+      // awaiting_payment regardless of `markPaid`.
+      const isAdmin = req.user?.role === "admin" || req.user?.role === "super_admin";
+      if (markPaid && isAdmin) {
         patch.paymentStatus = "paid";
         patch.paidAt = now;
         patch.status = "confirmed";
         patch.confirmedAt = now;
       }
-      // else: remain awaiting_payment until paid
+      // else: remain awaiting_payment until PaySwitch callback flips it
     } else {
       // cash_on_pickup: confirmed immediately, paid flips when owner marks pickup
       patch.status = "confirmed";

@@ -402,17 +402,53 @@ export default function Checkout() {
       if (isProposal && scope) {
         await queryClient.invalidateQueries({ queryKey: getGetBookingQueryKey(scope.bookingId) });
       }
-      const message = isProposal
-        ? results.length === 1
-          ? "Parts request sent to the owner for approval."
-          : `${results.length} parts requests sent to the owner.`
-        : results.length === 1
-          ? "Order placed."
-          : `${results.length} orders placed across vendors.`;
-      toast.success(message);
-      if (results.length === 1) navigate(`/orders/${results[0].id}`);
-      else if (isProposal && scope) navigate(`/bookings/${scope.bookingId}`);
-      else navigate("/orders");
+      // Proposals stay on the existing notify-the-owner flow. Direct buys
+      // now sit in awaiting_payment until the buyer completes PaySwitch.
+      // For single-seller carts we redirect straight into PaySwitch; for
+      // multi-seller carts we send the buyer to /orders where each order
+      // has its own "Pay now" button (one PaySwitch checkout per order).
+      if (isProposal) {
+        const message =
+          results.length === 1
+            ? "Parts request sent to the owner for approval."
+            : `${results.length} parts requests sent to the owner.`;
+        toast.success(message);
+        if (results.length === 1) navigate(`/orders/${results[0].id}`);
+        else if (scope) navigate(`/bookings/${scope.bookingId}`);
+        else navigate("/orders");
+        return;
+      }
+      if (results.length === 1) {
+        try {
+          const res = await fetch(
+            `/api/payments/payswitch/parts-orders/${results[0].id}/direct-buy`,
+            {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+          const body = (await res.json().catch(() => ({}))) as {
+            checkoutUrl?: string;
+            error?: string;
+          };
+          if (!res.ok || !body.checkoutUrl) {
+            toast.error(body.error ?? "Order created. Open it to retry payment.");
+            navigate(`/orders/${results[0].id}`);
+            return;
+          }
+          window.location.href = body.checkoutUrl;
+          return;
+        } catch {
+          toast.error("Order created. Open it to retry payment.");
+          navigate(`/orders/${results[0].id}`);
+          return;
+        }
+      }
+      toast.success(
+        `${results.length} orders created — pay each one from its order page.`,
+      );
+      navigate("/orders");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to place order.";
       toast.error(msg);

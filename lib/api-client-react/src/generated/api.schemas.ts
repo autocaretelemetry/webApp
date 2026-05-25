@@ -763,6 +763,7 @@ export type OrderStatus = typeof OrderStatus[keyof typeof OrderStatus];
 
 export const OrderStatus = {
   proposed: 'proposed',
+  awaiting_payment: 'awaiting_payment',
   placed: 'placed',
   confirmed: 'confirmed',
   shipped: 'shipped',
@@ -2333,6 +2334,7 @@ export type ListOrdersStatus = typeof ListOrdersStatus[keyof typeof ListOrdersSt
 
 export const ListOrdersStatus = {
   proposed: 'proposed',
+  awaiting_payment: 'awaiting_payment',
   placed: 'placed',
   confirmed: 'confirmed',
   shipped: 'shipped',

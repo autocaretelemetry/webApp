@@ -312,7 +312,17 @@ export async function closeInvoiceAsPaid(
   return row;
 }
 
+// LEGACY back-office settlement: marks an invoice paid without going
+// through PaySwitch. Owners must pay via POST /payments/payswitch/service-invoices/:id
+// which redirects to the real provider and only stamps paid in the callback.
+// Kept for admin manual settlement (cash collected outside the platform, etc).
 router.post("/invoices/:invoiceId/pay", requireAuth, async (req, res): Promise<void> => {
+  if (req.user?.role !== "admin" && req.user?.role !== "super_admin") {
+    res.status(403).json({
+      error: "Use the PaySwitch checkout endpoint to pay this invoice online.",
+    });
+    return;
+  }
   const params = PayInvoiceParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
