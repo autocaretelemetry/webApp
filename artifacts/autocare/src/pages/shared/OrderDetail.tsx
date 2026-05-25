@@ -89,10 +89,11 @@ export default function OrderDetail() {
     !!fleetMembership &&
     (fleetMembership.myRole === "admin" ||
       fleetMembership.myRole === "finance" ||
-      // canCheckoutDirectly is the per-member override exposed via the org
-      fleetOrgsData?.organizations?.[0]?.myRole !== undefined &&
-        (fleetMembership as { canCheckoutDirectly?: boolean })
-          .canCheckoutDirectly === true);
+      // Per-member override exposed via /organizations/mine as
+      // `myCanCheckoutDirectly` (the column itself is `canCheckoutDirectly`,
+      // but the response prefixes "my" so it doesn't collide with the
+      // per-member listing fields).
+      fleetMembership.myCanCheckoutDirectly === true);
   const fleetNeedsApproval =
     role === "fleet" && !!fleetMembership && !fleetCanApprove;
   const isOwner =
