@@ -377,7 +377,7 @@ describe("markStaleReminderRunsAsCrashed", () => {
         .get(`/api/notifications/reminder-runs`)
         .set("Cookie", cookieAdmin);
       expect(res.status).toBe(200);
-      const rows = res.body as Array<{ id: string; status: string }>;
+      const rows = res.body.runs as Array<{ id: string; status: string }>;
       const found = rows.find((r) => r.id === stale!.id);
       // It may or may not appear in the most-recent 25 depending on test
       // ordering, but the DB row must have been swept either way.
