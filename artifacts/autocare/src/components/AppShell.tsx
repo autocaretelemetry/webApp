@@ -38,6 +38,7 @@ import {
   Paintbrush,
   Percent,
   BellRing,
+  Banknote,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { AuthedUser } from "@workspace/api-client-react";
@@ -101,7 +102,10 @@ const OWNER_NAV: NavSection[] = [
   },
   {
     label: "Billing",
-    items: [{ href: "/billing/subscribe", label: "Subscription", icon: CreditCard }],
+    items: [
+      { href: "/billing/subscribe", label: "Subscription", icon: CreditCard },
+      { href: "/settings/payout", label: "Payout account", icon: Building2 },
+    ],
   },
 ];
 
@@ -132,7 +136,10 @@ const CENTER_NAV: NavSection[] = [
   },
   {
     label: "Billing",
-    items: [{ href: "/billing/subscribe", label: "Subscription", icon: CreditCard }],
+    items: [
+      { href: "/billing/subscribe", label: "Subscription", icon: CreditCard },
+      { href: "/settings/payout", label: "Payout account", icon: Building2 },
+    ],
   },
 ];
 
@@ -150,7 +157,10 @@ const VENDOR_NAV: NavSection[] = [
   },
   {
     label: "Billing",
-    items: [{ href: "/billing/subscribe", label: "Subscription", icon: CreditCard }],
+    items: [
+      { href: "/billing/subscribe", label: "Subscription", icon: CreditCard },
+      { href: "/settings/payout", label: "Payout account", icon: Building2 },
+    ],
   },
 ];
 
@@ -264,6 +274,7 @@ const SUPER_ADMIN_NAV: NavSection[] = [
       { href: "/super-admin/onboard", label: "Onboard Account", icon: UserPlus },
       { href: "/super-admin/organizations", label: "Institutions & Fleets", icon: Building2 },
       { href: "/super-admin/commissions", label: "Commissions", icon: Percent },
+      { href: "/super-admin/payouts", label: "Seller Payouts", icon: Banknote },
       { href: "/super-admin/landing", label: "Landing Page", icon: Paintbrush },
     ],
   },
@@ -296,6 +307,7 @@ function navFor(
           { href: "/super-admin/onboard", label: "Onboard Account", icon: UserPlus },
           { href: "/super-admin/organizations", label: "Institutions & Fleets", icon: Building2 },
           { href: "/super-admin/commissions", label: "Commissions", icon: Percent },
+          { href: "/super-admin/payouts", label: "Seller Payouts", icon: Banknote },
           { href: "/super-admin/landing", label: "Landing Page", icon: Paintbrush },
         ],
       },

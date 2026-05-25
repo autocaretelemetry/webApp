@@ -120,15 +120,33 @@ export default function OrderDetail() {
         : Promise.resolve(),
     ]);
 
-  const handleApproveAndPay = async () => {
+  const [payingOnline, setPayingOnline] = useState(false);
+  const checkoutOnline = async (
+    endpoint: "approve-and-pay" | "center-pay",
+    successMsg: string,
+  ) => {
+    setPayingOnline(true);
     try {
-      await approveAndPay.mutateAsync({ orderId: order.id });
-      await invalidateAfterMutation();
-      toast.success("Payment sent to the vendor. Stock reserved.");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to approve and pay.");
+      const res = await fetch(`/api/payments/payswitch/parts-orders/${order.id}/${endpoint}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      const body = (await res.json().catch(() => ({}))) as { checkoutUrl?: string; error?: string };
+      if (!res.ok || !body.checkoutUrl) {
+        toast.error(body.error ?? "Failed to start payment");
+        setPayingOnline(false);
+        return;
+      }
+      void successMsg;
+      window.location.href = body.checkoutUrl;
+    } catch {
+      toast.error("Failed to start payment");
+      setPayingOnline(false);
     }
   };
+  const handleApproveAndPay = () => checkoutOnline("approve-and-pay", "Payment sent");
+  void approveAndPay;
 
   const handleAuthorizeCenterPay = async () => {
     try {
@@ -140,18 +158,12 @@ export default function OrderDetail() {
     }
   };
 
-  const handleCenterPay = async () => {
-    try {
-      await centerPay.mutateAsync({ orderId: order.id });
-      await invalidateAfterMutation();
-      toast.success("Vendor paid. Cost will be added to the service invoice.");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to pay vendor.");
-    }
-  };
+  const handleCenterPay = () => checkoutOnline("center-pay", "Vendor paid");
+  void centerPay;
+  void invalidateAfterMutation;
 
   const paymentBusy =
-    approveAndPay.isPending || authorizeCenterPay.isPending || centerPay.isPending;
+    payingOnline || authorizeCenterPay.isPending;
 
   const advance = async (next: UpdateOrderStatusInputStatus, extra: { trackingCode?: string | null; deliveryAgentId?: string | null } = {}) => {
     try {

@@ -1,5 +1,6 @@
 import { useParams, Link, useLocation } from "wouter";
 import { useGetInvoice, useApproveInvoice, usePayInvoice, useMarkInvoiceCashPaid, getGetInvoiceQueryKey, getGetBookingQueryKey } from "@workspace/api-client-react";
+import { useState as useReactState } from "react";
 import type { QueryKey } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRole } from "@/lib/role";
@@ -58,21 +59,28 @@ export default function InvoiceDetail() {
     );
   };
 
-  const handlePay = () => {
-    payInvoice.mutate(
-      { invoiceId },
-      {
-        onSuccess: () => {
-          toast.success("Payment successful");
-          queryClient.invalidateQueries({ queryKey: getGetInvoiceQueryKey(invoiceId) });
-          if (invoice) {
-             queryClient.invalidateQueries({ queryKey: getGetBookingQueryKey(invoice.bookingId) });
-          }
-        },
-        onError: () => toast.error("Failed to process payment")
+  const [payingOnline, setPayingOnline] = useReactState(false);
+  const handlePay = async () => {
+    setPayingOnline(true);
+    try {
+      const res = await fetch(`/api/payments/payswitch/service-invoices/${invoiceId}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      const body = (await res.json().catch(() => ({}))) as { checkoutUrl?: string; error?: string };
+      if (!res.ok || !body.checkoutUrl) {
+        toast.error(body.error ?? "Failed to start payment");
+        setPayingOnline(false);
+        return;
       }
-    );
+      window.location.href = body.checkoutUrl;
+    } catch {
+      toast.error("Failed to start payment");
+      setPayingOnline(false);
+    }
   };
+  void payInvoice; void queryClient;
 
   if (isLoading) return <div className="p-8">Loading invoice...</div>;
   if (!invoice) return <div className="p-8">Invoice not found</div>;
@@ -116,8 +124,8 @@ export default function InvoiceDetail() {
               <p className="text-sm text-muted-foreground">The work is complete. Please pay the invoice.</p>
             </div>
             <div className="flex gap-2 w-full sm:w-auto">
-              <Button onClick={handlePay} disabled={payInvoice.isPending} className="w-full sm:w-auto bg-green-600 hover:bg-green-700">
-                {payInvoice.isPending ? "Processing..." : "Pay Now"}
+              <Button onClick={handlePay} disabled={payingOnline} className="w-full sm:w-auto bg-green-600 hover:bg-green-700">
+                {payingOnline ? "Redirecting..." : "Pay Now"}
               </Button>
             </div>
           </CardContent>

@@ -32,3 +32,5 @@ export * from "./approvalEvents";
 export * from "./reminderRuns";
 export * from "./platformCommissions";
 export * from "./paymentTransactions";
+export * from "./sellerPayouts";
+export * from "./payoutAccount";

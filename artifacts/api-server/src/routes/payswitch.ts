@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 import {
@@ -13,6 +13,12 @@ import {
   organizationMembersTable,
   centerStaffTable,
   vendorStaffTable,
+  invoicesTable,
+  bookingsTable,
+  ordersTable,
+  rentalBookingsTable,
+  rentalCarsTable,
+  vehiclesTable,
 } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
 import {
@@ -21,8 +27,23 @@ import {
   payswitchConfigured,
   publicOrigin,
 } from "../lib/payswitch";
+import { recordCommission } from "../lib/commissions";
+import {
+  createPayoutForSale,
+  resolveServiceInvoiceSeller,
+  resolvePartsOrderSeller,
+  resolveRentalBookingSeller,
+} from "../lib/payouts";
+import { closeInvoiceAsPaid } from "./invoices";
+import {
+  approveProposalAndReserveStock,
+  recordPartsOrderCommission,
+  authorizeProposalAction,
+} from "./orders";
 
 const router: IRouter = Router();
+
+// ---------------------- Subscriber options + auth helpers ----------------------
 
 const InitSubscriptionBody = z.object({
   planId: z.string().uuid(),
@@ -30,11 +51,6 @@ const InitSubscriptionBody = z.object({
   subscriberId: z.string().min(1),
 });
 
-/**
- * Verify the caller is allowed to subscribe on behalf of the given subscriber.
- * Admins and super admins can subscribe for anyone (back-office support).
- * Otherwise, the caller must own / staff / admin-or-finance the entity.
- */
 async function authorizeSubscriber(
   callerPhone: string | null,
   callerUserId: string,
@@ -119,7 +135,6 @@ async function authorizeSubscriber(
     return { ok: true, name: v.name };
   }
 
-  // organization
   if (!callerPhone) {
     return { ok: false, status: 403, error: "Phone not on file; cannot verify org membership." };
   }
@@ -147,17 +162,6 @@ async function authorizeSubscriber(
   return { ok: true, name: o.name };
 }
 
-/**
- * Start a PaySwitch checkout for a subscription. Returns a `checkoutUrl` that
- * the browser must redirect to. Subscription rows are created in
- * `pending_payment` state and only flipped to `active` once the provider
- * callback confirms `code === "000"`.
- */
-/**
- * Returns the subscriber identities the calling user is allowed to manage.
- * Drives the self-service Subscription page so it doesn't have to second-guess
- * which centerId/vendorId/orgId belongs to the signed-in user.
- */
 router.get("/me/subscriber-options", requireAuth, async (req, res): Promise<void> => {
   const user = req.user!;
   type Opt = {
@@ -170,10 +174,7 @@ router.get("/me/subscriber-options", requireAuth, async (req, res): Promise<void
     opts.push({ kind: "owner", subscriberId: user.phone, name: user.name ?? user.phone });
   }
   const centerRows = await db
-    .select({
-      id: serviceCentersTable.id,
-      name: serviceCentersTable.name,
-    })
+    .select({ id: serviceCentersTable.id, name: serviceCentersTable.name })
     .from(centerStaffTable)
     .innerJoin(serviceCentersTable, eq(serviceCentersTable.id, centerStaffTable.centerId))
     .where(and(eq(centerStaffTable.userId, user.id), eq(centerStaffTable.active, true)));
@@ -182,9 +183,6 @@ router.get("/me/subscriber-options", requireAuth, async (req, res): Promise<void
     opts.push({ kind: "center", subscriberId: c.id, name: c.name });
     centerIds.add(c.id);
   }
-  // Fallback: if no center_staff row exists, match by phone on the
-  // service_centers directory. This covers demo accounts (and any owner
-  // who registered a center directly) where staff linkage was never wired.
   if (user.phone) {
     const centerByPhone = await db
       .select({ id: serviceCentersTable.id, name: serviceCentersTable.name })
@@ -198,10 +196,7 @@ router.get("/me/subscriber-options", requireAuth, async (req, res): Promise<void
     }
   }
   const vendorRows = await db
-    .select({
-      id: vendorsTable.id,
-      name: vendorsTable.name,
-    })
+    .select({ id: vendorsTable.id, name: vendorsTable.name })
     .from(vendorStaffTable)
     .innerJoin(vendorsTable, eq(vendorsTable.id, vendorStaffTable.vendorId))
     .where(and(eq(vendorStaffTable.userId, user.id), eq(vendorStaffTable.active, true)));
@@ -230,10 +225,7 @@ router.get("/me/subscriber-options", requireAuth, async (req, res): Promise<void
         role: organizationMembersTable.role,
       })
       .from(organizationMembersTable)
-      .innerJoin(
-        organizationsTable,
-        eq(organizationsTable.id, organizationMembersTable.organizationId),
-      )
+      .innerJoin(organizationsTable, eq(organizationsTable.id, organizationMembersTable.organizationId))
       .where(eq(organizationMembersTable.phone, user.phone));
     for (const o of orgRows) {
       if (o.role === "admin" || o.role === "finance") {
@@ -241,10 +233,6 @@ router.get("/me/subscriber-options", requireAuth, async (req, res): Promise<void
       }
     }
   }
-  // Sort so the option matching the signed-in user's primary role comes
-  // first. Otherwise a vendor/center user who happens to have a phone would
-  // see the (always-prepended) "owner" option pre-selected and end up looking
-  // at owner plans instead of plans for their actual business identity.
   const preferred: Opt["kind"] | null =
     user.role === "vendor" || user.role === "vendor_staff"
       ? "vendor"
@@ -265,21 +253,89 @@ router.get("/me/subscriber-options", requireAuth, async (req, res): Promise<void
   res.json({ options: opts });
 });
 
-router.post("/payments/payswitch/subscriptions", requireAuth, async (req, res): Promise<void> => {
+// ---------------------- Shared init helper ----------------------
+
+interface InitArgs {
+  user: NonNullable<Request["user"]>;
+  amountPesewas: number;
+  purpose: string;
+  purposeRef: string;
+  description: string;
+  customerName?: string;
+  successRedirect: string;
+  failureRedirect: string;
+}
+
+/**
+ * Shared scaffolding for every "pay a sale" endpoint. Inserts the
+ * payment_transactions row in `pending`, calls TheTeller, and returns the
+ * checkout URL the browser must be redirected to. On provider failure we
+ * mark the txn failed and return a 502 — callers should NOT mutate the
+ * underlying sale (it stays awaiting_payment so the user can retry).
+ */
+async function initPaySwitchCheckout(
+  args: InitArgs,
+): Promise<{ ok: true; checkoutUrl: string; transactionId: string } | { ok: false; status: number; error: string }> {
   if (!payswitchConfigured()) {
-    res.status(503).json({ error: "PaySwitch is not configured on this server." });
-    return;
+    return { ok: false, status: 503, error: "PaySwitch is not configured on this server." };
   }
+  if (!args.user.email) {
+    return { ok: false, status: 400, error: "Your account is missing an email for the payment receipt." };
+  }
+  if (!Number.isFinite(args.amountPesewas) || args.amountPesewas <= 0) {
+    return { ok: false, status: 400, error: "Sale amount is not configured." };
+  }
+  const txnId = generateTxnId();
+  const origin = publicOrigin();
+  const redirectUrl = `${origin}/api/payments/payswitch/callback?txn=${txnId}`;
+  const [txn] = await db
+    .insert(paymentTransactionsTable)
+    .values({
+      provider: "payswitch",
+      transactionId: txnId,
+      purpose: args.purpose,
+      purposeRef: args.purposeRef,
+      amount: args.amountPesewas,
+      email: args.user.email,
+      phone: args.user.phone ?? null,
+      description: args.description,
+      status: "pending",
+      initiatedByUserId: args.user.id,
+      successRedirect: args.successRedirect,
+      failureRedirect: args.failureRedirect,
+    })
+    .returning();
+  const result = await initiateCheckout({
+    amountPesewas: args.amountPesewas,
+    transactionId: txnId,
+    description: args.description,
+    email: args.user.email,
+    redirectUrl,
+    ...(args.customerName ? { customerName: args.customerName } : {}),
+  });
+  if (!result.ok) {
+    await db
+      .update(paymentTransactionsTable)
+      .set({ status: "failed", providerReason: result.reason, completedAt: new Date() })
+      .where(eq(paymentTransactionsTable.id, txn.id));
+    return { ok: false, status: 502, error: result.reason };
+  }
+  await db
+    .update(paymentTransactionsTable)
+    .set({ checkoutUrl: result.checkoutUrl })
+    .where(eq(paymentTransactionsTable.id, txn.id));
+  return { ok: true, checkoutUrl: result.checkoutUrl, transactionId: txnId };
+}
+
+// ---------------------- Subscriptions (existing) ----------------------
+
+router.post("/payments/payswitch/subscriptions", requireAuth, async (req, res): Promise<void> => {
   const parsed = InitSubscriptionBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
   const user = req.user!;
-  if (!user.email) {
-    res.status(400).json({ error: "Your account is missing an email for the payment receipt." });
-    return;
-  }
   const [plan] = await db
     .select()
     .from(subscriptionPlansTable)
@@ -309,12 +365,9 @@ router.post("/payments/payswitch/subscriptions", requireAuth, async (req, res): 
     res.status(auth.status).json({ error: auth.error });
     return;
   }
-
-  // Plan prices are stored in cedis. PaySwitch wants pesewas.
   const amountPesewas = Math.round(plan.priceMonthly * 100);
   const periodEnd = new Date();
   periodEnd.setMonth(periodEnd.getMonth() + 1);
-
   const [sub] = await db
     .insert(subscriptionsTable)
     .values({
@@ -326,79 +379,288 @@ router.post("/payments/payswitch/subscriptions", requireAuth, async (req, res): 
       currentPeriodEnd: periodEnd,
     })
     .returning();
-
-  const txnId = generateTxnId();
-  const origin = publicOrigin();
-  const successRedirect = `/billing/result?status=success&subscription=${sub.id}`;
-  const failureRedirect = `/billing/result?status=failed&subscription=${sub.id}`;
-  const redirectUrl = `${origin}/api/payments/payswitch/callback?txn=${txnId}`;
-
-  const [txn] = await db
-    .insert(paymentTransactionsTable)
-    .values({
-      provider: "payswitch",
-      transactionId: txnId,
-      purpose: "subscription",
-      purposeRef: sub.id,
-      amount: amountPesewas,
-      email: user.email,
-      phone: user.phone ?? null,
-      description: `${plan.name} subscription — ${auth.name}`,
-      status: "pending",
-      initiatedByUserId: user.id,
-      successRedirect,
-      failureRedirect,
-    })
-    .returning();
-
-  const result = await initiateCheckout({
+  const init = await initPaySwitchCheckout({
+    user,
     amountPesewas,
-    transactionId: txnId,
-    description: txn.description,
-    email: user.email,
-    redirectUrl,
+    purpose: "subscription",
+    purposeRef: sub.id,
+    description: `${plan.name} subscription — ${auth.name}`,
     customerName: auth.name,
+    successRedirect: `/billing/result?status=success&purpose=subscription&subscription=${sub.id}`,
+    failureRedirect: `/billing/result?status=failed&purpose=subscription&subscription=${sub.id}`,
   });
-
-  if (!result.ok) {
-    await db
-      .update(paymentTransactionsTable)
-      .set({
-        status: "failed",
-        providerReason: result.reason,
-        completedAt: new Date(),
-      })
-      .where(eq(paymentTransactionsTable.id, txn.id));
+  if (!init.ok) {
     await db
       .update(subscriptionsTable)
       .set({ status: "cancelled", cancelledAt: new Date() })
       .where(eq(subscriptionsTable.id, sub.id));
-    req.log.warn({ reason: result.reason, raw: result.raw }, "payswitch initiate failed");
-    res.status(502).json({ error: result.reason });
+    res.status(init.status).json({ error: init.error });
     return;
   }
-
-  await db
-    .update(paymentTransactionsTable)
-    .set({ checkoutUrl: result.checkoutUrl })
-    .where(eq(paymentTransactionsTable.id, txn.id));
-
   res.status(201).json({
-    checkoutUrl: result.checkoutUrl,
-    transactionId: txnId,
+    checkoutUrl: init.checkoutUrl,
+    transactionId: init.transactionId,
     subscriptionId: sub.id,
   });
 });
 
+// ---------------------- Service invoice ----------------------
+
+const InvoiceIdParam = z.object({ invoiceId: z.string().uuid() });
+
+router.post(
+  "/payments/payswitch/service-invoices/:invoiceId",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    const params = InvoiceIdParam.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+    const user = req.user!;
+    const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, params.data.invoiceId));
+    if (!inv) {
+      res.status(404).json({ error: "Invoice not found" });
+      return;
+    }
+    if (inv.status !== "approved") {
+      res.status(409).json({
+        error: `Only approved invoices can be paid (current status: ${inv.status})`,
+      });
+      return;
+    }
+    const [bk] = await db
+      .select({ id: bookingsTable.id, vehicleId: bookingsTable.vehicleId })
+      .from(bookingsTable)
+      .where(eq(bookingsTable.id, inv.bookingId));
+    if (!bk) {
+      res.status(404).json({ error: "Booking not found" });
+      return;
+    }
+    const [veh] = await db
+      .select({ ownerPhone: vehiclesTable.ownerPhone })
+      .from(vehiclesTable)
+      .where(eq(vehiclesTable.id, bk.vehicleId));
+    const callerPhone = (user.phone ?? "").trim();
+    const isOwner = !!callerPhone && veh?.ownerPhone?.trim() === callerPhone;
+    if (!isOwner && user.role !== "admin" && user.role !== "super_admin") {
+      res.status(403).json({ error: "Only the vehicle owner can pay this invoice." });
+      return;
+    }
+    const init = await initPaySwitchCheckout({
+      user,
+      amountPesewas: Math.round(inv.total * 100),
+      purpose: "service_invoice",
+      purposeRef: inv.id,
+      description: `Service invoice ${inv.id.slice(0, 8)} — ${user.name ?? user.email}`,
+      ...(user.name ? { customerName: user.name } : {}),
+      successRedirect: `/billing/result?status=success&purpose=service_invoice&invoice=${inv.id}&booking=${inv.bookingId}`,
+      failureRedirect: `/billing/result?status=failed&purpose=service_invoice&invoice=${inv.id}&booking=${inv.bookingId}`,
+    });
+    if (!init.ok) {
+      res.status(init.status).json({ error: init.error });
+      return;
+    }
+    res.status(201).json({ checkoutUrl: init.checkoutUrl, transactionId: init.transactionId });
+  },
+);
+
+// ---------------------- Parts proposal: approve-and-pay ----------------------
+
+const OrderIdParam = z.object({ orderId: z.string().uuid() });
+
+async function authorizeOrderBuyer(
+  req: Request,
+  res: Response,
+  orderId: string,
+): Promise<typeof ordersTable.$inferSelect | null> {
+  const user = req.user!;
+  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId));
+  if (!order) {
+    res.status(404).json({ error: "Order not found" });
+    return null;
+  }
+  if (user.role === "admin" || user.role === "super_admin") return order;
+  const callerPhone = (user.phone ?? "").trim();
+  if (!callerPhone || order.buyerPhone.trim() !== callerPhone) {
+    res.status(403).json({ error: "You don't have access to this order." });
+    return null;
+  }
+  return order;
+}
+
+router.post(
+  "/payments/payswitch/parts-orders/:orderId/approve-and-pay",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    const params = OrderIdParam.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+    const user = req.user!;
+    // Reuse the same auth helper as the legacy /orders/:id/approve-and-pay
+    // route — it accepts the vehicle owner, platform admins, *and* org
+    // admin/finance (or canCheckoutDirectly members) when the vehicle is
+    // org-attached. Without this, fleet approval through PaySwitch breaks.
+    const guard = await authorizeProposalAction(req, res, params.data.orderId, "owner");
+    if (!guard) return;
+    const order = guard.order;
+    if (order.status !== "proposed") {
+      res.status(409).json({
+        error: `Only proposed orders can be approved (current status: ${order.status})`,
+      });
+      return;
+    }
+    const init = await initPaySwitchCheckout({
+      user,
+      amountPesewas: Math.round(order.total * 100),
+      purpose: "parts_order_approve",
+      purposeRef: order.id,
+      description: `Parts order ${order.id.slice(0, 8)} — owner pays vendor`,
+      ...(user.name ? { customerName: user.name } : {}),
+      successRedirect: `/billing/result?status=success&purpose=parts_order&order=${order.id}`,
+      failureRedirect: `/billing/result?status=failed&purpose=parts_order&order=${order.id}`,
+    });
+    if (!init.ok) {
+      res.status(init.status).json({ error: init.error });
+      return;
+    }
+    res.status(201).json({ checkoutUrl: init.checkoutUrl, transactionId: init.transactionId });
+  },
+);
+
+// ---------------------- Parts proposal: center settles with vendor ----------------------
+
+router.post(
+  "/payments/payswitch/parts-orders/:orderId/center-pay",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    const params = OrderIdParam.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+    const user = req.user!;
+    const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, params.data.orderId));
+    if (!order) {
+      res.status(404).json({ error: "Order not found" });
+      return;
+    }
+    if (!order.centerPayAuthorized || order.paymentStatus !== "unpaid" || !order.vendorId) {
+      res.status(409).json({
+        error: "This order isn't ready for center settlement.",
+      });
+      return;
+    }
+    // Caller must be center staff for the booking's center, or admin.
+    if (user.role !== "admin" && user.role !== "super_admin") {
+      if (!order.bookingId) {
+        res.status(403).json({ error: "Order has no associated booking." });
+        return;
+      }
+      const [booking] = await db
+        .select({ centerId: bookingsTable.serviceCenterId })
+        .from(bookingsTable)
+        .where(eq(bookingsTable.id, order.bookingId));
+      if (!booking) {
+        res.status(404).json({ error: "Booking not found" });
+        return;
+      }
+      const [staff] = await db
+        .select()
+        .from(centerStaffTable)
+        .where(
+          and(
+            eq(centerStaffTable.userId, user.id),
+            eq(centerStaffTable.centerId, booking.centerId),
+            eq(centerStaffTable.active, true),
+          ),
+        );
+      if (!staff) {
+        res.status(403).json({ error: "Only center staff can settle this parts order." });
+        return;
+      }
+    }
+    const init = await initPaySwitchCheckout({
+      user,
+      amountPesewas: Math.round(order.total * 100),
+      purpose: "parts_order_center_pay",
+      purposeRef: order.id,
+      description: `Center settlement for order ${order.id.slice(0, 8)}`,
+      ...(user.name ? { customerName: user.name } : {}),
+      successRedirect: `/billing/result?status=success&purpose=parts_order&order=${order.id}`,
+      failureRedirect: `/billing/result?status=failed&purpose=parts_order&order=${order.id}`,
+    });
+    if (!init.ok) {
+      res.status(init.status).json({ error: init.error });
+      return;
+    }
+    res.status(201).json({ checkoutUrl: init.checkoutUrl, transactionId: init.transactionId });
+  },
+);
+
+// ---------------------- Rental booking ----------------------
+
+const RentalIdParam = z.object({ rentalBookingId: z.string().uuid() });
+
+router.post(
+  "/payments/payswitch/rental-bookings/:rentalBookingId",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    const params = RentalIdParam.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+    const user = req.user!;
+    const [bk] = await db
+      .select()
+      .from(rentalBookingsTable)
+      .where(eq(rentalBookingsTable.id, params.data.rentalBookingId));
+    if (!bk) {
+      res.status(404).json({ error: "Rental booking not found" });
+      return;
+    }
+    if (bk.status !== "awaiting_payment" || bk.paymentStatus === "paid") {
+      res.status(409).json({
+        error: `This booking isn't ready for payment (status: ${bk.status}, payment: ${bk.paymentStatus}).`,
+      });
+      return;
+    }
+    const callerPhone = (user.phone ?? "").trim();
+    if (
+      user.role !== "admin" &&
+      user.role !== "super_admin" &&
+      (!callerPhone || bk.renterPhone.trim() !== callerPhone)
+    ) {
+      res.status(403).json({ error: "Only the renter can pay for this booking." });
+      return;
+    }
+    const init = await initPaySwitchCheckout({
+      user,
+      amountPesewas: Math.round(bk.total * 100),
+      purpose: "rental_booking",
+      purposeRef: bk.id,
+      description: `Rental booking ${bk.id.slice(0, 8)} — ${bk.renterName}`,
+      customerName: bk.renterName,
+      successRedirect: `/billing/result?status=success&purpose=rental_booking&rental=${bk.id}`,
+      failureRedirect: `/billing/result?status=failed&purpose=rental_booking&rental=${bk.id}`,
+    });
+    if (!init.ok) {
+      res.status(init.status).json({ error: init.error });
+      return;
+    }
+    res.status(201).json({ checkoutUrl: init.checkoutUrl, transactionId: init.transactionId });
+  },
+);
+
+// ---------------------- Callback dispatcher ----------------------
+
 /**
  * PaySwitch redirects the customer's browser here after they finish paying.
- * Query string: `code` (000 = success), `status`, `reason`, `transaction_id`
- * (we also tag our own `txn` for safety). Always 302s back to the web app.
- *
- * Intentionally has NO auth — the callback is hit by the customer's browser
- * carrying their session cookie, but also by users whose KYC isn't verified
- * (subscriptions can be purchased before/around KYC). The mount order in
- * `routes/index.ts` puts this BEFORE the global `requireKycVerified` gate.
+ * No auth — mounted before `requireKycVerified`. Dispatches by `purpose`
+ * to the matching success/failure handler. Always 302s back into the app.
  */
 router.get("/payments/payswitch/callback", async (req, res): Promise<void> => {
   const qTxn = (req.query["txn"] ?? req.query["transaction_id"]) as string | undefined;
@@ -418,7 +680,6 @@ router.get("/payments/payswitch/callback", async (req, res): Promise<void> => {
     res.redirect("/billing/result?status=failed&reason=unknown_transaction");
     return;
   }
-  // Idempotency — if we've already settled, just redirect.
   if (txn.status === "successful") {
     res.redirect(txn.successRedirect);
     return;
@@ -427,29 +688,30 @@ router.get("/payments/payswitch/callback", async (req, res): Promise<void> => {
     res.redirect(txn.failureRedirect);
     return;
   }
-
   const success = code === "000" && status === "successful";
   if (!success) {
-    await db
-      .update(paymentTransactionsTable)
-      .set({
-        status: "failed",
-        providerCode: code || null,
-        providerReason: reason || status || "declined",
-        completedAt: new Date(),
-      })
-      .where(eq(paymentTransactionsTable.id, txn.id));
-    if (txn.purpose === "subscription" && txn.purposeRef) {
-      await db
-        .update(subscriptionsTable)
-        .set({ status: "cancelled", cancelledAt: new Date() })
-        .where(eq(subscriptionsTable.id, txn.purposeRef));
-    }
+    await handleFailure(txn, code, reason || status || "declined");
     res.redirect(txn.failureRedirect);
     return;
   }
-
-  await db
+  // Idempotency: run the domain mutation FIRST, then CAS the txn from
+  // pending → successful with `where status='pending'`. If the handler
+  // throws we leave the txn in `pending` so a retry callback (or operator
+  // re-trigger) can replay it. The CAS guards against concurrent callbacks
+  // double-flipping the status — domain handlers are written to short-
+  // circuit when the sale is already in its post-payment state, so a duped
+  // run is safe in the rare case both racers slip past the early
+  // status check above.
+  try {
+    await handleSuccess(req, txn);
+  } catch (err) {
+    req.log.error({ err, txn: txn.id, purpose: txn.purpose }, "callback success handler threw");
+    res.redirect(
+      `/billing/result?status=failed&purpose=${encodeURIComponent(txn.purpose)}&reason=settlement_failed`,
+    );
+    return;
+  }
+  const flipped = await db
     .update(paymentTransactionsTable)
     .set({
       status: "successful",
@@ -457,9 +719,50 @@ router.get("/payments/payswitch/callback", async (req, res): Promise<void> => {
       providerReason: reason || "approved",
       completedAt: new Date(),
     })
-    .where(eq(paymentTransactionsTable.id, txn.id));
+    .where(
+      and(
+        eq(paymentTransactionsTable.id, txn.id),
+        eq(paymentTransactionsTable.status, "pending"),
+      ),
+    )
+    .returning({ id: paymentTransactionsTable.id });
+  if (flipped.length === 0) {
+    req.log.info({ txn: txn.id }, "callback CAS lost — another worker already settled this txn");
+  }
+  res.redirect(txn.successRedirect);
+});
 
+async function handleFailure(
+  txn: typeof paymentTransactionsTable.$inferSelect,
+  code: string,
+  reason: string,
+): Promise<void> {
+  await db
+    .update(paymentTransactionsTable)
+    .set({
+      status: "failed",
+      providerCode: code || null,
+      providerReason: reason,
+      completedAt: new Date(),
+    })
+    .where(eq(paymentTransactionsTable.id, txn.id));
   if (txn.purpose === "subscription" && txn.purposeRef) {
+    await db
+      .update(subscriptionsTable)
+      .set({ status: "cancelled", cancelledAt: new Date() })
+      .where(eq(subscriptionsTable.id, txn.purposeRef));
+  }
+  // Sale records (invoice, order, rental booking) intentionally stay in
+  // their pre-payment state so the buyer can retry.
+}
+
+async function handleSuccess(
+  req: Request,
+  txn: typeof paymentTransactionsTable.$inferSelect,
+): Promise<void> {
+  if (!txn.purposeRef) return;
+
+  if (txn.purpose === "subscription") {
     const [sub] = await db
       .update(subscriptionsTable)
       .set({ status: "active", cancelledAt: null })
@@ -472,9 +775,84 @@ router.get("/payments/payswitch/callback", async (req, res): Promise<void> => {
         paidAt: new Date(),
       });
     }
+    return;
   }
 
-  res.redirect(txn.successRedirect);
-});
+  if (txn.purpose === "service_invoice") {
+    await closeInvoiceAsPaid(
+      req,
+      txn.purposeRef,
+      "online",
+      "Owner",
+      "Payment received — job marked complete",
+    );
+    const seller = await resolveServiceInvoiceSeller(txn.purposeRef);
+    if (seller) await createPayoutForSale(seller);
+    return;
+  }
+
+  if (txn.purpose === "parts_order_approve") {
+    const row = await approveProposalAndReserveStock(txn.purposeRef, {
+      paymentStatus: "paid_by_owner",
+      centerPayAuthorized: false,
+      paidByUserId: txn.initiatedByUserId,
+    });
+    await recordPartsOrderCommission(row);
+    const seller = await resolvePartsOrderSeller(row.id);
+    if (seller) await createPayoutForSale(seller);
+    return;
+  }
+
+  if (txn.purpose === "parts_order_center_pay") {
+    const [updated] = await db
+      .update(ordersTable)
+      .set({
+        paymentStatus: "paid_by_center",
+        paidAt: new Date(),
+        paidByUserId: txn.initiatedByUserId,
+      })
+      .where(eq(ordersTable.id, txn.purposeRef))
+      .returning();
+    if (updated) {
+      await recordPartsOrderCommission(updated);
+      const seller = await resolvePartsOrderSeller(updated.id);
+      if (seller) await createPayoutForSale(seller);
+    }
+    return;
+  }
+
+  if (txn.purpose === "rental_booking") {
+    const now = new Date();
+    const [bk] = await db
+      .update(rentalBookingsTable)
+      .set({
+        paymentStatus: "paid",
+        paymentMethod: "online",
+        paidAt: now,
+        status: "confirmed",
+        confirmedAt: now,
+      })
+      .where(eq(rentalBookingsTable.id, txn.purposeRef))
+      .returning();
+    if (bk) {
+      const [car] = await db
+        .select({ ownerPhone: rentalCarsTable.ownerPhone })
+        .from(rentalCarsTable)
+        .where(eq(rentalCarsTable.id, bk.carId));
+      if (car?.ownerPhone) {
+        await recordCommission({
+          saleKind: "rental_booking",
+          saleId: bk.id,
+          sellerKind: "owner",
+          sellerId: car.ownerPhone,
+          grossAmount: bk.total,
+        });
+      }
+      const seller = await resolveRentalBookingSeller(bk.id);
+      if (seller) await createPayoutForSale(seller);
+    }
+    return;
+  }
+}
 
 export default router;

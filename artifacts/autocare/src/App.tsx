@@ -74,6 +74,8 @@ import SuperAdminApprovals from "@/pages/super_admin/Approvals";
 import SuperAdminOrganizations from "@/pages/super_admin/Organizations";
 import SuperAdminOnboard from "@/pages/super_admin/Onboard";
 import SuperAdminCommissions from "@/pages/super_admin/Commissions";
+import SuperAdminPayouts from "@/pages/super_admin/Payouts";
+import PayoutAccountPage from "@/pages/settings/PayoutAccount";
 import AdminRentals from "@/pages/admin/Rentals";
 import AdminRenters from "@/pages/admin/Renters";
 import AdminOwners from "@/pages/admin/Owners";
@@ -255,6 +257,8 @@ function AppRouter() {
         <Route path="/super-admin/organizations" component={superAdminOnly(SuperAdminOrganizations)} />
         <Route path="/super-admin/onboard" component={superAdminOnly(SuperAdminOnboard)} />
         <Route path="/super-admin/commissions" component={superAdminOnly(SuperAdminCommissions)} />
+        <Route path="/super-admin/payouts" component={superAdminOnly(SuperAdminPayouts)} />
+        <Route path="/settings/payout" component={PayoutAccountPage} />
 
         {/* Rentals Routes (owners + admins can browse; bookings open to any role using owner shell) */}
         <Route path="/rentals" component={RentalsBrowse} />

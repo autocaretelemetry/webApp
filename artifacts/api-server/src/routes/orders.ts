@@ -33,7 +33,7 @@ import { recordCommission } from "../lib/commissions";
  * set on the order row. The ledger insert itself is idempotent so this
  * is safe to call from every payment-flip path.
  */
-async function recordPartsOrderCommission(
+export async function recordPartsOrderCommission(
   order: typeof ordersTable.$inferSelect,
 ): Promise<void> {
   const sellerKind = order.vendorId ? "vendor" : "service_center";
@@ -685,7 +685,7 @@ router.patch("/orders/:orderId/status", async (req, res): Promise<void> => {
  * For center-sourced (on_hand) proposals also auto-stamps the delivered
  * lifecycle since the parts are already at the center.
  */
-async function approveProposalAndReserveStock(
+export async function approveProposalAndReserveStock(
   orderId: string,
   options: {
     paymentStatus: "paid_by_owner" | "paid_by_center" | "unpaid";
@@ -757,7 +757,7 @@ async function approveProposalAndReserveStock(
  * For org-attached vehicles, an org admin/finance member (or a member with
  * canCheckoutDirectly) is treated as "owner".
  */
-async function authorizeProposalAction(
+export async function authorizeProposalAction(
   req: Request,
   res: Response,
   orderId: string,

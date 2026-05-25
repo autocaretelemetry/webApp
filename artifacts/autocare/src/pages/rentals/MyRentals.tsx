@@ -99,15 +99,31 @@ export default function MyRentals() {
   };
 
   const pay = async (booking: RentalBooking, method: "online" | "cash_on_pickup") => {
+    if (method === "online") {
+      try {
+        const res = await fetch(`/api/payments/payswitch/rental-bookings/${booking.id}`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        });
+        const body = (await res.json().catch(() => ({}))) as { checkoutUrl?: string; error?: string };
+        if (!res.ok || !body.checkoutUrl) {
+          toast.error(body.error ?? "Failed to start payment");
+          return;
+        }
+        window.location.href = body.checkoutUrl;
+      } catch {
+        toast.error("Failed to start payment");
+      }
+      return;
+    }
     try {
       await update.mutateAsync({
         rentalBookingId: booking.id,
-        data: {
-          payment: { method, markPaid: method === "online" },
-        },
+        data: { payment: { method, markPaid: false } },
       });
       await invalidate();
-      toast.success(method === "online" ? "Payment received. Booking confirmed." : "Pickup confirmed. You'll pay on collection.");
+      toast.success("Pickup confirmed. You'll pay on collection.");
     } catch (err) {
       toast.error(describeMutationError(err, "Failed to record payment."));
     }

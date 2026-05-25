@@ -30,6 +30,7 @@ import addressesRouter from "./addresses";
 import publicCatalogRouter from "./publicCatalog";
 import commissionsRouter from "./commissions";
 import payswitchRouter from "./payswitch";
+import payoutsRouter from "./payouts";
 
 const router: IRouter = Router();
 
@@ -78,5 +79,6 @@ router.use(pushRouter);
 router.use(organizationsRouter);
 router.use(addressesRouter);
 router.use(commissionsRouter);
+router.use(payoutsRouter);
 
 export default router;

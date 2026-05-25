@@ -104,6 +104,10 @@ export const usersTable = pgTable("users", {
   // resend cooldown), and `attempts` (caps brute-force tries before the
   // applicant must request a fresh code).
   pendingVerifications: jsonb("pending_verifications").$type<PendingVerifications>(),
+  // Personal payout destination — used when this user is the seller (rental
+  // car owner). Service centers and vendors keep their own destinations on
+  // the directory tables.
+  payoutAccount: jsonb("payout_account").$type<PayoutAccountShape>(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -119,5 +123,13 @@ export type PendingVerificationEntry = {
 export type PendingVerifications = Partial<
   Record<NotificationChannel, PendingVerificationEntry>
 >;
+
+type PayoutAccountShape = {
+  kind: "bank" | "momo";
+  accountName: string;
+  accountNumber: string;
+  bank?: string;
+  network?: string;
+};
 
 export type User = typeof usersTable.$inferSelect;

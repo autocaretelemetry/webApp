@@ -254,7 +254,7 @@ router.post(
  *      the next reminder window starts here.
  *   4. Append the timeline event and fire the WhatsApp alert.
  */
-async function closeInvoiceAsPaid(
+export async function closeInvoiceAsPaid(
   req: Request,
   invoiceId: string,
   paymentMethod: "online" | "cash",
