@@ -11,7 +11,7 @@ import {
 } from "@/lib/queryKeys";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { CheckCircle2, XCircle, Clock } from "lucide-react";
 
 function readQuery(): URLSearchParams {
   return new URLSearchParams(window.location.search);
@@ -71,6 +71,7 @@ export default function PaymentResult() {
   const reason = params.get("reason");
   const purpose = params.get("purpose");
   const success = status === "success";
+  const pending = status === "pending";
   const copy = decorate(purpose, params);
 
   useEffect(() => {
@@ -99,6 +100,17 @@ export default function PaymentResult() {
               <h1 className="text-2xl font-bold">Payment received</h1>
               <p className="text-sm text-muted-foreground">{copy.successCopy}</p>
             </>
+          ) : pending ? (
+            <>
+              <Clock className="size-14 text-amber-600 mx-auto" />
+              <h1 className="text-2xl font-bold">Payment is still processing</h1>
+              <p className="text-sm text-muted-foreground">
+                We couldn't confirm the outcome with PaySwitch just yet. If
+                your bank charged you, this page will update automatically
+                once the provider reports back. Please refresh in a minute or
+                contact support if it stays this way.
+              </p>
+            </>
           ) : (
             <>
               <XCircle className="size-14 text-red-600 mx-auto" />
@@ -113,7 +125,7 @@ export default function PaymentResult() {
             </>
           )}
           <div className="flex justify-center gap-2 pt-2">
-            <Button onClick={() => navigate(copy.primary.href)} variant={success ? "default" : "default"}>
+            <Button onClick={() => navigate(copy.primary.href)} variant="default">
               {copy.primary.label}
             </Button>
             {copy.secondary ? (

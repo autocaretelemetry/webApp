@@ -148,12 +148,26 @@ export async function initiateCheckout(
 }
 
 export interface StatusCheckResult {
+  /**
+   * True only when the provider responded AND reports a settled, successful
+   * charge (code "000" + status "approved"/"successful"). False for both
+   * verified-not-paid AND for "we couldn't reach the provider" — callers
+   * must inspect `reachable` to tell them apart.
+   */
   ok: boolean;
+  /**
+   * Whether we successfully heard back from the provider at all. False when
+   * the network call threw or the provider returned a non-2xx HTTP response;
+   * in that case the txn must be left pending, NOT marked failed.
+   */
+  reachable: boolean;
   /** Provider status code (e.g. "000" on success). */
   code: string;
-  /** Lowercased provider status ("approved" / "successful" / "failed" / ...). */
+  /** Lowercased provider status ("approved" / "successful" / "pending" / "failed" / ...). */
   status: string;
   reason: string;
+  /** Verified amount in pesewas as reported by the provider, if present. */
+  amountPesewas: number | null;
   raw: unknown;
 }
 
@@ -165,26 +179,40 @@ export interface StatusCheckResult {
  * credentials. TheTeller endpoint:
  *   GET /v1.1/users/transactions/{transaction_id}/status
  * Returns `{ status: "approved", code: "000", ... }` for a real settlement.
+ * Authenticated with the same Basic credentials used for /checkout/initiate,
+ * plus the `Merchant-Id` header.
  */
 export async function checkTransactionStatus(
   transactionId: string,
 ): Promise<StatusCheckResult> {
-  const { apiUser, apiKey } = requireCreds();
+  const { merchantId, apiUser, apiKey } = requireCreds();
   const base = payswitchEnv() === "live" ? LIVE_BASE : TEST_BASE;
   const auth = Buffer.from(`${apiUser}:${apiKey}`).toString("base64");
   let resp: Response;
   try {
-    resp = await fetch(`${base}/v1.1/users/transactions/${encodeURIComponent(transactionId)}/status`, {
-      method: "GET",
-      headers: {
-        "Cache-Control": "no-cache",
-        Accept: "application/json",
-        Authorization: `Basic ${auth}`,
+    resp = await fetch(
+      `${base}/v1.1/users/transactions/${encodeURIComponent(transactionId)}/status`,
+      {
+        method: "GET",
+        headers: {
+          "Cache-Control": "no-cache",
+          Accept: "application/json",
+          "Merchant-Id": merchantId,
+          Authorization: `Basic ${auth}`,
+        },
       },
-    });
+    );
   } catch (err) {
     logger.error({ err, transactionId }, "payswitch status fetch failed");
-    return { ok: false, code: "", status: "network_error", reason: String(err), raw: null };
+    return {
+      ok: false,
+      reachable: false,
+      code: "",
+      status: "network_error",
+      reason: String(err),
+      amountPesewas: null,
+      raw: null,
+    };
   }
   const text = await resp.text();
   let json: unknown = null;
@@ -194,12 +222,17 @@ export async function checkTransactionStatus(
     // leave json null
   }
   if (!resp.ok) {
-    logger.warn({ status: resp.status, body: text, transactionId }, "payswitch status non-2xx");
+    logger.warn(
+      { status: resp.status, body: text, transactionId },
+      "payswitch status non-2xx",
+    );
     return {
       ok: false,
+      reachable: false,
       code: "",
       status: `http_${resp.status}`,
       reason: `Provider returned ${resp.status}`,
+      amountPesewas: null,
       raw: json ?? text,
     };
   }
@@ -211,10 +244,27 @@ export async function checkTransactionStatus(
     (typeof obj["reason"] === "string" && (obj["reason"] as string)) ||
     (typeof obj["message"] === "string" && (obj["message"] as string)) ||
     "";
+  const amountRaw = obj["amount"];
+  let amountPesewas: number | null = null;
+  if (typeof amountRaw === "number" && Number.isFinite(amountRaw)) {
+    amountPesewas = Math.round(amountRaw);
+  } else if (typeof amountRaw === "string" && amountRaw.trim() !== "") {
+    const n = Number(amountRaw);
+    if (Number.isFinite(n)) amountPesewas = Math.round(n);
+  }
   // TheTeller marks a settled charge with code "000" and status one of
   // "approved" | "successful". Anything else is non-success.
-  const success = code === "000" && (rawStatus === "approved" || rawStatus === "successful");
-  return { ok: success, code, status: rawStatus, reason, raw: json };
+  const success =
+    code === "000" && (rawStatus === "approved" || rawStatus === "successful");
+  return {
+    ok: success,
+    reachable: true,
+    code,
+    status: rawStatus,
+    reason,
+    amountPesewas,
+    raw: json,
+  };
 }
 
 /**

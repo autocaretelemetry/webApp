@@ -27,6 +27,7 @@ import {
   initiateCheckout,
   payswitchConfigured,
   publicOrigin,
+  verifyTransaction,
 } from "../lib/payswitch";
 import { recordCommission } from "../lib/commissions";
 import {
@@ -719,9 +720,11 @@ router.post(
  */
 router.get("/payments/payswitch/callback", async (req, res): Promise<void> => {
   const qTxn = (req.query["txn"] ?? req.query["transaction_id"]) as string | undefined;
-  const code = (req.query["code"] as string | undefined) ?? "";
-  const status = ((req.query["status"] as string | undefined) ?? "").toLowerCase();
-  const reason = (req.query["reason"] as string | undefined) ?? "";
+  // Query-string code/status/reason are attacker-controlled (the browser
+  // hits this URL). They are kept ONLY as a hint for the user-facing redirect
+  // message when the server-to-server verify call itself fails; they are
+  // never used to decide whether a payment really happened.
+  const hintReason = (req.query["reason"] as string | undefined) ?? "";
 
   if (!qTxn) {
     res.redirect("/billing/result?status=failed&reason=missing_transaction");
@@ -746,34 +749,99 @@ router.get("/payments/payswitch/callback", async (req, res): Promise<void> => {
   // Trust nothing in the query string. The browser-facing redirect is
   // reachable by anyone who knows a `txn` value, so we MUST verify with
   // PaySwitch server-to-server before settling the sale. The query-string
-  // status is only used as a fast-path failure reason when verification
-  // also reports non-success.
+  // status/reason are only used as a hint for the user-facing redirect when
+  // verification itself is unavailable.
   const verified = await checkTransactionStatus(qTxn);
+
+  // (1) Verification unreachable (network error / non-2xx). Do NOT mark the
+  // txn failed — the customer's payment may still be in flight. Leave it
+  // pending so a retry callback (or a future reconciler job) can resolve it.
+  if (!verified.reachable) {
+    req.log.warn(
+      { txn: txn.id, providerStatus: verified.status, providerReason: verified.reason },
+      "payswitch callback verification unreachable; leaving txn pending",
+    );
+    const reasonParam = encodeURIComponent(reason || "verification_unavailable");
+    res.redirect(
+      `/billing/result?status=pending&purpose=${encodeURIComponent(
+        txn.purpose,
+      )}&reason=${reasonParam}`,
+    );
+    return;
+  }
+
+  // (2) Provider responded but charge isn't settled. Distinguish in-flight
+  // states (still on 3-D Secure / bank approval) from terminal failure —
+  // we must never cancel a subscription just because the customer hit the
+  // callback URL early.
   if (!verified.ok) {
+    const TERMINAL_FAILURE_STATUSES = new Set([
+      "failed",
+      "declined",
+      "cancelled",
+      "canceled",
+      "expired",
+      "reversed",
+      "refunded",
+      "voided",
+    ]);
+    const NON_TERMINAL_STATUSES = new Set([
+      "",
+      "pending",
+      "processing",
+      "in_progress",
+      "initiated",
+    ]);
+    const isTerminal =
+      TERMINAL_FAILURE_STATUSES.has(verified.status) ||
+      (verified.code !== "" &&
+        verified.code !== "000" &&
+        !NON_TERMINAL_STATUSES.has(verified.status));
+
+    if (!isTerminal) {
+      req.log.info(
+        { txn: txn.id, providerStatus: verified.status, providerCode: verified.code },
+        "payswitch callback reports non-terminal status; leaving txn pending",
+      );
+      const reasonParam = encodeURIComponent(
+        reason || verified.status || "payment_in_progress",
+      );
+      res.redirect(
+        `/billing/result?status=pending&purpose=${encodeURIComponent(
+          txn.purpose,
+        )}&reason=${reasonParam}`,
+      );
+      return;
+    }
+
     const finalCode = verified.code || code || "";
     const finalReason =
       verified.reason || reason || verified.status || status || "declined";
     req.log.info(
       { txn: txn.id, providerStatus: verified.status, providerCode: verified.code },
-      "payswitch callback failed verification",
+      "payswitch callback verified terminal failure",
     );
     await handleFailure(txn, finalCode, finalReason);
     res.redirect(txn.failureRedirect);
     return;
   }
-  // Defence-in-depth: the verified amount must match what we charged for.
-  const verifiedAmount =
-    typeof (verified.raw as Record<string, unknown> | null)?.["amount"] === "string"
-      ? Number((verified.raw as Record<string, string>)["amount"])
-      : typeof (verified.raw as Record<string, unknown> | null)?.["amount"] === "number"
-        ? ((verified.raw as Record<string, number>)["amount"] as number)
-        : null;
-  if (verifiedAmount !== null && Number.isFinite(verifiedAmount) && verifiedAmount !== txn.amount) {
+  // (3) Verified paid. Defence-in-depth: the verified amount must match
+  // what we charged for. If PaySwitch reports a different amount, refuse
+  // to settle and flag for manual review.
+  if (
+    verified.amountPesewas !== null &&
+    Number.isFinite(verified.amountPesewas) &&
+    verified.amountPesewas !== txn.amount
+  ) {
     req.log.warn(
-      { txn: txn.id, expected: txn.amount, verifiedAmount },
+      { txn: txn.id, expected: txn.amount, verifiedAmount: verified.amountPesewas },
       "payswitch callback amount mismatch — refusing to settle",
     );
-    await handleFailure(txn, verified.code, "amount_mismatch");
+    await handleFailure(
+      txn,
+      verified.code,
+      `amount_mismatch: expected ${txn.amount}, got ${verified.amountPesewas}`,
+    );
     res.redirect(txn.failureRedirect);
     return;
   }
@@ -798,8 +866,8 @@ router.get("/payments/payswitch/callback", async (req, res): Promise<void> => {
     .update(paymentTransactionsTable)
     .set({
       status: "successful",
-      providerCode: code,
-      providerReason: reason || "approved",
+      providerCode: verify.code,
+      providerReason: verify.reason || "approved",
       completedAt: new Date(),
     })
     .where(
