@@ -67,4 +67,39 @@ app.listen(port, (err) => {
   } else {
     logger.info("In-process reminder scheduler disabled via env");
   }
+
+  // Payment-reconciliation sweep: every few minutes, look for
+  // `payment_transactions` rows that have been stuck in `pending` past the
+  // stale-threshold and ask PaySwitch for the canonical status. This is the
+  // self-healing safety net for customers who closed the tab before the
+  // browser callback fired AND whose webhook delivery was lost. Idempotent
+  // via the shared settlement dispatcher's CAS guard, so it's safe to run
+  // alongside the in-process scheduler and any external Scheduled
+  // Deployment running the same script.
+  if (process.env["DISABLE_PAYMENT_RECONCILER"] !== "1") {
+    void import("./lib/paymentReconciler").then(({ reconcilePendingPayments }) => {
+      const intervalMs = Number(
+        process.env["PAYMENT_RECONCILE_INTERVAL_MS"] ?? 5 * 60 * 1000,
+      );
+      const delayMs = Number(
+        process.env["PAYMENT_RECONCILE_INITIAL_DELAY_MS"] ?? 30_000,
+      );
+      const staleAfterMs = Number(
+        process.env["PAYMENT_RECONCILE_STALE_AFTER_MS"] ?? 10 * 60 * 1000,
+      );
+      const tick = () => {
+        void reconcilePendingPayments({ staleAfterMs, log: logger }).catch((err) =>
+          logger.error({ err }, "paymentReconciler tick threw"),
+        );
+      };
+      setTimeout(tick, delayMs);
+      setInterval(tick, intervalMs);
+      logger.info(
+        { intervalMs, delayMs, staleAfterMs },
+        "In-process payment reconciler enabled",
+      );
+    });
+  } else {
+    logger.info("In-process payment reconciler disabled via env");
+  }
 });

@@ -1,4 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
+import type { Logger } from "pino";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 import {
@@ -21,13 +22,14 @@ import {
   vehiclesTable,
 } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
+import { logger } from "../lib/logger";
 import {
   generateTxnId,
   checkTransactionStatus,
   initiateCheckout,
   payswitchConfigured,
   publicOrigin,
-  verifyTransaction,
+  type StatusCheckResult,
 } from "../lib/payswitch";
 import { recordCommission } from "../lib/commissions";
 import {
@@ -711,20 +713,148 @@ router.post(
   },
 );
 
+// ---------------------- Settlement dispatcher ----------------------
+
+/**
+ * Outcome of attempting to settle a transaction against a verified provider
+ * status. Used by the browser callback, the server-to-server webhook, and
+ * the reconciler job — all three share the same dispatcher so the rules
+ * for what counts as settled / failed / still-in-flight live in one place.
+ */
+export type SettleOutcome =
+  | { kind: "settled" }
+  | { kind: "already_settled"; status: "successful" | "failed" }
+  | { kind: "failed"; code: string; reason: string }
+  | { kind: "amount_mismatch"; reason: string }
+  | { kind: "pending"; reason: string }
+  | { kind: "in_progress"; reason: string }
+  | { kind: "handler_error"; reason: string };
+
+const TERMINAL_FAILURE_STATUSES = new Set([
+  "failed",
+  "declined",
+  "cancelled",
+  "canceled",
+  "expired",
+  "reversed",
+  "refunded",
+  "voided",
+]);
+const NON_TERMINAL_STATUSES = new Set([
+  "",
+  "pending",
+  "processing",
+  "in_progress",
+  "initiated",
+]);
+
+/**
+ * Given a payment_transactions row and a verified provider status, apply
+ * the right domain mutation (or none, if the charge isn't settled). All
+ * three settlement entry points — browser callback, webhook, reconciler —
+ * call this. Idempotency: CAS-updates the txn from pending → successful,
+ * and domain handlers short-circuit when the sale is already in its post-
+ * payment state.
+ */
+export async function settleVerifiedTransaction(
+  txn: typeof paymentTransactionsTable.$inferSelect,
+  verified: StatusCheckResult,
+  log: Logger,
+): Promise<SettleOutcome> {
+  if (txn.status === "successful" || txn.status === "failed") {
+    return { kind: "already_settled", status: txn.status };
+  }
+  // (1) Verification unreachable. Leave pending for a later retry.
+  if (!verified.reachable) {
+    log.warn(
+      { txn: txn.id, providerStatus: verified.status, providerReason: verified.reason },
+      "payswitch verification unreachable; leaving txn pending",
+    );
+    return { kind: "pending", reason: "verification_unavailable" };
+  }
+  // (2) Verified, but not paid. Distinguish in-flight from terminal failure.
+  if (!verified.ok) {
+    const isTerminal =
+      TERMINAL_FAILURE_STATUSES.has(verified.status) ||
+      (verified.code !== "" &&
+        verified.code !== "000" &&
+        !NON_TERMINAL_STATUSES.has(verified.status));
+    if (!isTerminal) {
+      log.info(
+        { txn: txn.id, providerStatus: verified.status, providerCode: verified.code },
+        "payswitch verification reports non-terminal status; leaving txn pending",
+      );
+      return {
+        kind: "in_progress",
+        reason: verified.status || "payment_in_progress",
+      };
+    }
+    const reason = verified.reason || verified.status || "declined";
+    log.info(
+      { txn: txn.id, providerStatus: verified.status, providerCode: verified.code },
+      "payswitch verification reports terminal failure",
+    );
+    await handleFailure(txn, verified.code, reason);
+    return { kind: "failed", code: verified.code, reason };
+  }
+  // (3) Verified paid. Defence-in-depth amount check.
+  if (
+    verified.amountPesewas !== null &&
+    Number.isFinite(verified.amountPesewas) &&
+    verified.amountPesewas !== txn.amount
+  ) {
+    const reason = `amount_mismatch: expected ${txn.amount}, got ${verified.amountPesewas}`;
+    log.warn(
+      { txn: txn.id, expected: txn.amount, verifiedAmount: verified.amountPesewas },
+      "payswitch verification amount mismatch — refusing to settle",
+    );
+    await handleFailure(txn, verified.code, reason);
+    return { kind: "amount_mismatch", reason };
+  }
+  // (4) Verified paid. Run domain mutation FIRST, then CAS the txn.
+  try {
+    await handleSuccess(log, txn);
+  } catch (err) {
+    log.error(
+      { err, txn: txn.id, purpose: txn.purpose },
+      "payswitch settlement domain handler threw",
+    );
+    return { kind: "handler_error", reason: "settlement_failed" };
+  }
+  const flipped = await db
+    .update(paymentTransactionsTable)
+    .set({
+      status: "successful",
+      providerCode: verified.code,
+      providerReason: verified.reason || "approved",
+      completedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(paymentTransactionsTable.id, txn.id),
+        eq(paymentTransactionsTable.status, "pending"),
+      ),
+    )
+    .returning({ id: paymentTransactionsTable.id });
+  if (flipped.length === 0) {
+    log.info(
+      { txn: txn.id },
+      "payswitch settlement CAS lost — another worker already settled this txn",
+    );
+  }
+  return { kind: "settled" };
+}
+
 // ---------------------- Callback dispatcher ----------------------
 
 /**
  * PaySwitch redirects the customer's browser here after they finish paying.
- * No auth — mounted before `requireKycVerified`. Dispatches by `purpose`
- * to the matching success/failure handler. Always 302s back into the app.
+ * No auth — mounted before `requireKycVerified`. Always 302s back into the app.
+ * The query string is untrusted; the server-to-server status check is the
+ * single source of truth.
  */
 router.get("/payments/payswitch/callback", async (req, res): Promise<void> => {
   const qTxn = (req.query["txn"] ?? req.query["transaction_id"]) as string | undefined;
-  // Query-string code/status/reason are attacker-controlled (the browser
-  // hits this URL). They are kept ONLY as a hint for the user-facing redirect
-  // message when the server-to-server verify call itself fails; they are
-  // never used to decide whether a payment really happened.
-  const hintReason = (req.query["reason"] as string | undefined) ?? "";
 
   if (!qTxn) {
     res.redirect("/billing/result?status=failed&reason=missing_transaction");
@@ -746,141 +876,73 @@ router.get("/payments/payswitch/callback", async (req, res): Promise<void> => {
     res.redirect(txn.failureRedirect);
     return;
   }
-  // Trust nothing in the query string. The browser-facing redirect is
-  // reachable by anyone who knows a `txn` value, so we MUST verify with
-  // PaySwitch server-to-server before settling the sale. The query-string
-  // status/reason are only used as a hint for the user-facing redirect when
-  // verification itself is unavailable.
   const verified = await checkTransactionStatus(qTxn);
-
-  // (1) Verification unreachable (network error / non-2xx). Do NOT mark the
-  // txn failed — the customer's payment may still be in flight. Leave it
-  // pending so a retry callback (or a future reconciler job) can resolve it.
-  if (!verified.reachable) {
-    req.log.warn(
-      { txn: txn.id, providerStatus: verified.status, providerReason: verified.reason },
-      "payswitch callback verification unreachable; leaving txn pending",
-    );
-    const reasonParam = encodeURIComponent(reason || "verification_unavailable");
-    res.redirect(
-      `/billing/result?status=pending&purpose=${encodeURIComponent(
-        txn.purpose,
-      )}&reason=${reasonParam}`,
-    );
-    return;
-  }
-
-  // (2) Provider responded but charge isn't settled. Distinguish in-flight
-  // states (still on 3-D Secure / bank approval) from terminal failure —
-  // we must never cancel a subscription just because the customer hit the
-  // callback URL early.
-  if (!verified.ok) {
-    const TERMINAL_FAILURE_STATUSES = new Set([
-      "failed",
-      "declined",
-      "cancelled",
-      "canceled",
-      "expired",
-      "reversed",
-      "refunded",
-      "voided",
-    ]);
-    const NON_TERMINAL_STATUSES = new Set([
-      "",
-      "pending",
-      "processing",
-      "in_progress",
-      "initiated",
-    ]);
-    const isTerminal =
-      TERMINAL_FAILURE_STATUSES.has(verified.status) ||
-      (verified.code !== "" &&
-        verified.code !== "000" &&
-        !NON_TERMINAL_STATUSES.has(verified.status));
-
-    if (!isTerminal) {
-      req.log.info(
-        { txn: txn.id, providerStatus: verified.status, providerCode: verified.code },
-        "payswitch callback reports non-terminal status; leaving txn pending",
-      );
-      const reasonParam = encodeURIComponent(
-        reason || verified.status || "payment_in_progress",
-      );
+  const outcome = await settleVerifiedTransaction(txn, verified, req.log);
+  const purposeParam = encodeURIComponent(txn.purpose);
+  switch (outcome.kind) {
+    case "settled":
+    case "already_settled":
+      res.redirect(txn.successRedirect);
+      return;
+    case "failed":
+    case "amount_mismatch":
+      res.redirect(txn.failureRedirect);
+      return;
+    case "pending":
+    case "in_progress":
       res.redirect(
-        `/billing/result?status=pending&purpose=${encodeURIComponent(
-          txn.purpose,
-        )}&reason=${reasonParam}`,
+        `/billing/result?status=pending&purpose=${purposeParam}&reason=${encodeURIComponent(outcome.reason)}`,
       );
       return;
-    }
+    case "handler_error":
+      res.redirect(
+        `/billing/result?status=failed&purpose=${purposeParam}&reason=${encodeURIComponent(outcome.reason)}`,
+      );
+      return;
+  }
+});
 
-    const finalCode = verified.code || code || "";
-    const finalReason =
-      verified.reason || reason || verified.status || status || "declined";
-    req.log.info(
-      { txn: txn.id, providerStatus: verified.status, providerCode: verified.code },
-      "payswitch callback verified terminal failure",
-    );
-    await handleFailure(txn, finalCode, finalReason);
-    res.redirect(txn.failureRedirect);
+// ---------------------- Webhook (server-to-server) ----------------------
+
+/**
+ * PaySwitch's status-notification webhook. Public (the provider has no way
+ * to authenticate to us); we ignore everything in the body except the
+ * transaction id and ALWAYS re-verify server-to-server against
+ * `/v1.1/users/transactions/:id/status` before settling. Replies 200 even
+ * for unknown / non-terminal events so PaySwitch doesn't keep retrying;
+ * the response body carries a short outcome string for the provider log.
+ */
+router.post("/payments/payswitch/webhook", async (req, res): Promise<void> => {
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const candidate =
+    (typeof body["transaction_id"] === "string" && body["transaction_id"]) ||
+    (typeof body["transactionId"] === "string" && (body["transactionId"] as string)) ||
+    (typeof body["txn"] === "string" && (body["txn"] as string)) ||
+    (typeof req.query["txn"] === "string" && (req.query["txn"] as string)) ||
+    (typeof req.query["transaction_id"] === "string" &&
+      (req.query["transaction_id"] as string)) ||
+    null;
+  if (!candidate) {
+    req.log.warn({ body }, "payswitch webhook missing transaction_id");
+    res.status(200).json({ ok: false, reason: "missing_transaction_id" });
     return;
   }
-  // (3) Verified paid. Defence-in-depth: the verified amount must match
-  // what we charged for. If PaySwitch reports a different amount, refuse
-  // to settle and flag for manual review.
-  if (
-    verified.amountPesewas !== null &&
-    Number.isFinite(verified.amountPesewas) &&
-    verified.amountPesewas !== txn.amount
-  ) {
-    req.log.warn(
-      { txn: txn.id, expected: txn.amount, verifiedAmount: verified.amountPesewas },
-      "payswitch callback amount mismatch — refusing to settle",
-    );
-    await handleFailure(
-      txn,
-      verified.code,
-      `amount_mismatch: expected ${txn.amount}, got ${verified.amountPesewas}`,
-    );
-    res.redirect(txn.failureRedirect);
+  const [txn] = await db
+    .select()
+    .from(paymentTransactionsTable)
+    .where(eq(paymentTransactionsTable.transactionId, candidate));
+  if (!txn) {
+    req.log.warn({ candidate }, "payswitch webhook for unknown transaction");
+    res.status(200).json({ ok: false, reason: "unknown_transaction" });
     return;
   }
-  // Idempotency: run the domain mutation FIRST, then CAS the txn from
-  // pending → successful with `where status='pending'`. If the handler
-  // throws we leave the txn in `pending` so a retry callback (or operator
-  // re-trigger) can replay it. The CAS guards against concurrent callbacks
-  // double-flipping the status — domain handlers are written to short-
-  // circuit when the sale is already in its post-payment state, so a duped
-  // run is safe in the rare case both racers slip past the early
-  // status check above.
-  try {
-    await handleSuccess(req, txn);
-  } catch (err) {
-    req.log.error({ err, txn: txn.id, purpose: txn.purpose }, "callback success handler threw");
-    res.redirect(
-      `/billing/result?status=failed&purpose=${encodeURIComponent(txn.purpose)}&reason=settlement_failed`,
-    );
+  if (txn.status === "successful" || txn.status === "failed") {
+    res.status(200).json({ ok: true, outcome: "already_settled", status: txn.status });
     return;
   }
-  const flipped = await db
-    .update(paymentTransactionsTable)
-    .set({
-      status: "successful",
-      providerCode: verify.code,
-      providerReason: verify.reason || "approved",
-      completedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(paymentTransactionsTable.id, txn.id),
-        eq(paymentTransactionsTable.status, "pending"),
-      ),
-    )
-    .returning({ id: paymentTransactionsTable.id });
-  if (flipped.length === 0) {
-    req.log.info({ txn: txn.id }, "callback CAS lost — another worker already settled this txn");
-  }
-  res.redirect(txn.successRedirect);
+  const verified = await checkTransactionStatus(candidate);
+  const outcome = await settleVerifiedTransaction(txn, verified, req.log);
+  res.status(200).json({ ok: true, outcome: outcome.kind });
 });
 
 async function handleFailure(
@@ -908,10 +970,15 @@ async function handleFailure(
 }
 
 async function handleSuccess(
-  req: Request,
+  log: Logger,
   txn: typeof paymentTransactionsTable.$inferSelect,
 ): Promise<void> {
   if (!txn.purposeRef) return;
+
+  // closeInvoiceAsPaid takes a Request only for its `.log` field (used by a
+  // fire-and-forget WhatsApp alert). Synthesize a minimal stand-in so the
+  // webhook and reconciler — which have no Request — can call it too.
+  const reqShim = { log } as unknown as Request;
 
   if (txn.purpose === "subscription") {
     const [sub] = await db
@@ -931,7 +998,7 @@ async function handleSuccess(
 
   if (txn.purpose === "service_invoice") {
     await closeInvoiceAsPaid(
-      req,
+      reqShim,
       txn.purposeRef,
       "online",
       "Owner",
