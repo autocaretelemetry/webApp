@@ -16,6 +16,7 @@ import {
   GetInvoiceParams,
   ApproveInvoiceParams,
   PayInvoiceParams,
+  MarkInvoiceCashPaidParams,
 } from "@workspace/api-zod";
 import {
   notifyCenterInvoiceApproved,
@@ -243,36 +244,28 @@ router.post(
   },
 );
 
-router.post("/invoices/:invoiceId/pay", requireAuth, async (req, res): Promise<void> => {
-  const params = PayInvoiceParams.safeParse(req.params);
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
-  const access = await authorizeInvoice(req, res, params.data.invoiceId);
-  if (!access) return;
-  // Paying an invoice is the vehicle owner's action.
-  if (access.relationship === "center") {
-    res.status(403).json({
-      error: "Only the vehicle owner can pay this invoice.",
-    });
-    return;
-  }
-  const existing = access.invoice;
-  if (existing.status !== "approved") {
-    res.status(409).json({
-      error: `Only approved invoices can be paid (current status: ${existing.status})`,
-    });
-    return;
-  }
+/**
+ * Shared side-effects for closing an invoice as paid. Identical between the
+ * owner-driven online flow and the center-recorded cash flow — only the
+ * `paymentMethod` stamp, timeline-event copy, and `actor` differ. We:
+ *   1. Flip the invoice to paid (with paidAt + paymentMethod).
+ *   2. Record platform commission on the service-center sale.
+ *   3. Mark the booking completed and snapshot the vehicle's mileage so
+ *      the next reminder window starts here.
+ *   4. Append the timeline event and fire the WhatsApp alert.
+ */
+async function closeInvoiceAsPaid(
+  req: Request,
+  invoiceId: string,
+  paymentMethod: "online" | "cash",
+  actor: "Owner" | "Service Center",
+  timelineLabel: string,
+): Promise<typeof invoicesTable.$inferSelect> {
   const [row] = await db
     .update(invoicesTable)
-    .set({ status: "paid", paidAt: new Date() })
-    .where(eq(invoicesTable.id, params.data.invoiceId))
+    .set({ status: "paid", paidAt: new Date(), paymentMethod })
+    .where(eq(invoicesTable.id, invoiceId))
     .returning();
-  // Platform commission: deduct super-admin-configured % from the
-  // service center's effective payout. Fire-and-forget; ledger insert
-  // is idempotent so retries can't double-charge.
   const [bookingForCommission] = await db
     .select({ centerId: bookingsTable.serviceCenterId })
     .from(bookingsTable)
@@ -293,8 +286,6 @@ router.post("/invoices/:invoiceId/pay", requireAuth, async (req, res): Promise<v
     .where(eq(bookingsTable.id, row.bookingId))
     .returning();
   if (bookingRow) {
-    // Snapshot the vehicle's current mileage as the "last serviced" baseline
-    // so the next reminder window is computed from this completed job.
     const [veh] = await db
       .select()
       .from(vehiclesTable)
@@ -311,14 +302,88 @@ router.post("/invoices/:invoiceId/pay", requireAuth, async (req, res): Promise<v
   }
   await db.insert(bookingEventsTable).values({
     bookingId: row.bookingId,
-    label: "Payment received — job marked complete",
-    actor: "Owner",
+    label: timelineLabel,
+    actor,
     kind: "invoice_paid",
   });
   notifyCenterPaymentReceived(row.bookingId, row.total).catch((err) =>
     req.log.warn({ err }, "WhatsApp payment-received alert failed"),
   );
+  return row;
+}
+
+router.post("/invoices/:invoiceId/pay", requireAuth, async (req, res): Promise<void> => {
+  const params = PayInvoiceParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const access = await authorizeInvoice(req, res, params.data.invoiceId);
+  if (!access) return;
+  // Paying an invoice online is the vehicle owner's action.
+  if (access.relationship === "center") {
+    res.status(403).json({
+      error: "Only the vehicle owner can pay this invoice.",
+    });
+    return;
+  }
+  const existing = access.invoice;
+  if (existing.status !== "approved") {
+    res.status(409).json({
+      error: `Only approved invoices can be paid (current status: ${existing.status})`,
+    });
+    return;
+  }
+  const row = await closeInvoiceAsPaid(
+    req,
+    params.data.invoiceId,
+    "online",
+    "Owner",
+    "Payment received — job marked complete",
+  );
   res.json(row);
 });
+
+router.post(
+  "/invoices/:invoiceId/mark-cash-paid",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    const params = MarkInvoiceCashPaidParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+    const access = await authorizeInvoice(req, res, params.data.invoiceId);
+    if (!access) return;
+    // Cash is collected in person at the service center, so only the
+    // center handling the booking can record it. Owners pay online via
+    // /invoices/:id/pay; admins fall through (relationship === "center"
+    // for the platform-admin synthesized membership).
+    if (access.relationship === "owner") {
+      res.status(403).json({
+        error: "Only the service center can record a cash payment.",
+      });
+      return;
+    }
+    const existing = access.invoice;
+    // Cash means the owner is settling in person, so we don't require the
+    // formal online approval step. Anything that hasn't already terminated
+    // (paid / rejected) is fair game.
+    if (existing.status !== "pending_approval" && existing.status !== "approved") {
+      res.status(409).json({
+        error: `Only pending or approved invoices can be settled in cash (current status: ${existing.status})`,
+      });
+      return;
+    }
+    const row = await closeInvoiceAsPaid(
+      req,
+      params.data.invoiceId,
+      "cash",
+      "Service Center",
+      "Cash received — job marked complete",
+    );
+    res.json(row);
+  },
+);
 
 export default router;

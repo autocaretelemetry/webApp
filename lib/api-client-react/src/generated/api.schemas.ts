@@ -502,6 +502,17 @@ export const InvoiceStatus = {
   rejected: 'rejected',
 } as const;
 
+/**
+ * How the invoice was settled. NULL until paid; 'online' for the owner self-service flow, 'cash' when the service center recorded cash received in person.
+ */
+export type InvoicePaymentMethod = typeof InvoicePaymentMethod[keyof typeof InvoicePaymentMethod] | null;
+
+
+export const InvoicePaymentMethod = {
+  online: 'online',
+  cash: 'cash',
+} as const;
+
 export interface Invoice {
   id: string;
   bookingId: string;
@@ -512,6 +523,8 @@ export interface Invoice {
   total: number;
   notes?: string | null;
   status: InvoiceStatus;
+  /** How the invoice was settled. NULL until paid; 'online' for the owner self-service flow, 'cash' when the service center recorded cash received in person. */
+  paymentMethod?: InvoicePaymentMethod;
   createdAt: string;
   approvedAt?: string | null;
   paidAt?: string | null;

@@ -20,6 +20,10 @@ export const invoicesTable = pgTable("invoices", {
   total: real("total").notNull(),
   notes: text("notes"),
   status: text("status").notNull().default("pending_approval"),
+  // How the invoice was settled. NULL until the invoice is paid; "online"
+  // for the owner-driven self-service flow, "cash" when the service
+  // center records cash received in person.
+  paymentMethod: text("payment_method"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   approvedAt: timestamp("approved_at", { withTimezone: true }),
   paidAt: timestamp("paid_at", { withTimezone: true }),

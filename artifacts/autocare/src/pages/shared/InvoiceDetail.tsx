@@ -1,5 +1,5 @@
 import { useParams, Link, useLocation } from "wouter";
-import { useGetInvoice, useApproveInvoice, usePayInvoice, getGetInvoiceQueryKey, getGetBookingQueryKey } from "@workspace/api-client-react";
+import { useGetInvoice, useApproveInvoice, usePayInvoice, useMarkInvoiceCashPaid, getGetInvoiceQueryKey, getGetBookingQueryKey } from "@workspace/api-client-react";
 import type { QueryKey } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRole } from "@/lib/role";
@@ -21,6 +21,26 @@ export default function InvoiceDetail() {
   
   const approveInvoice = useApproveInvoice();
   const payInvoice = usePayInvoice();
+  const markCashPaid = useMarkInvoiceCashPaid();
+
+  const handleMarkCashPaid = () => {
+    if (!window.confirm("Confirm you've received the cash payment from the owner. This will close the invoice and mark the booking complete.")) {
+      return;
+    }
+    markCashPaid.mutate(
+      { invoiceId },
+      {
+        onSuccess: () => {
+          toast.success("Cash payment recorded");
+          queryClient.invalidateQueries({ queryKey: getGetInvoiceQueryKey(invoiceId) });
+          if (invoice) {
+            queryClient.invalidateQueries({ queryKey: getGetBookingQueryKey(invoice.bookingId) });
+          }
+        },
+        onError: () => toast.error("Failed to record cash payment"),
+      },
+    );
+  };
 
   const handleApprove = () => {
     approveInvoice.mutate(
@@ -98,6 +118,30 @@ export default function InvoiceDetail() {
             <div className="flex gap-2 w-full sm:w-auto">
               <Button onClick={handlePay} disabled={payInvoice.isPending} className="w-full sm:w-auto bg-green-600 hover:bg-green-700">
                 {payInvoice.isPending ? "Processing..." : "Pay Now"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {role === "center" && (invoice.status === "pending_approval" || invoice.status === "approved") && (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardContent className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div>
+              <h3 className="font-bold text-lg">Cash payment</h3>
+              <p className="text-sm text-muted-foreground">
+                If the owner is paying in person, record the cash here. The invoice closes
+                immediately and the booking is marked complete — same as an online payment.
+              </p>
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button
+                onClick={handleMarkCashPaid}
+                disabled={markCashPaid.isPending}
+                variant="outline"
+                className="w-full sm:w-auto border-amber-600 text-amber-700 hover:bg-amber-100"
+              >
+                {markCashPaid.isPending ? "Recording..." : "Mark cash received"}
               </Button>
             </div>
           </CardContent>

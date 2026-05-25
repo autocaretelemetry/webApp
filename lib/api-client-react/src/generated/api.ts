@@ -2441,7 +2441,7 @@ export const getPayInvoiceUrl = (invoiceId: string,) => {
 }
 
 /**
- * @summary Mark an approved invoice as paid (mocked payment)
+ * @summary Owner marks an approved invoice as paid online (mocked payment). Records paymentMethod=online.
  */
 export const payInvoice = async (invoiceId: string, options?: RequestInit): Promise<Invoice> => {
 
@@ -2489,7 +2489,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PayInvoiceMutationError = ErrorType<unknown>
 
     /**
- * @summary Mark an approved invoice as paid (mocked payment)
+ * @summary Owner marks an approved invoice as paid online (mocked payment). Records paymentMethod=online.
  */
 export const usePayInvoice = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof payInvoice>>, TError,{invoiceId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -2500,6 +2500,76 @@ export const usePayInvoice = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getPayInvoiceMutationOptions(options));
+    }
+
+export const getMarkInvoiceCashPaidUrl = (invoiceId: string,) => {
+
+
+
+
+  return `/api/invoices/${invoiceId}/mark-cash-paid`
+}
+
+/**
+ * @summary Service center records cash received in person and closes the invoice as paid. Allowed from pending_approval or approved. Records paymentMethod=cash.
+ */
+export const markInvoiceCashPaid = async (invoiceId: string, options?: RequestInit): Promise<Invoice> => {
+
+  return customFetch<Invoice>(getMarkInvoiceCashPaidUrl(invoiceId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getMarkInvoiceCashPaidMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markInvoiceCashPaid>>, TError,{invoiceId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof markInvoiceCashPaid>>, TError,{invoiceId: string}, TContext> => {
+
+const mutationKey = ['markInvoiceCashPaid'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof markInvoiceCashPaid>>, {invoiceId: string}> = (props) => {
+          const {invoiceId} = props ?? {};
+
+          return  markInvoiceCashPaid(invoiceId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarkInvoiceCashPaidMutationResult = NonNullable<Awaited<ReturnType<typeof markInvoiceCashPaid>>>
+
+    export type MarkInvoiceCashPaidMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Service center records cash received in person and closes the invoice as paid. Allowed from pending_approval or approved. Records paymentMethod=cash.
+ */
+export const useMarkInvoiceCashPaid = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markInvoiceCashPaid>>, TError,{invoiceId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof markInvoiceCashPaid>>,
+        TError,
+        {invoiceId: string},
+        TContext
+      > => {
+      return useMutation(getMarkInvoiceCashPaidMutationOptions(options));
     }
 
 export const getGetOwnerDashboardUrl = () => {

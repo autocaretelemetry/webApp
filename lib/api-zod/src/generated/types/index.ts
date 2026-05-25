@@ -78,6 +78,7 @@ export * from './healthStatus';
 export * from './invoice';
 export * from './invoiceItem';
 export * from './invoiceItemKind';
+export * from './invoicePaymentMethod';
 export * from './invoiceStatus';
 export * from './kycDecisionInput';
 export * from './kycDecisionInputDecision';

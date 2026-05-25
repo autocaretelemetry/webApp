@@ -15,7 +15,14 @@ export function InvoiceSummary({ invoice, className }: InvoiceSummaryProps) {
       <CardHeader className="pb-4">
         <div className="flex justify-between items-center">
           <CardTitle>Invoice</CardTitle>
-          <StatusBadge status={invoice.status} type="invoice" />
+          <div className="flex items-center gap-2">
+            {invoice.status === "paid" && invoice.paymentMethod && (
+              <span className="text-xs uppercase tracking-wide px-2 py-0.5 rounded-full border bg-muted text-muted-foreground">
+                {invoice.paymentMethod === "cash" ? "Cash" : "Online"}
+              </span>
+            )}
+            <StatusBadge status={invoice.status} type="invoice" />
+          </div>
         </div>
         <p className="text-sm text-muted-foreground">ID: {invoice.id.split('-')[0].toUpperCase()}</p>
       </CardHeader>

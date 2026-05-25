@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { InvoiceItem } from './invoiceItem';
+import type { InvoicePaymentMethod } from './invoicePaymentMethod';
 import type { InvoiceStatus } from './invoiceStatus';
 
 export interface Invoice {
@@ -18,6 +19,8 @@ export interface Invoice {
   total: number;
   notes?: string | null;
   status: InvoiceStatus;
+  /** How the invoice was settled. NULL until paid; 'online' for the owner self-service flow, 'cash' when the service center recorded cash received in person. */
+  paymentMethod?: InvoicePaymentMethod;
   createdAt: Date;
   approvedAt?: Date | null;
   paidAt?: Date | null;

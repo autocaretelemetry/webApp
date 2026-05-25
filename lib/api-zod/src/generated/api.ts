@@ -735,6 +735,7 @@ export const GetBookingResponse = zod.object({
   "total": zod.number(),
   "notes": zod.string().nullish(),
   "status": zod.enum(['pending_approval', 'approved', 'paid', 'rejected']),
+  "paymentMethod": zod.enum(['online', 'cash']).nullish().describe('How the invoice was settled. NULL until paid; \'online\' for the owner self-service flow, \'cash\' when the service center recorded cash received in person.'),
   "createdAt": zod.coerce.date(),
   "approvedAt": zod.coerce.date().nullish(),
   "paidAt": zod.coerce.date().nullish()
@@ -956,6 +957,7 @@ export const GetInvoiceResponse = zod.object({
   "total": zod.number(),
   "notes": zod.string().nullish(),
   "status": zod.enum(['pending_approval', 'approved', 'paid', 'rejected']),
+  "paymentMethod": zod.enum(['online', 'cash']).nullish().describe('How the invoice was settled. NULL until paid; \'online\' for the owner self-service flow, \'cash\' when the service center recorded cash received in person.'),
   "createdAt": zod.coerce.date(),
   "approvedAt": zod.coerce.date().nullish(),
   "paidAt": zod.coerce.date().nullish()
@@ -984,6 +986,7 @@ export const ApproveInvoiceResponse = zod.object({
   "total": zod.number(),
   "notes": zod.string().nullish(),
   "status": zod.enum(['pending_approval', 'approved', 'paid', 'rejected']),
+  "paymentMethod": zod.enum(['online', 'cash']).nullish().describe('How the invoice was settled. NULL until paid; \'online\' for the owner self-service flow, \'cash\' when the service center recorded cash received in person.'),
   "createdAt": zod.coerce.date(),
   "approvedAt": zod.coerce.date().nullish(),
   "paidAt": zod.coerce.date().nullish()
@@ -991,7 +994,7 @@ export const ApproveInvoiceResponse = zod.object({
 
 
 /**
- * @summary Mark an approved invoice as paid (mocked payment)
+ * @summary Owner marks an approved invoice as paid online (mocked payment). Records paymentMethod=online.
  */
 export const PayInvoiceParams = zod.object({
   "invoiceId": zod.coerce.string()
@@ -1012,6 +1015,36 @@ export const PayInvoiceResponse = zod.object({
   "total": zod.number(),
   "notes": zod.string().nullish(),
   "status": zod.enum(['pending_approval', 'approved', 'paid', 'rejected']),
+  "paymentMethod": zod.enum(['online', 'cash']).nullish().describe('How the invoice was settled. NULL until paid; \'online\' for the owner self-service flow, \'cash\' when the service center recorded cash received in person.'),
+  "createdAt": zod.coerce.date(),
+  "approvedAt": zod.coerce.date().nullish(),
+  "paidAt": zod.coerce.date().nullish()
+})
+
+
+/**
+ * @summary Service center records cash received in person and closes the invoice as paid. Allowed from pending_approval or approved. Records paymentMethod=cash.
+ */
+export const MarkInvoiceCashPaidParams = zod.object({
+  "invoiceId": zod.coerce.string()
+})
+
+export const MarkInvoiceCashPaidResponse = zod.object({
+  "id": zod.string(),
+  "bookingId": zod.string(),
+  "items": zod.array(zod.object({
+  "description": zod.string(),
+  "quantity": zod.number(),
+  "unitPrice": zod.number(),
+  "kind": zod.enum(['labor', 'part'])
+})),
+  "laborTotal": zod.number(),
+  "partsTotal": zod.number(),
+  "tax": zod.number(),
+  "total": zod.number(),
+  "notes": zod.string().nullish(),
+  "status": zod.enum(['pending_approval', 'approved', 'paid', 'rejected']),
+  "paymentMethod": zod.enum(['online', 'cash']).nullish().describe('How the invoice was settled. NULL until paid; \'online\' for the owner self-service flow, \'cash\' when the service center recorded cash received in person.'),
   "createdAt": zod.coerce.date(),
   "approvedAt": zod.coerce.date().nullish(),
   "paidAt": zod.coerce.date().nullish()

@@ -522,7 +522,21 @@ paths:
     post:
       operationId: payInvoice
       tags: [invoices]
-      summary: Mark an approved invoice as paid (mocked payment)
+      summary: Owner marks an approved invoice as paid online (mocked payment). Records paymentMethod=online.
+      parameters:
+        - { name: invoiceId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Invoice" }
+
+  /invoices/{invoiceId}/mark-cash-paid:
+    post:
+      operationId: markInvoiceCashPaid
+      tags: [invoices]
+      summary: Service center records cash received in person and closes the invoice as paid. Allowed from pending_approval or approved. Records paymentMethod=cash.
       parameters:
         - { name: invoiceId, in: path, required: true, schema: { type: string } }
       responses:
@@ -2700,6 +2714,11 @@ components:
         status:
           type: string
           enum: [pending_approval, approved, paid, rejected]
+        paymentMethod:
+          type: string
+          enum: [online, cash]
+          nullable: true
+          description: "How the invoice was settled. NULL until paid; 'online' for the owner self-service flow, 'cash' when the service center recorded cash received in person."
         createdAt: { type: string, format: date-time }
         approvedAt: { type: string, format: date-time, nullable: true }
         paidAt: { type: string, format: date-time, nullable: true }
