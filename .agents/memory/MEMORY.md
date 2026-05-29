@@ -1,0 +1,1 @@
+- [Role system is account-bound](role-system-account-bound.md) — web/mobile clamp non-super_admins to their account role; "remove role switcher for prod" is mostly a no-op, only demo login shortcuts + direct setRole pages need removal.
