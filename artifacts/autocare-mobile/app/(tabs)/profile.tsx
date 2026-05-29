@@ -199,8 +199,8 @@ export default function ProfileScreen() {
           <ActionRow
             icon="mail"
             label="Help & support"
-            hint="support@autocare.test"
-            onPress={() => void Linking.openURL("mailto:support@autocare.test")}
+            hint="support@autocare.app"
+            onPress={() => void Linking.openURL("mailto:support@autocare.app")}
           />
         </Card>
       </Section>

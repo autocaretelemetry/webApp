@@ -711,12 +711,6 @@ function SidebarBody({
           collapsed={collapsed}
           onNavigate={onNavigate}
         />
-        <SidebarItem
-          item={{ href: "/settings", label: "Settings", icon: Settings }}
-          active={location === "/settings"}
-          collapsed={collapsed}
-          onNavigate={onNavigate}
-        />
       </div>
     </div>
   );

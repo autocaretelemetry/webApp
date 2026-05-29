@@ -176,42 +176,28 @@ export default function Landing() {
           </div>
           <Card className="bg-sidebar border-border/60">
             <CardContent className="pt-6 space-y-4">
-              <h3 className="font-semibold text-lg">Demo accounts</h3>
+              <h3 className="font-semibold text-lg">Get started</h3>
               <p className="text-sm text-muted-foreground">
-                Pick a role and sign in to try {content.brandName} end-to-end.
+                Create an account to join {content.brandName}, or sign in if you
+                already have one. New applications are reviewed before access is
+                granted.
               </p>
-              <div className="divide-y rounded-md border bg-card">
-                {[
-                  ["Owner", "owner@autocare.test", "owner1234"],
-                  ["Renter", "renter@autocare.test", "renter1234"],
-                  ["Service center", "center@autocare.test", "center1234"],
-                  ["Vendor", "vendor@autocare.test", "vendor1234"],
-                  ["Delivery agent", "delivery@autocare.test", "delivery1234"],
-                  ["Fleet admin", "fleet@autocare.test", "fleet1234"],
-                  ["Fleet finance", "finance@autocare.test", "finance1234"],
-                  ["Fleet driver", "driver@autocare.test", "driver1234"],
-                  ["Admin", "admin@autocare.test", "admin1234"],
-                  ["Super admin", "superadmin@autocare.test", "super1234"],
-                ].map(([label, email, pw]) => (
-                  <div
-                    key={email}
-                    className="flex items-center justify-between gap-3 px-3 py-2 text-xs"
-                  >
-                    <span className="font-medium">{label}</span>
-                    <code className="text-[11px] text-muted-foreground">
-                      {email} / {pw}
-                    </code>
-                  </div>
-                ))}
-              </div>
               <div className="grid grid-cols-2 gap-2">
-                <Link href="/login">
-                  <Button className="w-full">Open sign in</Button>
-                </Link>
                 <Link href="/signup">
-                  <Button variant="outline" className="w-full">Apply for access</Button>
+                  <Button className="w-full">Apply for access</Button>
+                </Link>
+                <Link href="/login">
+                  <Button variant="outline" className="w-full">Sign in</Button>
                 </Link>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Just want to rent a car?{" "}
+                <Link href="/rentals/signup">
+                  <span className="text-primary font-medium hover:underline cursor-pointer">
+                    Quick renter signup
+                  </span>
+                </Link>
+              </p>
             </CardContent>
           </Card>
         </div>

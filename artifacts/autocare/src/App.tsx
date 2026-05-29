@@ -105,7 +105,6 @@ import Cart from "@/pages/shared/Cart";
 import Checkout from "@/pages/shared/Checkout";
 import Orders from "@/pages/shared/Orders";
 import OrderDetail from "@/pages/shared/OrderDetail";
-import Settings from "@/pages/Settings";
 
 // Billing
 import Subscribe from "@/pages/billing/Subscribe";
@@ -295,7 +294,6 @@ function AppRouter() {
         <Route path="/invoices/:id" component={InvoiceDetail} />
         <Route path="/billing/subscribe" component={Subscribe} />
         <Route path="/billing/result" component={PaymentResult} />
-        <Route path="/settings" component={Settings} />
         <Route path="/profile" component={ProfilePage} />
         <Route path="/center/staff" component={centerOnly(CenterStaffPage)} />
 

@@ -8,17 +8,6 @@ import { Button, Card, Input } from "@/components/ui";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
-const DEMO_ACCOUNTS: Array<{ label: string; email: string; password: string }> = [
-  { label: "Owner", email: "owner@autocare.test", password: "owner1234" },
-  { label: "Renter", email: "renter@autocare.test", password: "renter1234" },
-  { label: "Center", email: "center@autocare.test", password: "center1234" },
-  { label: "Vendor", email: "vendor@autocare.test", password: "vendor1234" },
-  { label: "Fleet admin", email: "fleet@autocare.test", password: "fleet1234" },
-  { label: "Delivery", email: "delivery@autocare.test", password: "delivery1234" },
-  { label: "Admin", email: "admin@autocare.test", password: "admin1234" },
-  { label: "Super admin", email: "superadmin@autocare.test", password: "super_admin1234" },
-];
-
 export default function LoginScreen() {
   const c = useColors();
   const insets = useSafeAreaInsets();
@@ -135,37 +124,6 @@ export default function LoginScreen() {
             </Link>
           </View>
         </Card>
-
-        <View style={{ gap: 8 }}>
-          <Text
-            style={{
-              color: c.mutedForeground,
-              fontFamily: "Inter_500Medium",
-              fontSize: 12,
-              textTransform: "uppercase",
-              letterSpacing: 0.8,
-            }}
-          >
-            Quick sign-in (demo)
-          </Text>
-          <Card padding={6}>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-              {DEMO_ACCOUNTS.map((a) => (
-                <Button
-                  key={a.email}
-                  label={a.label}
-                  tone="ghost"
-                  onPress={() => {
-                    setEmail(a.email);
-                    setPassword(a.password);
-                    void submit(a.email, a.password);
-                  }}
-                  style={{ paddingVertical: 8, paddingHorizontal: 12 }}
-                />
-              ))}
-            </View>
-          </Card>
-        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
