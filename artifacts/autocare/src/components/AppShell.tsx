@@ -39,6 +39,7 @@ import {
   Percent,
   BellRing,
   Banknote,
+  RefreshCw,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { AuthedUser } from "@workspace/api-client-react";
@@ -275,6 +276,7 @@ const SUPER_ADMIN_NAV: NavSection[] = [
       { href: "/super-admin/organizations", label: "Institutions & Fleets", icon: Building2 },
       { href: "/super-admin/commissions", label: "Commissions", icon: Percent },
       { href: "/super-admin/payouts", label: "Seller Payouts", icon: Banknote },
+      { href: "/super-admin/payments", label: "Payment Transactions", icon: RefreshCw },
       { href: "/super-admin/finance", label: "Finance Dashboard", icon: TrendingUp },
       { href: "/super-admin/landing", label: "Landing Page", icon: Paintbrush },
     ],
@@ -309,6 +311,7 @@ function navFor(
           { href: "/super-admin/organizations", label: "Institutions & Fleets", icon: Building2 },
           { href: "/super-admin/commissions", label: "Commissions", icon: Percent },
           { href: "/super-admin/payouts", label: "Seller Payouts", icon: Banknote },
+          { href: "/super-admin/payments", label: "Payment Transactions", icon: RefreshCw },
           { href: "/super-admin/finance", label: "Finance Dashboard", icon: TrendingUp },
           { href: "/super-admin/landing", label: "Landing Page", icon: Paintbrush },
         ],

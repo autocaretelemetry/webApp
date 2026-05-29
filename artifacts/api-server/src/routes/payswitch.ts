@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import type { Logger } from "pino";
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc, like } from "drizzle-orm";
 import {
   db,
   subscriptionPlansTable,
@@ -1110,5 +1110,95 @@ async function handleSuccess(
     return;
   }
 }
+
+// ---------------------- Super-admin payment-transactions queue ----------------------
+
+function requireSuperAdminPayments(req: Request, res: Response): boolean {
+  const user = req.user!;
+  if (user.role !== "admin" && user.role !== "super_admin") {
+    res.status(403).json({ error: "Super-admin only." });
+    return false;
+  }
+  return true;
+}
+
+const AdminPaymentsQuery = z.object({
+  status: z.enum(["pending", "successful", "failed", "amount_mismatch"]).optional(),
+});
+
+/**
+ * Lists recent payment_transactions rows for the super-admin triage queue.
+ * `status=amount_mismatch` is a derived filter: rows are `status=failed` with
+ * a `providerReason` starting with `amount_mismatch:` (the marker the
+ * settlement dispatcher writes when the provider-reported amount didn't
+ * match what we charged).
+ */
+router.get("/admin/payments", requireAuth, async (req, res): Promise<void> => {
+  if (!requireSuperAdminPayments(req, res)) return;
+  const parsed = AdminPaymentsQuery.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const filter = parsed.data.status;
+  const where =
+    filter === "amount_mismatch"
+      ? and(
+          eq(paymentTransactionsTable.status, "failed"),
+          like(paymentTransactionsTable.providerReason, "amount_mismatch:%"),
+        )
+      : filter
+        ? eq(paymentTransactionsTable.status, filter)
+        : undefined;
+  const rows = await (where
+    ? db.select().from(paymentTransactionsTable).where(where)
+    : db.select().from(paymentTransactionsTable))
+    .orderBy(desc(paymentTransactionsTable.createdAt))
+    .limit(200);
+  res.json({ payswitchConfigured: payswitchConfigured(), payments: rows });
+});
+
+/**
+ * Re-runs verification + the shared settlement dispatcher for a single
+ * payment_transactions row. Mirrors what the reconciler does on its tick,
+ * but for one specific txn the super admin clicks on.
+ */
+router.post("/admin/payments/:txnId/recheck", requireAuth, async (req, res): Promise<void> => {
+  if (!requireSuperAdminPayments(req, res)) return;
+  const id = z.string().uuid().safeParse(req.params["txnId"]);
+  if (!id.success) {
+    res.status(400).json({ error: "Invalid transaction id" });
+    return;
+  }
+  const [txn] = await db
+    .select()
+    .from(paymentTransactionsTable)
+    .where(eq(paymentTransactionsTable.id, id.data));
+  if (!txn) {
+    res.status(404).json({ error: "Transaction not found" });
+    return;
+  }
+  if (!payswitchConfigured()) {
+    res.status(409).json({ error: "PaySwitch credentials not configured." });
+    return;
+  }
+  const verified = await checkTransactionStatus(txn.transactionId);
+  const outcome = await settleVerifiedTransaction(txn, verified, req.log);
+  const [fresh] = await db
+    .select()
+    .from(paymentTransactionsTable)
+    .where(eq(paymentTransactionsTable.id, txn.id));
+  res.json({
+    outcome,
+    verified: {
+      reachable: verified.reachable,
+      code: verified.code,
+      status: verified.status,
+      reason: verified.reason,
+      amountPesewas: verified.amountPesewas,
+    },
+    payment: fresh ?? txn,
+  });
+});
 
 export default router;
