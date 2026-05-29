@@ -954,7 +954,11 @@ async function handleFailure(
   code: string,
   reason: string,
 ): Promise<void> {
-  await db
+  // CAS the flip on `status='pending'` so a manual mark-failed (or a slow
+  // terminal-failure verification) can never clobber a charge a concurrent
+  // worker already settled as `successful`. If the CAS loses we skip the
+  // downstream subscription cancellation too.
+  const flipped = await db
     .update(paymentTransactionsTable)
     .set({
       status: "failed",
@@ -962,7 +966,14 @@ async function handleFailure(
       providerReason: reason,
       completedAt: new Date(),
     })
-    .where(eq(paymentTransactionsTable.id, txn.id));
+    .where(
+      and(
+        eq(paymentTransactionsTable.id, txn.id),
+        eq(paymentTransactionsTable.status, "pending"),
+      ),
+    )
+    .returning({ id: paymentTransactionsTable.id });
+  if (flipped.length === 0) return;
   if (txn.purpose === "subscription" && txn.purposeRef) {
     await db
       .update(subscriptionsTable)
@@ -1119,7 +1130,7 @@ async function handleSuccess(
 
 function requireSuperAdminPayments(req: Request, res: Response): boolean {
   const user = req.user!;
-  if (user.role !== "admin" && user.role !== "super_admin") {
+  if (user.role !== "super_admin") {
     res.status(403).json({ error: "Super-admin only." });
     return false;
   }
@@ -1227,6 +1238,74 @@ router.post("/admin/payments/:txnId/recheck", requireAuth, async (req, res): Pro
     },
     payment: fresh ?? txn,
   });
+});
+
+const MarkFailedBody = z.object({
+  note: z.string().trim().max(500).optional(),
+});
+
+/**
+ * Terminally fail a charge that PaySwitch will never settle (e.g. the buyer
+ * abandoned the checkout and the transaction is stuck `pending` with the
+ * provider unreachable). Super-admin only. Rather than poke the database
+ * directly we synthesize an operator-forced terminal status and run it
+ * through the same `settleVerifiedTransaction` dispatcher as the reconciler
+ * and browser callback, so the txn-status CAS keeps this idempotent against
+ * a concurrent real settlement: if a callback/webhook flips the charge to
+ * `successful` first, the dispatcher short-circuits and this is a no-op. The
+ * operator's audit note is stored on `providerReason` behind a `manual_fail:`
+ * marker.
+ */
+router.post("/admin/payments/:txnId/mark-failed", requireAuth, async (req, res): Promise<void> => {
+  if (!requireSuperAdminPayments(req, res)) return;
+  const id = z.string().uuid().safeParse(req.params["txnId"]);
+  if (!id.success) {
+    res.status(400).json({ error: "Invalid transaction id" });
+    return;
+  }
+  const parsed = MarkFailedBody.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const [txn] = await db
+    .select()
+    .from(paymentTransactionsTable)
+    .where(eq(paymentTransactionsTable.id, id.data));
+  if (!txn) {
+    res.status(404).json({ error: "Transaction not found" });
+    return;
+  }
+  if (txn.status === "successful") {
+    res.status(409).json({
+      error: "This charge already settled successfully and cannot be marked failed.",
+    });
+    return;
+  }
+  const user = req.user!;
+  const note = parsed.data.note?.trim();
+  const reason = `manual_fail: ${note || "Marked failed by operator"} (by ${user.email ?? user.id})`;
+  const verified: StatusCheckResult = {
+    ok: false,
+    reachable: true,
+    // A status in TERMINAL_FAILURE_STATUSES so the dispatcher treats this as
+    // a settled failure (not in-flight) and routes through handleFailure.
+    status: "cancelled",
+    code: "manual",
+    reason,
+    amountPesewas: null,
+    raw: { manual: true, markedByUserId: user.id },
+  };
+  req.log.warn(
+    { txn: txn.id, by: user.id, note: note ?? null },
+    "admin manually marking payment transaction failed",
+  );
+  const outcome = await settleVerifiedTransaction(txn, verified, req.log);
+  const [fresh] = await db
+    .select()
+    .from(paymentTransactionsTable)
+    .where(eq(paymentTransactionsTable.id, txn.id));
+  res.json({ outcome, payment: fresh ?? txn });
 });
 
 export default router;

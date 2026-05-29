@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, like } from "drizzle-orm";
 import {
   db,
   usersTable,
@@ -35,12 +35,32 @@ const { reconcilePendingPayments } = await import("../lib/paymentReconciler");
 
 const TAG = "task98-pay";
 const SUPER_EMAIL = `${TAG}-super@autocare.test`;
+const OWNER_EMAIL = `${TAG}-owner-user@autocare.test`;
+const ADMIN_EMAIL = `${TAG}-admin-user@autocare.test`;
 const PASSWORD = "test-password-1234";
 
 let planId: string;
 let superUserId: string;
+let ownerUserId: string;
+let adminUserId: string;
+
+async function loginCookie(email: string): Promise<string> {
+  const res = await request(app)
+    .post("/api/auth/login")
+    .send({ email, password: PASSWORD });
+  expect(res.status, `login ${email}: ${res.text}`).toBe(200);
+  const set = res.headers["set-cookie"];
+  return Array.isArray(set) ? set.join("; ") : String(set ?? "");
+}
 
 async function cleanup(): Promise<void> {
+  // Bare (non-subscription) txns this suite seeds carry our TAG prefix in
+  // transactionId and have no sale link, so the subscription-scoped sweep below
+  // never reaches them. Delete by prefix first or the unique transactionId
+  // constraint trips on the next run.
+  await db
+    .delete(paymentTransactionsTable)
+    .where(like(paymentTransactionsTable.transactionId, `${TAG}-%`));
   const txnRows = await db
     .select({ id: paymentTransactionsTable.id, ref: paymentTransactionsTable.purposeRef })
     .from(paymentTransactionsTable)
@@ -66,7 +86,15 @@ async function cleanup(): Promise<void> {
   await db
     .delete(subscriptionPlansTable)
     .where(eq(subscriptionPlansTable.name, `${TAG}-plan`));
-  await db.delete(usersTable).where(eq(usersTable.email, SUPER_EMAIL.toLowerCase()));
+  await db
+    .delete(usersTable)
+    .where(
+      inArray(usersTable.email, [
+        SUPER_EMAIL.toLowerCase(),
+        OWNER_EMAIL.toLowerCase(),
+        ADMIN_EMAIL.toLowerCase(),
+      ]),
+    );
 }
 
 beforeAll(async () => {
@@ -95,6 +123,32 @@ beforeAll(async () => {
     })
     .returning({ id: usersTable.id });
   superUserId = su!.id;
+
+  const [owner] = await db
+    .insert(usersTable)
+    .values({
+      email: OWNER_EMAIL.toLowerCase(),
+      passwordHash: hashPassword(PASSWORD),
+      name: "T98 Owner User",
+      role: "owner",
+      approvalStatus: "approved",
+      kycStatus: "verified",
+    })
+    .returning({ id: usersTable.id });
+  ownerUserId = owner!.id;
+
+  const [admin] = await db
+    .insert(usersTable)
+    .values({
+      email: ADMIN_EMAIL.toLowerCase(),
+      passwordHash: hashPassword(PASSWORD),
+      name: "T98 Admin User",
+      role: "admin",
+      approvalStatus: "approved",
+      kycStatus: "verified",
+    })
+    .returning({ id: usersTable.id });
+  adminUserId = admin!.id;
 });
 
 afterAll(async () => {
@@ -144,6 +198,122 @@ async function seedPendingTxn(opts: {
     .returning({ id: paymentTransactionsTable.id });
   return { subId: sub!.id, txnRowId: txn!.id, transactionId };
 }
+
+/** Insert one standalone pending payment_transactions row (no sale link). */
+async function seedBarePendingTxn(opts: {
+  txnSuffix: string;
+  status?: string;
+}): Promise<{ txnRowId: string; transactionId: string }> {
+  const transactionId = `${TAG}-${opts.txnSuffix}`.slice(0, 24);
+  const [txn] = await db
+    .insert(paymentTransactionsTable)
+    .values({
+      provider: "payswitch",
+      transactionId,
+      purpose: "service_invoice",
+      purposeRef: null,
+      amount: 5000,
+      email: SUPER_EMAIL.toLowerCase(),
+      description: "bare test charge",
+      status: opts.status ?? "pending",
+      initiatedByUserId: superUserId,
+      successRedirect: "/billing/result?status=success",
+      failureRedirect: "/billing/result?status=failed",
+    })
+    .returning({ id: paymentTransactionsTable.id });
+  return { txnRowId: txn!.id, transactionId };
+}
+
+describe("admin mark-failed — operator terminally fails a stuck charge", () => {
+  it("flips a pending txn to failed with a manual_fail audit note (super-admin only)", async () => {
+    const superCookie = await loginCookie(SUPER_EMAIL);
+    const { txnRowId, transactionId } = await seedBarePendingTxn({ txnSuffix: "mf-ok" });
+
+    const res = await request(app)
+      .post(`/api/admin/payments/${txnRowId}/mark-failed`)
+      .set("Cookie", superCookie)
+      .send({ note: "Customer abandoned checkout" });
+    expect(res.status, res.text).toBe(200);
+    expect(res.body).toMatchObject({ outcome: { kind: "failed" } });
+    expect(res.body.payment.status).toBe("failed");
+
+    const [after] = await db
+      .select()
+      .from(paymentTransactionsTable)
+      .where(eq(paymentTransactionsTable.id, txnRowId));
+    expect(after?.status).toBe("failed");
+    expect(after?.providerReason ?? "").toMatch(/^manual_fail:/);
+    expect(after?.providerReason ?? "").toContain("Customer abandoned checkout");
+    expect(after?.completedAt).toBeTruthy();
+
+    // Provider must never be contacted for a manual fail.
+    expect(mockCheck).not.toHaveBeenCalled();
+
+    // Idempotent on replay: already-settled short-circuit, status unchanged.
+    const replay = await request(app)
+      .post(`/api/admin/payments/${txnRowId}/mark-failed`)
+      .set("Cookie", superCookie)
+      .send({});
+    expect(replay.status).toBe(200);
+    expect(replay.body).toMatchObject({
+      outcome: { kind: "already_settled", status: "failed" },
+    });
+    void transactionId;
+  });
+
+  it("refuses to fail an already-successful charge (409)", async () => {
+    const superCookie = await loginCookie(SUPER_EMAIL);
+    const { txnRowId } = await seedBarePendingTxn({
+      txnSuffix: "mf-paid",
+      status: "successful",
+    });
+    const res = await request(app)
+      .post(`/api/admin/payments/${txnRowId}/mark-failed`)
+      .set("Cookie", superCookie)
+      .send({});
+    expect(res.status).toBe(409);
+
+    const [after] = await db
+      .select()
+      .from(paymentTransactionsTable)
+      .where(eq(paymentTransactionsTable.id, txnRowId));
+    expect(after?.status).toBe("successful");
+  });
+
+  it("rejects a non-admin caller with 403", async () => {
+    const ownerCookie = await loginCookie(OWNER_EMAIL);
+    const { txnRowId } = await seedBarePendingTxn({ txnSuffix: "mf-403" });
+    const res = await request(app)
+      .post(`/api/admin/payments/${txnRowId}/mark-failed`)
+      .set("Cookie", ownerCookie)
+      .send({});
+    expect(res.status).toBe(403);
+
+    const [after] = await db
+      .select()
+      .from(paymentTransactionsTable)
+      .where(eq(paymentTransactionsTable.id, txnRowId));
+    expect(after?.status).toBe("pending");
+    void ownerUserId;
+  });
+
+  it("rejects a plain admin (non-super) caller with 403", async () => {
+    const adminCookie = await loginCookie(ADMIN_EMAIL);
+    const { txnRowId } = await seedBarePendingTxn({ txnSuffix: "mf-admin-403" });
+    const res = await request(app)
+      .post(`/api/admin/payments/${txnRowId}/mark-failed`)
+      .set("Cookie", adminCookie)
+      .send({});
+    expect(res.status).toBe(403);
+
+    const [after] = await db
+      .select()
+      .from(paymentTransactionsTable)
+      .where(eq(paymentTransactionsTable.id, txnRowId));
+    expect(after?.status).toBe("pending");
+    void adminUserId;
+  });
+});
 
 function approvedStatus(amountPesewas: number) {
   return {

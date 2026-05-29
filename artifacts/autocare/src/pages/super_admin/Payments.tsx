@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { toast } from "sonner";
-import { AlertTriangle, Clock, RefreshCw } from "lucide-react";
+import { AlertTriangle, Clock, RefreshCw, XCircle } from "lucide-react";
 
 type Payment = {
   id: string;
@@ -79,7 +79,9 @@ export default function PaymentsAdminPage() {
       }).then((r) => r.json()),
     refetchInterval: 15_000,
   });
-  const [busy, setBusy] = useState<string | null>(null);
+  const [busy, setBusy] = useState<{ id: string; action: "recheck" | "fail" } | null>(
+    null,
+  );
   const rows = data?.payments ?? [];
 
   const stuckCount = summary?.stuckCount ?? 0;
@@ -107,7 +109,7 @@ export default function PaymentsAdminPage() {
   };
 
   const recheck = async (id: string) => {
-    setBusy(id);
+    setBusy({ id, action: "recheck" });
     try {
       const res = await fetch(`/api/admin/payments/${id}/recheck`, {
         method: "POST",
@@ -124,6 +126,39 @@ export default function PaymentsAdminPage() {
       const kind = json.outcome?.kind ?? "unknown";
       const reason = json.outcome?.reason ? ` — ${json.outcome.reason}` : "";
       toast.success(`Re-checked: ${kind}${reason}`);
+      void qc.invalidateQueries({ queryKey: ["admin", "payments"] });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const markFailed = async (id: string) => {
+    if (
+      !window.confirm(
+        "Terminally fail this charge? Use this only when PaySwitch will never settle it. This is idempotent — a real settlement that arrives first wins.",
+      )
+    ) {
+      return;
+    }
+    const note = window.prompt("Audit note (why are you failing this charge?):") ?? "";
+    setBusy({ id, action: "fail" });
+    try {
+      const res = await fetch(`/api/admin/payments/${id}/mark-failed`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note: note.trim() || undefined }),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        outcome?: { kind: string; reason?: string };
+      };
+      if (!res.ok) {
+        toast.error(json.error ?? "Mark failed");
+        return;
+      }
+      const kind = json.outcome?.kind ?? "unknown";
+      toast.success(`Marked failed: ${kind}`);
       void qc.invalidateQueries({ queryKey: ["admin", "payments"] });
     } finally {
       setBusy(null);
@@ -290,14 +325,28 @@ export default function PaymentsAdminPage() {
                     size="sm"
                     variant="outline"
                     disabled={
-                      busy === p.id ||
+                      busy?.id === p.id ||
                       !data?.payswitchConfigured ||
                       p.status === "successful"
                     }
                     onClick={() => recheck(p.id)}
                   >
                     <RefreshCw className="size-3 mr-1" />
-                    {busy === p.id ? "Re-checking…" : "Re-check now"}
+                    {busy?.id === p.id && busy.action === "recheck"
+                      ? "Re-checking…"
+                      : "Re-check now"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-red-700 hover:text-red-800"
+                    disabled={busy?.id === p.id || p.status !== "pending"}
+                    onClick={() => markFailed(p.id)}
+                  >
+                    <XCircle className="size-3 mr-1" />
+                    {busy?.id === p.id && busy.action === "fail"
+                      ? "Failing…"
+                      : "Mark failed"}
                   </Button>
                 </div>
               </CardContent>
