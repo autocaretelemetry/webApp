@@ -175,6 +175,14 @@ export default function ProfileScreen() {
               onPress={() => router.push("/admin/approvals")}
             />
           ) : null}
+          {showApprovals ? (
+            <ActionRow
+              icon="credit-card"
+              label="Payment transactions"
+              hint="Re-check stuck charges"
+              onPress={() => router.push("/admin/payments")}
+            />
+          ) : null}
         </Card>
       </Section>
 
