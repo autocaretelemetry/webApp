@@ -3,6 +3,7 @@ import type { Logger } from "pino";
 import { db, paymentTransactionsTable } from "@workspace/db";
 import { checkTransactionStatus, payswitchConfigured } from "./payswitch";
 import { settleVerifiedTransaction, type SettleOutcome } from "../routes/payswitch";
+import { maybeAlertStuckPayments } from "./paymentStuckAlerts";
 import { logger as rootLogger } from "./logger";
 
 export interface ReconcileResult {
@@ -93,5 +94,18 @@ export async function reconcilePendingPayments(opts?: {
     }
   }
   log.info({ ...result, cutoff }, "paymentReconciler tick complete");
+
+  // Page platform admins if this sweep looks unhealthy — either too many
+  // charges are stuck in `pending` past the cutoff, or too many verifications
+  // bounced off PaySwitch (likely an outage). Deduped per UTC day. Never let
+  // an alerting failure break the reconcile result.
+  await maybeAlertStuckPayments({
+    staleAfterMs,
+    unreachable: result.unreachable,
+    log,
+  }).catch((err) =>
+    log.error({ err }, "paymentReconciler: stuck-payment alert threw"),
+  );
+
   return result;
 }

@@ -75,7 +75,10 @@ app.listen(port, (err) => {
   // browser callback fired AND whose webhook delivery was lost. Idempotent
   // via the shared settlement dispatcher's CAS guard, so it's safe to run
   // alongside the in-process scheduler and any external Scheduled
-  // Deployment running the same script.
+  // Deployment running the same script. Each tick also pages platform admins
+  // (deduped per UTC day) when the `pending` backlog past the stale cutoff
+  // grows beyond `PAYMENT_STUCK_ALERT_THRESHOLD` or too many verifications
+  // bounce off PaySwitch (`PAYMENT_STUCK_UNREACHABLE_STREAK`).
   if (process.env["DISABLE_PAYMENT_RECONCILER"] !== "1") {
     void import("./lib/paymentReconciler").then(({ reconcilePendingPayments }) => {
       const intervalMs = Number(

@@ -188,6 +188,31 @@ export function payoutStuckDigestEmail(args: {
   };
 }
 
+export function paymentStuckAlertEmail(args: {
+  stuckCount: number;
+  unreachable: number;
+  staleAfterMs: number;
+  reasons: string[];
+  listUrl: string;
+}): Omit<EmailMessage, "to"> {
+  const { stuckCount, unreachable, staleAfterMs, reasons, listUrl } = args;
+  const mins = Math.max(1, Math.floor(staleAfterMs / (60 * 1000)));
+  const reasonLines = reasons.map((r) => `• ${r}`).join("\n");
+  const reasonItems = reasons
+    .map(
+      (r) =>
+        `<li style="margin:4px 0;">${escape(r)}</li>`,
+    )
+    .join("");
+  return {
+    subject: `AutoCare: ${stuckCount} payment${stuckCount === 1 ? "" : "s"} stuck in 'pending'`,
+    text: `Heads up — payment settlement looks unhealthy. The reconciler just swept payment_transactions and tripped an alert.\n\n${reasonLines}\n\n${stuckCount} charge${stuckCount === 1 ? " has" : "s have"} been stuck in 'pending' for more than ${mins} minutes; ${unreachable} verification${unreachable === 1 ? "" : "s"} could not reach PaySwitch on this sweep. This often means a PaySwitch outage is stranding customer payments.\n\nReview the queue: ${listUrl}\n\nYou will not receive another email about this today; if payments are still stuck tomorrow you will be alerted again.\n\n— AutoCare`,
+    html: wrap(
+      `<h2 style="margin:0 0 16px;">Payments stuck in 'pending'</h2><p>Payment settlement looks unhealthy. The reconciler just swept <code>payment_transactions</code> and tripped an alert.</p><ul style="margin:16px 0;padding-left:20px;color:#1f2937;">${reasonItems}</ul><p><strong>${stuckCount}</strong> charge${stuckCount === 1 ? " has" : "s have"} been stuck in <code>pending</code> for more than <strong>${mins} minutes</strong>; <strong>${unreachable}</strong> verification${unreachable === 1 ? "" : "s"} could not reach PaySwitch on this sweep. This often means a PaySwitch outage is stranding customer payments.</p><p><a href="${escape(listUrl)}" style="color:#b45309;font-weight:600;">Open the payments queue →</a></p><p style="color:#9ca3af;font-size:12px;margin-top:24px;">You will not receive another email about this today; if payments are still stuck tomorrow you will be alerted again.</p>`,
+    ),
+  };
+}
+
 export function kycRejectedEmail(
   name: string,
   note: string | null | undefined,
