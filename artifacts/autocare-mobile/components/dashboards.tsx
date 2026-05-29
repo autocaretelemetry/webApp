@@ -590,6 +590,89 @@ function DeliveryDashboard() {
   );
 }
 
+/* -------------------- Stuck payments alert (super admin) -------------------- */
+function StuckPaymentsAlert() {
+  const c = useColors();
+  const router = useRouter();
+  const { role } = useAuth();
+  const isSuper = role === "super_admin";
+
+  const stuck = useQuery({
+    queryKey: ["mobile-admin-payments-stuck"],
+    enabled: isSuper,
+    refetchInterval: 30_000,
+    queryFn: async () => {
+      const [pendingRes, mismatchRes] = await Promise.all([
+        apiFetch<{ payments: unknown[] }>(`/api/admin/payments?status=pending`),
+        apiFetch<{ payments: unknown[] }>(`/api/admin/payments?status=amount_mismatch`),
+      ]);
+      const pending = pendingRes.ok && pendingRes.data ? pendingRes.data.payments.length : 0;
+      const mismatch = mismatchRes.ok && mismatchRes.data ? mismatchRes.data.payments.length : 0;
+      return { pending, mismatch, total: pending + mismatch };
+    },
+  });
+
+  if (!isSuper) return null;
+
+  const total = stuck.data?.total ?? 0;
+  const pending = stuck.data?.pending ?? 0;
+  const mismatch = stuck.data?.mismatch ?? 0;
+  const hasAlerts = total > 0;
+  const accent = hasAlerts ? c.warning : c.primary;
+
+  const subtitle = hasAlerts
+    ? [
+        pending > 0 ? `${pending} pending` : null,
+        mismatch > 0 ? `${mismatch} amount mismatch` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "All charges verified — tap to review";
+
+  return (
+    <Pressable
+      onPress={() => router.push("/admin/payments")}
+      style={({ pressed }) => ({
+        backgroundColor: c.card,
+        borderColor: hasAlerts ? accent : c.border,
+        borderWidth: 1,
+        borderRadius: c.radius * 1.5,
+        padding: 14,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        opacity: pressed ? 0.85 : 1,
+      })}
+    >
+      <View
+        style={{
+          width: 42,
+          height: 42,
+          borderRadius: 21,
+          backgroundColor: `${accent}22`,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Feather name={hasAlerts ? "alert-triangle" : "credit-card"} size={20} color={accent} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: c.foreground, fontFamily: "Inter_600SemiBold", fontSize: 15 }}>
+          {hasAlerts ? "Payments need a re-check" : "Payment transactions"}
+        </Text>
+        <Text
+          numberOfLines={1}
+          style={{ color: c.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 2 }}
+        >
+          {subtitle}
+        </Text>
+      </View>
+      {hasAlerts ? <Badge label={String(total)} tone="warning" /> : null}
+      <Feather name="chevron-right" size={20} color={c.mutedForeground} />
+    </Pressable>
+  );
+}
+
 /* -------------------- Admin / Super Admin -------------------- */
 function AdminDashboard() {
   const { data, isLoading } = useGetAdminOverview();
@@ -605,6 +688,7 @@ function AdminDashboard() {
     | undefined;
   return (
     <View style={{ gap: 18 }}>
+      <StuckPaymentsAlert />
       <StatRow>
         <StatTile label="Users" value={o?.users ?? "—"} />
         <StatTile label="Vehicles" value={o?.vehicles ?? "—"} />
