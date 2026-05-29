@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { toast } from "sonner";
-import { RefreshCw } from "lucide-react";
+import { AlertTriangle, Clock, RefreshCw } from "lucide-react";
 
 type Payment = {
   id: string;
@@ -67,8 +67,44 @@ export default function PaymentsAdminPage() {
       }).then((r) => r.json()),
     refetchInterval: 15_000,
   });
+  const { data: summary } = useQuery<{
+    stuckCount: number;
+    threshold: number;
+    staleAfterMs: number;
+  }>({
+    queryKey: ["admin", "payments", "stuck-summary"],
+    queryFn: () =>
+      fetch(`/api/admin/payments/stuck-summary`, {
+        credentials: "include",
+      }).then((r) => r.json()),
+    refetchInterval: 15_000,
+  });
   const [busy, setBusy] = useState<string | null>(null);
   const rows = data?.payments ?? [];
+
+  const stuckCount = summary?.stuckCount ?? 0;
+  const stuckThreshold = summary?.threshold ?? 0;
+  const staleAfterMs = summary?.staleAfterMs ?? 0;
+  const staleMinutes = summary ? Math.round(staleAfterMs / 60_000) : 0;
+  const showStuckBanner = stuckThreshold > 0 && stuckCount >= stuckThreshold;
+
+  const isStale = (p: Payment): boolean =>
+    p.status === "pending" &&
+    staleAfterMs > 0 &&
+    Date.now() - new Date(p.createdAt).getTime() >= staleAfterMs;
+  const firstStaleId = rows.find(isStale)?.id ?? null;
+
+  const goToStuck = () => {
+    setFilter("pending");
+    const target = firstStaleId
+      ? `payment-row-${firstStaleId}`
+      : "payment-rows";
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById(target)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
 
   const recheck = async (id: string) => {
     setBusy(id);
@@ -106,6 +142,63 @@ export default function PaymentsAdminPage() {
             : ""
         }
       />
+      {summary && (
+        <Card
+          className={
+            showStuckBanner
+              ? "border-amber-300 bg-amber-50"
+              : "border-border bg-muted/40"
+          }
+        >
+          <CardContent className="py-4 flex flex-wrap items-center gap-3">
+            {showStuckBanner ? (
+              <AlertTriangle className="size-5 text-amber-700 shrink-0" />
+            ) : (
+              <Clock className="size-5 text-muted-foreground shrink-0" />
+            )}
+            <div className="flex-1 min-w-[12rem]">
+              {showStuckBanner ? (
+                <>
+                  <p className="font-semibold text-amber-900">
+                    {stuckCount} payment{stuckCount === 1 ? "" : "s"} stuck in
+                    &lsquo;pending&rsquo; &gt; {staleMinutes} min — likely
+                    PaySwitch outage
+                  </p>
+                  <p className="text-xs text-amber-800">
+                    This is at or above the alert threshold of {stuckThreshold}.
+                    Super admins have been notified.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="font-medium">
+                    {stuckCount} payment{stuckCount === 1 ? "" : "s"} stuck in
+                    &lsquo;pending&rsquo; &gt; {staleMinutes} min
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Below the alert threshold of {stuckThreshold}. The
+                    background reconciler re-verifies these automatically.
+                  </p>
+                </>
+              )}
+            </div>
+            {stuckCount > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                className={
+                  showStuckBanner
+                    ? "border-amber-400 text-amber-900 hover:bg-amber-100"
+                    : ""
+                }
+                onClick={goToStuck}
+              >
+                View stuck payments
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
       <div className="flex flex-wrap gap-2 items-center">
         <span className="text-sm">Filter:</span>
         {FILTERS.map((f) => (
@@ -127,14 +220,19 @@ export default function PaymentsAdminPage() {
           </CardContent>
         </Card>
       )}
-      <div className="space-y-2">
+      <div id="payment-rows" className="space-y-2 scroll-mt-4">
         {rows.map((p) => {
           const tone = STATUS_TONE[p.status];
           const isAmountMismatch =
             p.status === "failed" &&
             (p.providerReason ?? "").startsWith("amount_mismatch:");
+          const stale = isStale(p);
           return (
-            <Card key={p.id}>
+            <Card
+              key={p.id}
+              id={`payment-row-${p.id}`}
+              className={stale ? "border-amber-300 bg-amber-50/60 scroll-mt-4" : "scroll-mt-4"}
+            >
               <CardContent className="py-4 space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
@@ -147,6 +245,11 @@ export default function PaymentsAdminPage() {
                     <p className="text-xs text-muted-foreground">
                       {p.purposeRef ? `${p.purposeRef.slice(0, 8)} · ` : ""}
                       {formatDateTime(p.createdAt)} · {ageOf(p.createdAt)}
+                      {stale && (
+                        <span className="ml-1 text-amber-700 font-medium">
+                          · stuck
+                        </span>
+                      )}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">

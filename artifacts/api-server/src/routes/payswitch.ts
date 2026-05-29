@@ -38,6 +38,10 @@ import {
   resolvePartsOrderSeller,
   resolveRentalBookingSeller,
 } from "../lib/payouts";
+import {
+  countStalePendingPayments,
+  stuckCountThreshold,
+} from "../lib/paymentStuckAlerts";
 import { closeInvoiceAsPaid } from "./invoices";
 import {
   approveProposalAndReserveStock,
@@ -1157,6 +1161,30 @@ router.get("/admin/payments", requireAuth, async (req, res): Promise<void> => {
     .limit(200);
   res.json({ payswitchConfigured: payswitchConfigured(), payments: rows });
 });
+
+/**
+ * Live health summary for the payments queue. Returns the true backlog of
+ * `pending` charges older than the reconciler's stale cutoff (independent of
+ * the per-tick limit) plus the alert threshold, so the page can render the
+ * same "stuck payments — likely PaySwitch outage" banner the background
+ * `maybeAlertStuckPayments` sweep pages super admins about.
+ */
+router.get(
+  "/admin/payments/stuck-summary",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    if (!requireSuperAdminPayments(req, res)) return;
+    const staleAfterMs = Number(
+      process.env["PAYMENT_RECONCILE_STALE_AFTER_MS"] ?? 10 * 60 * 1000,
+    );
+    const stuckCount = await countStalePendingPayments(staleAfterMs);
+    res.json({
+      stuckCount,
+      threshold: stuckCountThreshold(),
+      staleAfterMs,
+    });
+  },
+);
 
 /**
  * Re-runs verification + the shared settlement dispatcher for a single
