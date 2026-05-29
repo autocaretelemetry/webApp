@@ -144,6 +144,50 @@ export function reminderJobFailureEmail(args: {
   };
 }
 
+export function payoutStuckDigestEmail(args: {
+  payouts: ReadonlyArray<{
+    sellerName: string;
+    sellerKind: string;
+    netAmount: number;
+    status: string;
+    lastError: string | null;
+    createdAt: Date;
+  }>;
+  thresholdMs: number;
+  listUrl: string;
+}): Omit<EmailMessage, "to"> {
+  const { payouts, thresholdMs, listUrl } = args;
+  const hours = Math.max(1, Math.floor(thresholdMs / (60 * 60 * 1000)));
+  const fmtReason = (p: { status: string; lastError: string | null }): string => {
+    if (p.status === "needs_account") return "no payout account on file";
+    if (p.status === "failed")
+      return `disbursement failed — ${(p.lastError ?? "unknown error").slice(0, 160)}`;
+    return "still pending disbursement";
+  };
+  const fmtAge = (createdAt: Date): string => {
+    const h = Math.floor((Date.now() - createdAt.getTime()) / (60 * 60 * 1000));
+    if (h < 48) return `${h}h`;
+    return `${Math.floor(h / 24)}d`;
+  };
+  const lines = payouts.map(
+    (p) =>
+      `• [${p.status}] ${p.sellerName} (${p.sellerKind}) — GHS ${p.netAmount.toFixed(2)} — stuck ${fmtAge(p.createdAt)} — ${fmtReason(p)}`,
+  );
+  const rows = payouts
+    .map(
+      (p) =>
+        `<tr><td style="padding:8px 12px;border-top:1px solid #e5e7eb;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:#92400e;">${escape(p.status)}</td><td style="padding:8px 12px;border-top:1px solid #e5e7eb;">${escape(p.sellerName)} <span style="color:#6b7280;">(${escape(p.sellerKind)})</span></td><td style="padding:8px 12px;border-top:1px solid #e5e7eb;white-space:nowrap;">GHS ${p.netAmount.toFixed(2)}</td><td style="padding:8px 12px;border-top:1px solid #e5e7eb;white-space:nowrap;color:#6b7280;">${escape(fmtAge(p.createdAt))}</td><td style="padding:8px 12px;border-top:1px solid #e5e7eb;color:#6b7280;font-size:13px;">${escape(fmtReason(p))}</td></tr>`,
+    )
+    .join("");
+  return {
+    subject: `AutoCare: ${payouts.length} seller payout${payouts.length === 1 ? "" : "s"} stuck > ${hours}h`,
+    text: `Heads up — ${payouts.length} seller payout${payouts.length === 1 ? " has" : "s have"} been stuck for more than ${hours} hours. Review and settle them so funds don't sit unpaid.\n\n${lines.join("\n")}\n\nReview the queue: ${listUrl}\n\nYou will not receive another email about these specific payouts today; if they remain stuck tomorrow you will be alerted again.\n\n— AutoCare`,
+    html: wrap(
+      `<h2 style="margin:0 0 16px;">Seller payouts stuck</h2><p><strong>${payouts.length}</strong> payout${payouts.length === 1 ? " has" : "s have"} been stuck for more than <strong>${hours} hours</strong>. Review and settle them so funds don't sit unpaid.</p><table style="width:100%;border-collapse:collapse;margin:16px 0;"><thead><tr><th style="text-align:left;padding:8px 12px;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;">Status</th><th style="text-align:left;padding:8px 12px;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;">Seller</th><th style="text-align:left;padding:8px 12px;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;">Net</th><th style="text-align:left;padding:8px 12px;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;">Age</th><th style="text-align:left;padding:8px 12px;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;">Reason</th></tr></thead><tbody>${rows}</tbody></table><p><a href="${escape(listUrl)}" style="color:#b45309;font-weight:600;">Open the payouts queue →</a></p><p style="color:#9ca3af;font-size:12px;margin-top:24px;">You will not receive another email about these specific payouts today; if they remain stuck tomorrow you will be alerted again.</p>`,
+    ),
+  };
+}
+
 export function kycRejectedEmail(
   name: string,
   note: string | null | undefined,

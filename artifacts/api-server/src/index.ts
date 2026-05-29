@@ -102,4 +102,34 @@ app.listen(port, (err) => {
   } else {
     logger.info("In-process payment reconciler disabled via env");
   }
+
+  // Seller-payout stuck-row sweep: every few hours, scan `seller_payouts`
+  // for rows in `needs_account` / `pending` / `failed` past the stuck
+  // threshold (default 24h) and drop a deduped in-app notification +
+  // optional email digest into every active admin's queue so funds don't
+  // sit unpaid waiting for a super-admin to manually visit the queue.
+  // Opt out with `DISABLE_PAYOUT_STUCK_SCHEDULER=1`.
+  if (process.env["DISABLE_PAYOUT_STUCK_SCHEDULER"] !== "1") {
+    void import("./lib/payoutAlerts").then(({ runPayoutStuckAlerts }) => {
+      const intervalMs = Number(
+        process.env["PAYOUT_STUCK_INTERVAL_MS"] ?? 6 * 60 * 60 * 1000,
+      );
+      const delayMs = Number(
+        process.env["PAYOUT_STUCK_INITIAL_DELAY_MS"] ?? 60_000,
+      );
+      const tick = () => {
+        runPayoutStuckAlerts().catch((err) =>
+          logger.error({ err }, "payout stuck alert tick threw"),
+        );
+      };
+      setTimeout(tick, delayMs);
+      setInterval(tick, intervalMs);
+      logger.info(
+        { intervalMs, delayMs },
+        "In-process payout stuck-alert scheduler enabled",
+      );
+    });
+  } else {
+    logger.info("In-process payout stuck-alert scheduler disabled via env");
+  }
 });
