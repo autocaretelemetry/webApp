@@ -206,11 +206,6 @@ export default function Landing() {
       <footer className="border-t mt-12">
         <div className="max-w-6xl mx-auto px-6 py-6 text-xs text-muted-foreground flex items-center justify-between">
           <span>{content.footerText}</span>
-          <Link href="/login">
-            <span className="hover:text-foreground cursor-pointer">
-              {content.footerSignInLabel}
-            </span>
-          </Link>
         </div>
       </footer>
     </div>
