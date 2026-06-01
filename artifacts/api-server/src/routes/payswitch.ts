@@ -1421,4 +1421,125 @@ router.post("/admin/payments/:txnId/mark-failed", requireAuth, async (req, res):
   res.json({ outcome, payment: fresh ?? txn });
 });
 
+/**
+ * Undo an operator-forced "Mark failed" on a payment transaction. Super-admin
+ * only — closes the loop on the manual-fail workflow when the wrong charge was
+ * failed. Re-verifies with PaySwitch FIRST and only resets the row to `pending`
+ * (clearing the manual-fail audit columns) when the provider still reports the
+ * charge as unsettled. Refuses when PaySwitch reports the charge as settled
+ * (the operator should Re-check to settle it instead) or when the provider is
+ * unreachable (we can't confirm it's safe to reopen). Only rows that were
+ * manually failed can be reopened — a genuine provider-reported failure is left
+ * untouched. The flip is CAS-guarded on `status='failed'` so a concurrent
+ * settlement can't be clobbered.
+ */
+router.post("/admin/payments/:txnId/reopen", requireAuth, async (req, res): Promise<void> => {
+  if (!requireSuperAdminPayments(req, res)) return;
+  const id = z.string().uuid().safeParse(req.params["txnId"]);
+  if (!id.success) {
+    res.status(400).json({ error: "Invalid transaction id" });
+    return;
+  }
+  const [txn] = await db
+    .select()
+    .from(paymentTransactionsTable)
+    .where(eq(paymentTransactionsTable.id, id.data));
+  if (!txn) {
+    res.status(404).json({ error: "Transaction not found" });
+    return;
+  }
+  if (!payswitchConfigured()) {
+    res.status(409).json({ error: "PaySwitch credentials not configured." });
+    return;
+  }
+  // Reopen is strictly the inverse of mark-failed: only a charge an operator
+  // forced to `failed` is eligible. Detect via the dedicated audit columns,
+  // falling back to the legacy `manual_fail:` providerReason marker.
+  const wasManuallyFailed =
+    txn.status === "failed" &&
+    (!!txn.manualFailAt ||
+      !!txn.manualFailById ||
+      !!txn.manualFailByEmail ||
+      (txn.providerReason ?? "").startsWith("manual_fail:"));
+  if (!wasManuallyFailed) {
+    res.status(409).json({
+      error:
+        "Only a manually-failed charge can be reopened. This transaction wasn't failed by an operator.",
+    });
+    return;
+  }
+  const verified = await checkTransactionStatus(txn.transactionId);
+  if (!verified.reachable) {
+    res.status(409).json({
+      error: "Couldn't reach PaySwitch to verify this charge — try again shortly.",
+    });
+    return;
+  }
+  // Refuse to reopen anything the provider reports as actually settled; the
+  // operator should Re-check now to settle it rather than reset it to pending.
+  if (verified.ok) {
+    res.status(409).json({
+      error:
+        "PaySwitch reports this charge as settled — it can't be reopened. Use Re-check now to settle it instead.",
+    });
+    return;
+  }
+  const user = req.user!;
+  req.log.warn(
+    {
+      txn: txn.id,
+      by: user.id,
+      priorManualFail: {
+        byId: txn.manualFailById,
+        byEmail: txn.manualFailByEmail,
+        note: txn.manualFailNote,
+        at: txn.manualFailAt,
+      },
+      providerStatus: verified.status,
+      providerCode: verified.code,
+    },
+    "admin reopening a manually-failed payment transaction back to pending",
+  );
+  const reopened = await db
+    .update(paymentTransactionsTable)
+    .set({
+      status: "pending",
+      providerCode: null,
+      providerReason: null,
+      completedAt: null,
+      manualFailById: null,
+      manualFailByEmail: null,
+      manualFailNote: null,
+      manualFailAt: null,
+    })
+    .where(
+      and(
+        eq(paymentTransactionsTable.id, txn.id),
+        eq(paymentTransactionsTable.status, "failed"),
+      ),
+    )
+    .returning({ id: paymentTransactionsTable.id });
+  if (reopened.length === 0) {
+    res.status(409).json({
+      error: "This charge is no longer failed — it may have settled in the meantime.",
+    });
+    return;
+  }
+  const [fresh] = await db
+    .select()
+    .from(paymentTransactionsTable)
+    .where(eq(paymentTransactionsTable.id, txn.id));
+  res.json({
+    outcome: { kind: "reopened" },
+    verified: {
+      reachable: verified.reachable,
+      code: verified.code,
+      status: verified.status,
+      reason: verified.reason,
+      amountPesewas: verified.amountPesewas,
+    },
+    payment: fresh ?? txn,
+  });
+});
+
 export default router;

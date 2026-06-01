@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { toast } from "sonner";
-import { AlertTriangle, Clock, RefreshCw, XCircle } from "lucide-react";
+import { AlertTriangle, Clock, RefreshCw, RotateCcw, XCircle } from "lucide-react";
 
 type Payment = {
   id: string;
@@ -111,9 +111,10 @@ export default function PaymentsAdminPage() {
       }).then((r) => r.json()),
     refetchInterval: 15_000,
   });
-  const [busy, setBusy] = useState<{ id: string; action: "recheck" | "fail" } | null>(
-    null,
-  );
+  const [busy, setBusy] = useState<{
+    id: string;
+    action: "recheck" | "fail" | "reopen";
+  } | null>(null);
   const rows = data?.payments ?? [];
 
   const stuckCount = summary?.stuckCount ?? 0;
@@ -191,6 +192,35 @@ export default function PaymentsAdminPage() {
       }
       const kind = json.outcome?.kind ?? "unknown";
       toast.success(`Marked failed: ${kind}`);
+      void qc.invalidateQueries({ queryKey: ["admin", "payments"] });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const reopen = async (id: string) => {
+    if (
+      !window.confirm(
+        "Reopen this charge? We'll re-check with PaySwitch first and only reset it to pending if it's still unsettled — a charge PaySwitch reports as settled can't be reopened.",
+      )
+    ) {
+      return;
+    }
+    setBusy({ id, action: "reopen" });
+    try {
+      const res = await fetch(`/api/admin/payments/${id}/reopen`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        outcome?: { kind: string };
+      };
+      if (!res.ok) {
+        toast.error(json.error ?? "Reopen failed");
+        return;
+      }
+      toast.success("Reopened — reset to pending for re-verification");
       void qc.invalidateQueries({ queryKey: ["admin", "payments"] });
     } finally {
       setBusy(null);
@@ -403,6 +433,19 @@ export default function PaymentsAdminPage() {
                       ? "Failing…"
                       : "Mark failed"}
                   </Button>
+                  {manualFail && p.status === "failed" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busy?.id === p.id || !data?.payswitchConfigured}
+                      onClick={() => reopen(p.id)}
+                    >
+                      <RotateCcw className="size-3 mr-1" />
+                      {busy?.id === p.id && busy.action === "reopen"
+                        ? "Reopening…"
+                        : "Reopen"}
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

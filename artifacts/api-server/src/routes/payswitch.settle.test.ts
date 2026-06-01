@@ -373,6 +373,159 @@ function approvedStatus(amountPesewas: number) {
   };
 }
 
+/** Insert one standalone manually-failed payment_transactions row. */
+async function seedManuallyFailedTxn(opts: {
+  txnSuffix: string;
+}): Promise<{ txnRowId: string; transactionId: string }> {
+  const transactionId = `${TAG}-${opts.txnSuffix}`.slice(0, 24);
+  const [txn] = await db
+    .insert(paymentTransactionsTable)
+    .values({
+      provider: "payswitch",
+      transactionId,
+      purpose: "service_invoice",
+      purposeRef: null,
+      amount: 5000,
+      email: SUPER_EMAIL.toLowerCase(),
+      description: "manually failed test charge",
+      status: "failed",
+      providerCode: "manual",
+      providerReason: "manual_fail: wrong charge (by op)",
+      completedAt: new Date(),
+      manualFailById: superUserId,
+      manualFailByEmail: SUPER_EMAIL.toLowerCase(),
+      manualFailNote: "wrong charge",
+      manualFailAt: new Date(),
+      initiatedByUserId: superUserId,
+      successRedirect: "/billing/result?status=success",
+      failureRedirect: "/billing/result?status=failed",
+    })
+    .returning({ id: paymentTransactionsTable.id });
+  return { txnRowId: txn!.id, transactionId };
+}
+
+describe("admin reopen — undo an operator-forced fail", () => {
+  it("resets a manually-failed charge to pending and clears the audit columns when still unsettled", async () => {
+    const superCookie = await loginCookie(SUPER_EMAIL);
+    const { txnRowId } = await seedManuallyFailedTxn({ txnSuffix: "ro-ok" });
+    // Provider reachable but reports the charge as NOT paid (declined).
+    mockCheck.mockResolvedValue({
+      ok: false,
+      reachable: true,
+      code: "101",
+      status: "declined",
+      reason: "Declined",
+      amountPesewas: null,
+      raw: null,
+    });
+
+    const res = await request(app)
+      .post(`/api/admin/payments/${txnRowId}/reopen`)
+      .set("Cookie", superCookie)
+      .send({});
+    expect(res.status, res.text).toBe(200);
+    expect(res.body).toMatchObject({ outcome: { kind: "reopened" } });
+    expect(res.body.payment.status).toBe("pending");
+
+    const [after] = await db
+      .select()
+      .from(paymentTransactionsTable)
+      .where(eq(paymentTransactionsTable.id, txnRowId));
+    expect(after?.status).toBe("pending");
+    expect(after?.completedAt).toBeNull();
+    expect(after?.providerReason).toBeNull();
+    expect(after?.providerCode).toBeNull();
+    expect(after?.manualFailById).toBeNull();
+    expect(after?.manualFailByEmail).toBeNull();
+    expect(after?.manualFailNote).toBeNull();
+    expect(after?.manualFailAt).toBeNull();
+  });
+
+  it("refuses to reopen a charge the provider reports as settled (409)", async () => {
+    const superCookie = await loginCookie(SUPER_EMAIL);
+    const { txnRowId } = await seedManuallyFailedTxn({ txnSuffix: "ro-paid" });
+    mockCheck.mockResolvedValue(approvedStatus(5000));
+
+    const res = await request(app)
+      .post(`/api/admin/payments/${txnRowId}/reopen`)
+      .set("Cookie", superCookie)
+      .send({});
+    expect(res.status).toBe(409);
+
+    const [after] = await db
+      .select()
+      .from(paymentTransactionsTable)
+      .where(eq(paymentTransactionsTable.id, txnRowId));
+    // Untouched — still failed with its audit intact.
+    expect(after?.status).toBe("failed");
+    expect(after?.manualFailById).toBe(superUserId);
+  });
+
+  it("refuses to reopen when the provider is unreachable (409)", async () => {
+    const superCookie = await loginCookie(SUPER_EMAIL);
+    const { txnRowId } = await seedManuallyFailedTxn({ txnSuffix: "ro-unr" });
+    mockCheck.mockResolvedValue({
+      ok: false,
+      reachable: false,
+      code: "",
+      status: "network_error",
+      reason: "boom",
+      amountPesewas: null,
+      raw: null,
+    });
+
+    const res = await request(app)
+      .post(`/api/admin/payments/${txnRowId}/reopen`)
+      .set("Cookie", superCookie)
+      .send({});
+    expect(res.status).toBe(409);
+
+    const [after] = await db
+      .select()
+      .from(paymentTransactionsTable)
+      .where(eq(paymentTransactionsTable.id, txnRowId));
+    expect(after?.status).toBe("failed");
+  });
+
+  it("refuses to reopen a genuine provider-reported failure (not manual) with 409", async () => {
+    const superCookie = await loginCookie(SUPER_EMAIL);
+    const { txnRowId } = await seedBarePendingTxn({
+      txnSuffix: "ro-prov",
+      status: "failed",
+    });
+    const res = await request(app)
+      .post(`/api/admin/payments/${txnRowId}/reopen`)
+      .set("Cookie", superCookie)
+      .send({});
+    expect(res.status).toBe(409);
+    // Provider must never be contacted — we bail before verification.
+    expect(mockCheck).not.toHaveBeenCalled();
+
+    const [after] = await db
+      .select()
+      .from(paymentTransactionsTable)
+      .where(eq(paymentTransactionsTable.id, txnRowId));
+    expect(after?.status).toBe("failed");
+  });
+
+  it("rejects a non-super-admin caller with 403", async () => {
+    const adminCookie = await loginCookie(ADMIN_EMAIL);
+    const { txnRowId } = await seedManuallyFailedTxn({ txnSuffix: "ro-403" });
+    const res = await request(app)
+      .post(`/api/admin/payments/${txnRowId}/reopen`)
+      .set("Cookie", adminCookie)
+      .send({});
+    expect(res.status).toBe(403);
+    expect(mockCheck).not.toHaveBeenCalled();
+
+    const [after] = await db
+      .select()
+      .from(paymentTransactionsTable)
+      .where(eq(paymentTransactionsTable.id, txnRowId));
+    expect(after?.status).toBe("failed");
+  });
+});
+
 describe("payswitch webhook — re-verifies and settles", () => {
   it("settles a pending txn from {transaction_id} only and is idempotent on replay", async () => {
     const { subId, txnRowId, transactionId } = await seedPendingTxn({
