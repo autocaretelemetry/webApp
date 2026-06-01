@@ -1,0 +1,35 @@
+# Render Blueprint — single-service deploy for AutoCare.
+# The API server serves the built web SPA from the same origin (see
+# artifacts/api-server/src/app.ts resolveWebDistDir + SPA fallback), so there is
+# only ONE service and no cross-origin CORS/cookie work is needed.
+#
+# IMPORTANT: do NOT use the root `pnpm run build` — it recursively builds every
+# artifact (mobile/expo + mockup-sandbox) and will fail the deploy. Build only
+# the web app and the api-server, in that order.
+services:
+  - type: web
+    name: autocare
+    runtime: node
+    plan: starter
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @workspace/autocare run build && pnpm --filter @workspace/api-server run build
+    startCommand: pnpm --filter @workspace/api-server run start
+    healthCheckPath: /api/healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      # Asset base path for the web build (same-origin). Keep VITE_API_BASE_URL
+      # UNSET so the web app talks to same-origin /api.
+      - key: BASE_PATH
+        value: /
+      - key: DATABASE_URL
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: PAYSWITCH_MERCHANT_ID
+        sync: false
+      - key: PAYSWITCH_API_USER
+        sync: false
+      - key: PAYSWITCH_API_KEY
+        sync: false
