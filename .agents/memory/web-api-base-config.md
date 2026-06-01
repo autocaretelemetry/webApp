@@ -17,3 +17,14 @@ The web app supports two deploy shapes from one build: same-origin (Replit proxy
 **Audit before claiming done:** grep for `fetch("/api`, `href={…url}`, and `<img src={…}` across `artifacts/autocare/src`; the only allowed bare `/api` literals are comments, the persisted onChange storage lines, and the two helper files. A reviewer caught media `href`s and direct `<img>` sinks three separate times — fetch-only sweeps miss them.
 
 **Known gap (intentional):** cross-origin cookie auth (`credentials:"include"` + cookie sessions) needs server CORS + `SameSite=None; Secure` cookies for true two-origin operation; not yet implemented.
+
+## Deploying off Replit (Render etc.)
+
+Two shapes — prefer **single-service**:
+- **Single Node service (recommended):** the API server serves the built web SPA from the same origin. `app.ts` `resolveWebDistDir()` locates `artifacts/autocare/dist/public` and adds `express.static` + an SPA fallback, gated off when `NODE_ENV==="development"` (Replit dev keeps web on the Vite server). Same origin → the cross-origin cookie gap above is moot. Build only the web + api (`--filter`), never the root `pnpm run build`.
+- **Split-domain:** static web site + separate API service; requires the unfinished CORS + cookie work, so login won't persist.
+
+**Why these bite:**
+- The web `vite.config.ts` historically threw on missing `PORT` even for a static `vite build`; a Static-Site/CI build has no server and no `PORT`, so it failed. Fix: enforce `PORT` only when `command === "serve"`. `BASE_PATH` is still required at build (sets asset base; use `/`).
+- The **root** `pnpm run build` builds *every* artifact incl. mobile (expo) + mockup-sandbox; any one failing kills the deploy. A single service must use a targeted `--filter` build, not the root build.
+- SPA fallback must skip the API: guard with segment-aware, case-insensitive `^/api(?:/|$)` (not `startsWith("/api")`, which false-matches `/apiary`) and mount it AFTER the `/api` router.
