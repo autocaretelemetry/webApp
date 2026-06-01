@@ -419,8 +419,8 @@ function DocImg({ label, url }: { label: string; url?: string | null }) {
       <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
       <div className="aspect-[4/3] rounded-md bg-muted border overflow-hidden">
         {url ? (
-          <a href={url} target="_blank" rel="noreferrer">
-            <img src={url} alt={label} className="w-full h-full object-cover" />
+          <a href={resolveImageUrl(url)} target="_blank" rel="noreferrer">
+            <img src={resolveImageUrl(url)} alt={label} className="w-full h-full object-cover" />
           </a>
         ) : (
           <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">Not provided</div>

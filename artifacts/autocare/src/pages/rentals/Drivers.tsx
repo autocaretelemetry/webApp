@@ -9,6 +9,7 @@ import {
 } from "@workspace/api-client-react";
 import { getListDriversQueryKey } from "@/lib/queryKeys";
 import { describeMutationError } from "@/lib/adminErrors";
+import { resolveImageUrl } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
 import { useUpload } from "@workspace/object-storage-web";
 import { PageHeader } from "@/components/PageHeader";
@@ -290,7 +291,7 @@ export default function DriversPage() {
               <div className="flex gap-3 p-4">
                 <div className="h-16 w-16 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
                   {d.photoUrl ? (
-                    <img src={d.photoUrl} alt={d.name} className="w-full h-full object-cover" />
+                    <img src={resolveImageUrl(d.photoUrl)} alt={d.name} className="w-full h-full object-cover" />
                   ) : (
                     <User className="h-7 w-7 text-muted-foreground" />
                   )}
@@ -396,7 +397,7 @@ function PhotoField({
         onClick={() => inputRef.current?.click()}
       >
         {url ? (
-          <img src={url} alt="Driver" className="w-full h-full object-cover" />
+          <img src={resolveImageUrl(url)} alt="Driver" className="w-full h-full object-cover" />
         ) : isUploading ? (
           <div className="flex flex-col items-center gap-1 text-xs text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />

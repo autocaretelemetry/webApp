@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/format";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useListMechanics,
@@ -78,7 +79,7 @@ export default function AdminMechanics() {
             <CardContent className="p-4 flex items-center gap-3">
               <div className="h-11 w-11 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0 overflow-hidden">
                 {m.avatarUrl ? (
-                  <img src={m.avatarUrl} alt={m.name} className="w-full h-full object-cover" />
+                  <img src={resolveImageUrl(m.avatarUrl)} alt={m.name} className="w-full h-full object-cover" />
                 ) : (
                   <Wrench className="h-5 w-5" />
                 )}

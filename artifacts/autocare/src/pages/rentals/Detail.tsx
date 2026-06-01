@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/format";
 import { useEffect, useMemo, useState } from "react";
 import { recordRecentlyViewedCar } from "@/lib/recentCars";
 import { Link, useParams, useSearch, useLocation } from "wouter";
@@ -235,7 +236,7 @@ export default function RentalDetail() {
                   <div className="h-16 w-16 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
                     {car.driver.photoUrl ? (
                       <img
-                        src={car.driver.photoUrl}
+                        src={resolveImageUrl(car.driver.photoUrl)}
                         alt={car.driver.name}
                         className="w-full h-full object-cover"
                       />

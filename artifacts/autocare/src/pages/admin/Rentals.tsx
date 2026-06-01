@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/format";
 import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -284,7 +285,7 @@ function CarGrid({
           <CardContent className="p-4 flex gap-3">
             <div className="h-24 w-32 rounded-md bg-muted overflow-hidden flex-shrink-0">
               {c.imageUrl ? (
-                <img src={c.imageUrl} alt={c.model} className="w-full h-full object-cover" />
+                <img src={resolveImageUrl(c.imageUrl)} alt={c.model} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                   <Car className="h-8 w-8" />

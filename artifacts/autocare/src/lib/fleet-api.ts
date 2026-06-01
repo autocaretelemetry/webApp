@@ -1,12 +1,12 @@
 import { useQuery, useMutation, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
+import { API_ROOT } from "./api-base";
 
 // Fleet endpoints intentionally live outside the OpenAPI contract (same
 // pattern as the maintenance-history CSV/PDF route): they're consumed
 // only by this single web client, so we hit them with plain fetch +
-// React Query and keep codegen churn down. Always go through the proxy
-// at the app's BASE_URL — never call the API service port directly.
-
-const API = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/api`;
+// React Query and keep codegen churn down. Resolves to the same-origin
+// proxy on Replit, or the configured VITE_API_BASE_URL origin (e.g. Render).
+const API = API_ROOT;
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API}${path}`, {
@@ -466,8 +466,8 @@ export async function downloadFleetHistory(opts: {
   filename: string;
 }): Promise<void> {
   const base = opts.vehicleId
-    ? `/api/organizations/${opts.orgId}/vehicles/${opts.vehicleId}/maintenance-history.${opts.format}`
-    : `/api/organizations/${opts.orgId}/maintenance-history.${opts.format}`;
+    ? `${API}/organizations/${opts.orgId}/vehicles/${opts.vehicleId}/maintenance-history.${opts.format}`
+    : `${API}/organizations/${opts.orgId}/maintenance-history.${opts.format}`;
   const res = await fetch(base, { credentials: "include" });
   if (!res.ok) {
     const text = await res.text().catch(() => "");

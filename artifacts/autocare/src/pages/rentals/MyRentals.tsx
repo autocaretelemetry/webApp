@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getListRentalBookingsQueryKey } from "@/lib/queryKeys";
 import { describeMutationError } from "@/lib/adminErrors";
+import { API_ROOT } from "../../lib/api-base";
 import { useAuth } from "@/lib/auth";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
@@ -101,7 +102,7 @@ export default function MyRentals() {
   const pay = async (booking: RentalBooking, method: "online" | "cash_on_pickup") => {
     if (method === "online") {
       try {
-        const res = await fetch(`/api/payments/payswitch/rental-bookings/${booking.id}`, {
+        const res = await fetch(`${API_ROOT}/payments/payswitch/rental-bookings/${booking.id}`, {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -283,7 +284,7 @@ function RentalRow({
                 asChild
               >
                 <a
-                  href={`/api/rental-bookings/${b.id}/receipt.pdf`}
+                  href={`${API_ROOT}/rental-bookings/${b.id}/receipt.pdf`}
                   target="_blank"
                   rel="noreferrer"
                 >

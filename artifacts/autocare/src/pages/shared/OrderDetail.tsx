@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/format";
 import { useEffect, useState } from "react";
 import { useParams, useLocation, Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -17,6 +18,7 @@ import {
   getListDeliveryAgentsQueryKey,
   getGetBookingQueryKey,
 } from "@/lib/queryKeys";
+import { API_ROOT } from "../../lib/api-base";
 import { PageHeader } from "@/components/PageHeader";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
 import { PaymentBadge } from "@/components/PaymentBadge";
@@ -127,7 +129,7 @@ export default function OrderDetail() {
   ) => {
     setPayingOnline(true);
     try {
-      const res = await fetch(`/api/payments/payswitch/parts-orders/${order.id}/${endpoint}`, {
+      const res = await fetch(`${API_ROOT}/payments/payswitch/parts-orders/${order.id}/${endpoint}`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -273,7 +275,7 @@ export default function OrderDetail() {
                   <div key={line.id} className="flex gap-3">
                     <div className="w-16 h-16 rounded-md bg-muted overflow-hidden flex-shrink-0 flex items-center justify-center">
                       {line.snapshot.imageUrl ? (
-                        <img src={line.snapshot.imageUrl} alt={line.snapshot.name} className="w-full h-full object-cover" />
+                        <img src={resolveImageUrl(line.snapshot.imageUrl)} alt={line.snapshot.name} className="w-full h-full object-cover" />
                       ) : (
                         <Package className="h-6 w-6 text-muted-foreground/40" />
                       )}

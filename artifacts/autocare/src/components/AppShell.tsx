@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useAuth } from "@/lib/auth";
 import { resolveImageUrl } from "@/lib/format";
+import { API_ROOT } from "../lib/api-base";
 import {
   Car,
   Wrench,
@@ -423,7 +424,7 @@ function useApprovalsPendingCount(enabled: boolean): number | null {
     let cancelled = false;
     async function load(): Promise<void> {
       try {
-        const res = await fetch("/api/admin/approvals/counts", {
+        const res = await fetch(`${API_ROOT}/admin/approvals/counts`, {
           credentials: "include",
         });
         if (!res.ok) return;

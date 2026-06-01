@@ -10,6 +10,7 @@ import {
   getListSubscriptionPlansQueryKey,
   getListSubscriptionsQueryKey,
 } from "@/lib/queryKeys";
+import { API_ROOT } from "../../lib/api-base";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -46,7 +47,7 @@ export default function Subscribe() {
   const { data: optionsResp, isLoading: optsLoading } = useQuery<{ options: SubscriberOption[] }>({
     queryKey: ["me/subscriber-options"],
     queryFn: async () => {
-      const r = await fetch("/api/me/subscriber-options", { credentials: "include" });
+      const r = await fetch(`${API_ROOT}/me/subscriber-options`, { credentials: "include" });
       if (!r.ok) throw new Error("Could not load subscriber options");
       return r.json();
     },
@@ -96,7 +97,7 @@ export default function Subscribe() {
   const initiate = useMutation({
     mutationFn: async (planId: string) => {
       if (!selected) throw new Error("Pick an account first");
-      const r = await fetch("/api/payments/payswitch/subscriptions", {
+      const r = await fetch(`${API_ROOT}/payments/payswitch/subscriptions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

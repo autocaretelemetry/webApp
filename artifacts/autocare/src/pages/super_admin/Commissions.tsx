@@ -8,10 +8,11 @@ import { Label } from "@/components/ui/label";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { Percent, Wrench, Package, Car, Save } from "lucide-react";
 import { toast } from "sonner";
+import { API_ROOT } from "../../lib/api-base";
 
 // Commission endpoints intentionally live outside OpenAPI (single client,
 // super-admin only) — call them with plain fetch through the proxy.
-const API = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/api`;
+const API = API_ROOT;
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API}${path}`, {
     credentials: "include",

@@ -12,6 +12,7 @@ Connected automotive service platform pairing vehicle owners, renters, service c
 - `pnpm --filter @workspace/api-spec run codegen` — regen hooks + Zod schemas from OpenAPI
 - `pnpm --filter @workspace/db run push` — push DB schema (dev only)
 - Required env: `DATABASE_URL`
+- Split-domain deploys (e.g. Render: static web site + separate API service): set web build-time env `VITE_API_BASE_URL` to the API server's absolute origin (e.g. `https://autocare-api.onrender.com`, no trailing `/api`). Unset → same-origin `/api` proxy (Replit default). See `artifacts/autocare/src/lib/api-base.ts`. Note: two-origin deploys also need server CORS (`Access-Control-Allow-Credentials` + specific origin) and `SameSite=None; Secure` session cookies — not yet wired.
 
 ## Stack
 

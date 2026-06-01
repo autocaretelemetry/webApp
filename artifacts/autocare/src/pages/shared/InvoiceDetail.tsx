@@ -10,6 +10,7 @@ import { InvoiceSummary } from "@/components/InvoiceSummary";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
+import { API_ROOT } from "../../lib/api-base";
 
 export default function InvoiceDetail() {
   const params = useParams();
@@ -63,7 +64,7 @@ export default function InvoiceDetail() {
   const handlePay = async () => {
     setPayingOnline(true);
     try {
-      const res = await fetch(`/api/payments/payswitch/service-invoices/${invoiceId}`, {
+      const res = await fetch(`${API_ROOT}/payments/payswitch/service-invoices/${invoiceId}`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

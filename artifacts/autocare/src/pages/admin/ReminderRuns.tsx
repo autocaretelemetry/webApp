@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { formatDateTime } from "@/lib/format";
+import { API_ROOT } from "../../lib/api-base";
 
 type ReminderRun = {
   id: string;
@@ -51,7 +52,7 @@ export default function AdminReminderRuns() {
   const { data, isLoading, refetch } = useQuery<ReminderRunsResponse>({
     queryKey: REMINDER_RUNS_KEY,
     queryFn: async () => {
-      const res = await fetch("/api/notifications/reminder-runs", {
+      const res = await fetch(`${API_ROOT}/notifications/reminder-runs`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error(`Failed to load reminder runs (${res.status})`);
@@ -68,7 +69,7 @@ export default function AdminReminderRuns() {
   async function triggerNow() {
     setIsTriggering(true);
     try {
-      const res = await fetch("/api/notifications/generate-reminders", {
+      const res = await fetch(`${API_ROOT}/notifications/generate-reminders`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

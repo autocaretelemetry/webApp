@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Clock, Loader2, Send } from "lucide-react";
+import { API_ROOT } from "../../lib/api-base";
 
 type PublicAction =
   | "applied"
@@ -71,7 +72,7 @@ export function MyApprovalTimeline({ title = "Your decision history" }: { title?
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/me/approval-events", { credentials: "include" });
+        const res = await fetch(`${API_ROOT}/me/approval-events`, { credentials: "include" });
         if (!res.ok) throw new Error("Failed to load history");
         const data = (await res.json()) as ApprovalEvent[];
         if (!cancelled) setEvents(data.filter((e) => !e.internal && e.action !== "note"));

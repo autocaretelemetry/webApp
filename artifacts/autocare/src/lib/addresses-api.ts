@@ -1,11 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { API_ROOT } from "./api-base";
 
 // Saved-shipping-address book lives outside the OpenAPI contract (same
 // precedent as the fleet routes): single client, plain fetch + React
-// Query so we skip codegen churn. Always go through the proxy at the
-// app's BASE_URL — never call the API service port directly.
-
-const API = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/api`;
+// Query so we skip codegen churn. Resolves to the same-origin proxy on
+// Replit, or the configured VITE_API_BASE_URL origin (e.g. Render).
+const API = API_ROOT;
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API}${path}`, {

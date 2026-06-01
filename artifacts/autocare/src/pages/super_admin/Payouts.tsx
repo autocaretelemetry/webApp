@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDateTime } from "@/lib/format";
+import { API_ROOT } from "../../lib/api-base";
 import { toast } from "sonner";
 import { RefreshCw, CheckCircle2 } from "lucide-react";
 
@@ -49,13 +50,13 @@ export default function PayoutsAdminPage() {
   const { data, isLoading } = useQuery<{ disburseConfigured: boolean; payouts: Payout[] }>({
     queryKey: ["admin", "payouts", filter],
     queryFn: () =>
-      fetch(`/api/admin/payouts${filter ? `?status=${filter}` : ""}`, { credentials: "include" })
+      fetch(`${API_ROOT}/admin/payouts${filter ? `?status=${filter}` : ""}`, { credentials: "include" })
         .then((r) => r.json()),
   });
   const rows = data?.payouts ?? [];
 
   const retry = async (id: string) => {
-    const res = await fetch(`/api/admin/payouts/${id}/retry`, {
+    const res = await fetch(`${API_ROOT}/admin/payouts/${id}/retry`, {
       method: "POST",
       credentials: "include",
     });
@@ -72,7 +73,7 @@ export default function PayoutsAdminPage() {
     const reference = window.prompt("PaySwitch / bank reference for this manual settlement:");
     if (!reference) return;
     const note = window.prompt("Optional note:") ?? undefined;
-    const res = await fetch(`/api/admin/payouts/${id}/mark-paid`, {
+    const res = await fetch(`${API_ROOT}/admin/payouts/${id}/mark-paid`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },

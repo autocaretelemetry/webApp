@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDateTime } from "@/lib/format";
+import { API_ROOT } from "../../lib/api-base";
 import { toast } from "sonner";
 import { AlertTriangle, Clock, RefreshCw, RotateCcw, XCircle } from "lucide-react";
 
@@ -94,7 +95,7 @@ export default function PaymentsAdminPage() {
   }>({
     queryKey: ["admin", "payments", filter],
     queryFn: () =>
-      fetch(`/api/admin/payments${filter ? `?status=${filter}` : ""}`, {
+      fetch(`${API_ROOT}/admin/payments${filter ? `?status=${filter}` : ""}`, {
         credentials: "include",
       }).then((r) => r.json()),
     refetchInterval: 15_000,
@@ -106,7 +107,7 @@ export default function PaymentsAdminPage() {
   }>({
     queryKey: ["admin", "payments", "stuck-summary"],
     queryFn: () =>
-      fetch(`/api/admin/payments/stuck-summary`, {
+      fetch(`${API_ROOT}/admin/payments/stuck-summary`, {
         credentials: "include",
       }).then((r) => r.json()),
     refetchInterval: 15_000,
@@ -144,7 +145,7 @@ export default function PaymentsAdminPage() {
   const recheck = async (id: string) => {
     setBusy({ id, action: "recheck" });
     try {
-      const res = await fetch(`/api/admin/payments/${id}/recheck`, {
+      const res = await fetch(`${API_ROOT}/admin/payments/${id}/recheck`, {
         method: "POST",
         credentials: "include",
       });
@@ -176,7 +177,7 @@ export default function PaymentsAdminPage() {
     const note = window.prompt("Audit note (why are you failing this charge?):") ?? "";
     setBusy({ id, action: "fail" });
     try {
-      const res = await fetch(`/api/admin/payments/${id}/mark-failed`, {
+      const res = await fetch(`${API_ROOT}/admin/payments/${id}/mark-failed`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -208,7 +209,7 @@ export default function PaymentsAdminPage() {
     }
     setBusy({ id, action: "reopen" });
     try {
-      const res = await fetch(`/api/admin/payments/${id}/reopen`, {
+      const res = await fetch(`${API_ROOT}/admin/payments/${id}/reopen`, {
         method: "POST",
         credentials: "include",
       });

@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/format";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useListVendors,
@@ -67,7 +68,7 @@ export default function AdminVendors() {
             <CardContent className="p-5 flex items-start gap-3">
               <div className="h-12 w-12 rounded-md bg-primary/10 text-primary flex items-center justify-center flex-shrink-0 overflow-hidden">
                 {v.logoUrl ? (
-                  <img src={v.logoUrl} alt={v.name} className="w-full h-full object-cover" />
+                  <img src={resolveImageUrl(v.logoUrl)} alt={v.name} className="w-full h-full object-cover" />
                 ) : (
                   <Store className="h-6 w-6" />
                 )}

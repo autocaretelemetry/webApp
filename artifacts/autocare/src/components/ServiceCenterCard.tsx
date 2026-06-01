@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/format";
 import { ServiceCenter } from "@workspace/api-client-react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +18,7 @@ export function ServiceCenterCard({ center, onRetainer = false }: ServiceCenterC
       {center.imageUrl && (
         <div className="h-40 w-full overflow-hidden bg-muted">
           <img 
-            src={center.imageUrl} 
+            src={resolveImageUrl(center.imageUrl)} 
             alt={center.name} 
             className="h-full w-full object-cover"
           />

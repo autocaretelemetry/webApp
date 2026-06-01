@@ -1,2 +1,3 @@
-- [Role system is account-bound](role-system-account-bound.md) — web/mobile clamp non-super_admins to their account role; "remove role switcher for prod" is mostly a no-op, only demo login shortcuts + direct setRole pages need removal.
-- [Payment manual settlement](payment-manual-settlement.md) — operator actions on payment_transactions must route through settleVerifiedTransaction (synthetic StatusCheckResult); handleFailure CAS-guards its flip.
+- [Role system is account-bound](role-system-account-bound.md) — non-super_admins are clamped to their account role; "remove role switcher" is mostly a no-op.
+- [Payment manual settlement](payment-manual-settlement.md) — operator payment actions must route through the single verified-settlement dispatcher; flips are CAS/idempotent-guarded.
+- [Web configurable API origin](web-api-base-config.md) — same-origin vs external API; route fetch via API_ROOT and ALL media (img src + a href) via resolveImageUrl, not just fetch.

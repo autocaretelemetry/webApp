@@ -20,11 +20,12 @@ import { ImageUploader } from "@/components/ImageUploader";
 import { formatCurrency, resolveImageUrl } from "@/lib/format";
 import { toast } from "sonner";
 import { Building2, Loader2, Package, Plus, Save, X } from "lucide-react";
+import { API_ROOT } from "../../lib/api-base";
 
 // Center-shop endpoints live outside the OpenAPI surface (single client,
 // plain Express + Zod on the server). We hit them with fetch + React Query
 // the same way the fleet endpoints do.
-const API = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/api`;
+const API = API_ROOT;
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API}${path}`, {
@@ -469,7 +470,7 @@ function useMyCenter() {
   return useQuery<{ id: string; name: string } | null>({
     queryKey: ["me/subscriber-options", "center"],
     queryFn: async () => {
-      const r = await fetch("/api/me/subscriber-options", {
+      const r = await fetch(`${API}/me/subscriber-options`, {
         credentials: "include",
       });
       if (!r.ok) throw new Error(`Request failed (${r.status})`);

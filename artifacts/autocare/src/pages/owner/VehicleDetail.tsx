@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/format";
 import { useParams, Link } from "wouter";
 import { useGetVehicle, useGetVehicleHistory, useGetVehicleReminders, getGetVehicleQueryKey, getGetVehicleHistoryQueryKey, getGetVehicleRemindersQueryKey } from "@workspace/api-client-react";
 import { PageHeader } from "@/components/PageHeader";
@@ -7,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Car, Settings, Hash, Calendar, AlertCircle, Download } from "lucide-react";
 import { toast } from "sonner";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { API_ROOT } from "../../lib/api-base";
 import { Badge } from "@/components/ui/badge";
 import { ServiceIntervalCard } from "@/components/ServiceIntervalCard";
 
@@ -26,7 +28,7 @@ export default function VehicleDetail() {
   const downloadHistory = async (format: "csv" | "pdf") => {
     try {
       const res = await fetch(
-        `/api/vehicles/${vehicle.id}/maintenance-history.${format}`,
+        `${API_ROOT}/vehicles/${vehicle.id}/maintenance-history.${format}`,
         { credentials: "include" },
       );
       if (res.status === 402) {
@@ -67,7 +69,7 @@ export default function VehicleDetail() {
         <Card className="md:col-span-1 overflow-hidden">
           {vehicle.imageUrl ? (
              <div className="h-48 w-full bg-muted">
-               <img src={vehicle.imageUrl} alt="Vehicle" className="h-full w-full object-cover" />
+               <img src={resolveImageUrl(vehicle.imageUrl)} alt="Vehicle" className="h-full w-full object-cover" />
              </div>
           ) : (
             <div className="h-48 w-full bg-muted flex items-center justify-center">

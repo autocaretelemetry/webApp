@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/format";
 import { useParams, Link } from "wouter";
 import { useGetServiceCenter, useListMechanicsForCenter, getGetServiceCenterQueryKey, getListMechanicsForCenterQueryKey } from "@workspace/api-client-react";
 import { PageHeader } from "@/components/PageHeader";
@@ -22,7 +23,7 @@ export default function ServiceCenterDetail() {
     <div className="space-y-8 animate-in fade-in-50 duration-500">
       <div className="relative h-64 rounded-xl overflow-hidden bg-muted mb-8">
         {center.imageUrl ? (
-          <img src={center.imageUrl} alt={center.name} className="w-full h-full object-cover" />
+          <img src={resolveImageUrl(center.imageUrl)} alt={center.name} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <Store className="h-16 w-16 text-muted-foreground/30" />

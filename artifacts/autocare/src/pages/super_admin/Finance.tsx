@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/format";
+import { API_ROOT } from "../../lib/api-base";
 import {
   Bar,
   BarChart,
@@ -84,7 +85,7 @@ function formatDay(iso: string): string {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-const API = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/api`;
+const API = API_ROOT;
 
 export default function Finance() {
   const [days, setDays] = useState(30);

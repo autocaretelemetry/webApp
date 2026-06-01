@@ -8,6 +8,7 @@ import {
 import { getGetRenterProfileByPhoneQueryKey } from "@/lib/queryKeys";
 import { useAuth } from "@/lib/auth";
 import { describeMutationError } from "@/lib/adminErrors";
+import { resolveImageUrl } from "@/lib/format";
 import { useUpload } from "@workspace/object-storage-web";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -313,7 +314,7 @@ function UploadField({
         tabIndex={0}
       >
         {url ? (
-          <img src={url} alt={label} className="w-full h-full object-cover" />
+          <img src={resolveImageUrl(url)} alt={label} className="w-full h-full object-cover" />
         ) : isUploading ? (
           <div className="flex flex-col items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />

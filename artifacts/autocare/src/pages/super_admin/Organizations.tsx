@@ -3,8 +3,9 @@ import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Building2, Users, Truck, MapPin, ShieldCheck } from "lucide-react";
+import { API_ROOT } from "../../lib/api-base";
 
-const API = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/api`;
+const API = API_ROOT;
 
 type AdminOrg = {
   id: string;

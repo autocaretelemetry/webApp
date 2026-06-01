@@ -3,6 +3,7 @@ import { useLocation, Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCreateOrder, useGetBooking, useListOrders, getListOrdersQueryKey as genGetListOrdersQueryKey } from "@workspace/api-client-react";
 import { getListOrdersQueryKey, getListPartsQueryKey, getGetBookingQueryKey } from "@/lib/queryKeys";
+import { API_ROOT } from "../../lib/api-base";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -421,7 +422,7 @@ export default function Checkout() {
       if (results.length === 1) {
         try {
           const res = await fetch(
-            `/api/payments/payswitch/parts-orders/${results[0].id}/direct-buy`,
+            `${API_ROOT}/payments/payswitch/parts-orders/${results[0].id}/direct-buy`,
             {
               method: "POST",
               credentials: "include",

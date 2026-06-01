@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { API_ROOT } from "../../lib/api-base";
 import { toast } from "sonner";
 import {
   Car,
@@ -78,7 +79,7 @@ const KYC_META: Record<OwnerRow["kycStatus"], { label: string; cls: string }> = 
 };
 
 async function loadOwners(): Promise<OwnerRow[]> {
-  const res = await fetch("/api/admin/owners", { credentials: "include" });
+  const res = await fetch(`${API_ROOT}/admin/owners`, { credentials: "include" });
   if (!res.ok) throw new Error("Failed to load owners");
   return res.json();
 }
@@ -127,7 +128,7 @@ export default function AdminOwners() {
   async function setStatus(row: OwnerRow, approvalStatus: "approved" | "rejected", note?: string) {
     setBusyId(row.id);
     try {
-      const res = await fetch(`/api/admin/users/${row.id}/status`, {
+      const res = await fetch(`${API_ROOT}/admin/users/${row.id}/status`, {
         method: "PATCH",
         credentials: "include",
         headers: { "content-type": "application/json" },

@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { MyApprovalTimeline } from "./MyApprovalTimeline";
+import { API_ROOT } from "../../lib/api-base";
+import { resolveImageUrl } from "@/lib/format";
 
 type DocSpec = { key: string; label: string; required: boolean };
 
@@ -80,7 +82,7 @@ export default function OnboardingKyc() {
       const documents = docs
         .filter((d) => urls[d.key])
         .map((d) => ({ key: d.key, label: d.label, url: urls[d.key]! }));
-      const res = await fetch("/api/me/kyc", {
+      const res = await fetch(`${API_ROOT}/me/kyc`, {
         method: "POST",
         credentials: "include",
         headers: { "content-type": "application/json" },
@@ -271,7 +273,7 @@ function UploadField({
         tabIndex={0}
       >
         {url ? (
-          <img src={url} alt={label} className="w-full h-full object-cover" />
+          <img src={resolveImageUrl(url)} alt={label} className="w-full h-full object-cover" />
         ) : isUploading ? (
           <div className="flex flex-col items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />

@@ -1,11 +1,13 @@
 import { format, formatDistanceToNow, isToday, isYesterday } from "date-fns";
+import { API_ORIGIN, API_ROOT } from "./api-base";
 
 /**
  * Resolve an image reference to a renderable URL. Accepts:
  *  - absolute URLs (`http://…`, `https://…`, `data:…`, `blob:…`) — returned as-is
- *  - already-prefixed app paths (`/api/…`) — returned as-is
+ *  - already-prefixed app paths (`/api/…`) — kept relative on same-origin
+ *    deploys, or absolutised onto the configured API origin (Render).
  *  - storage object paths (e.g. `uploads/<id>` or `/objects/<id>`) — wrapped
- *    into `/api/storage/objects/<id>` so the API serves the bytes.
+ *    into `<api>/storage/objects/<id>` so the API serves the bytes.
  *  - empty/nullish — returns an empty string so callers can fallback.
  */
 export function resolveImageUrl(value: string | null | undefined): string {
@@ -13,9 +15,9 @@ export function resolveImageUrl(value: string | null | undefined): string {
   const v = value.trim();
   if (!v) return "";
   if (/^(https?:|data:|blob:)/i.test(v)) return v;
-  if (v.startsWith("/api/")) return v;
+  if (v.startsWith("/api/")) return API_ORIGIN ? `${API_ORIGIN}${v}` : v;
   const cleaned = v.replace(/^\/+/, "").replace(/^objects\//, "");
-  return `/api/storage/objects/${cleaned}`;
+  return `${API_ROOT}/storage/objects/${cleaned}`;
 }
 
 export function formatCurrency(amount: number): string {

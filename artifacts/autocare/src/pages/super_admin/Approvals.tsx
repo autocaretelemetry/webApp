@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/format";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,6 +25,7 @@ import {
   TabsTrigger,
   TabsContent,
 } from "@/components/ui/tabs";
+import { API_ROOT } from "../../lib/api-base";
 import { toast } from "sonner";
 import {
   CheckCircle2,
@@ -212,7 +214,7 @@ async function fetchApprovals(params: {
   if (params.role && params.role !== "all") qs.set("role", params.role);
   if (params.q.trim()) qs.set("q", params.q.trim());
   if (params.cursor) qs.set("cursor", params.cursor);
-  const res = await fetch(`/api/admin/approvals?${qs.toString()}`, {
+  const res = await fetch(`${API_ROOT}/admin/approvals?${qs.toString()}`, {
     credentials: "include",
   });
   if (!res.ok) throw new Error("Failed to load");
@@ -240,7 +242,7 @@ export default function ApprovalsPage() {
 
   const refreshCounts = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/approvals/counts", {
+      const res = await fetch(`${API_ROOT}/admin/approvals/counts`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed");
@@ -400,7 +402,7 @@ function ApprovalsList({
     }
     setBusy(row.id);
     try {
-      const url = kind === "kyc" ? `/api/admin/kyc/${row.id}` : `/api/admin/approvals/${row.id}`;
+      const url = kind === "kyc" ? `${API_ROOT}/admin/kyc/${row.id}` : `${API_ROOT}/admin/approvals/${row.id}`;
       const body =
         kind === "kyc"
           ? {
@@ -437,7 +439,7 @@ function ApprovalsList({
   async function resend(row: AuthedUserRow) {
     setBusy(row.id);
     try {
-      const res = await fetch(`/api/admin/approvals/${row.id}/resend-email`, {
+      const res = await fetch(`${API_ROOT}/admin/approvals/${row.id}/resend-email`, {
         method: "POST",
         credentials: "include",
       });
@@ -700,13 +702,13 @@ function ApprovalsList({
                   return (
                     <a
                       key={d.key}
-                      href={d.url}
+                      href={resolveImageUrl(d.url)}
                       target="_blank"
                       rel="noreferrer"
                       className="block rounded-md border bg-card hover:border-primary/40 overflow-hidden"
                     >
                       <div className="aspect-[4/3] bg-muted flex items-center justify-center">
-                        <img src={d.url} alt={d.label} className="w-full h-full object-cover" />
+                        <img src={resolveImageUrl(d.url)} alt={d.label} className="w-full h-full object-cover" />
                       </div>
                       <div className="px-2 py-1.5 text-[11px] flex items-center gap-1.5">
                         <FileText className="h-3 w-3" /> {d.label}
@@ -779,7 +781,7 @@ function ApprovalsList({
                       <div className="flex items-center justify-between gap-2 mb-1.5">
                         <span className="text-xs font-medium">{d.label}</span>
                         <a
-                          href={d.url}
+                          href={resolveImageUrl(d.url)}
                           target="_blank"
                           rel="noreferrer"
                           className="text-[11px] text-primary hover:underline"
@@ -879,7 +881,7 @@ function HistoryDialog({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/admin/approvals/${applicant.id}/events`, {
+        const res = await fetch(`${API_ROOT}/admin/approvals/${applicant.id}/events`, {
           credentials: "include",
         });
         if (!res.ok) throw new Error("Failed to load history");
@@ -901,7 +903,7 @@ function HistoryDialog({
     if (!applicant || !note.trim()) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/admin/approvals/${applicant.id}/notes`, {
+      const res = await fetch(`${API_ROOT}/admin/approvals/${applicant.id}/notes`, {
         method: "POST",
         credentials: "include",
         headers: { "content-type": "application/json" },

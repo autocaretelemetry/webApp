@@ -19,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { API_ROOT } from "../../lib/api-base";
 import { toast } from "sonner";
 import {
   Building2,
@@ -115,7 +116,7 @@ export default function SuperAdminOnboard() {
       for (const [k, v] of Object.entries(applicant)) {
         if (v.trim()) applicantData[k] = v.trim();
       }
-      const res = await fetch("/api/admin/users", {
+      const res = await fetch(`${API_ROOT}/admin/users`, {
         method: "POST",
         credentials: "include",
         headers: { "content-type": "application/json" },

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Building2, Smartphone } from "lucide-react";
+import { API_ROOT } from "../../lib/api-base";
 
 type Account = {
   kind: "bank" | "momo";
@@ -24,9 +25,9 @@ type Option =
   | { kind: "organization"; subscriberId: string; name: string };
 
 const endpointFor = (opt: Option) => {
-  if (opt.kind === "owner") return "/api/me/payout-account";
-  if (opt.kind === "center") return `/api/service-centers/${opt.subscriberId}/payout-account`;
-  if (opt.kind === "vendor") return `/api/vendors/${opt.subscriberId}/payout-account`;
+  if (opt.kind === "owner") return `${API_ROOT}/me/payout-account`;
+  if (opt.kind === "center") return `${API_ROOT}/service-centers/${opt.subscriberId}/payout-account`;
+  if (opt.kind === "vendor") return `${API_ROOT}/vendors/${opt.subscriberId}/payout-account`;
   return null;
 };
 
@@ -170,7 +171,7 @@ export default function PayoutAccountPage() {
   const { data, isLoading } = useQuery<{ options: Option[] }>({
     queryKey: ["me", "subscriber-options"],
     queryFn: () =>
-      fetch("/api/me/subscriber-options", { credentials: "include" }).then((r) => r.json()),
+      fetch(`${API_ROOT}/me/subscriber-options`, { credentials: "include" }).then((r) => r.json()),
   });
   const options = data?.options ?? [];
 

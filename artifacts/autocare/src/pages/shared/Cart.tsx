@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/format";
 import { Link, useLocation } from "wouter";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -105,7 +106,7 @@ export default function Cart() {
                     <div key={line.partId} className="flex gap-3">
                       <div className="w-16 h-16 rounded-md bg-muted overflow-hidden flex-shrink-0 flex items-center justify-center">
                         {line.imageUrl ? (
-                          <img src={line.imageUrl} alt={line.name} className="w-full h-full object-cover" />
+                          <img src={resolveImageUrl(line.imageUrl)} alt={line.name} className="w-full h-full object-cover" />
                         ) : (
                           <Package className="h-6 w-6 text-muted-foreground/40" />
                         )}

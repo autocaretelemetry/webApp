@@ -1,3 +1,4 @@
+import { resolveImageUrl } from "@/lib/format";
 import { Vehicle } from "@workspace/api-client-react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +16,7 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
       {vehicle.imageUrl ? (
         <div className="h-48 w-full overflow-hidden bg-muted">
           <img 
-            src={vehicle.imageUrl} 
+            src={resolveImageUrl(vehicle.imageUrl)} 
             alt={`${vehicle.year} ${vehicle.brand} ${vehicle.model}`} 
             className="h-full w-full object-cover transition-transform hover:scale-105"
           />
