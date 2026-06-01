@@ -7,7 +7,9 @@ Connected automotive service platform pairing vehicle owners, renters, service c
 - `pnpm --filter @workspace/api-server run dev` — API server (port 5000)
 - `pnpm --filter @workspace/autocare run dev` — web app
 - `pnpm run typecheck` — full typecheck
-- `pnpm run build` — typecheck + build
+- `pnpm run build` — full typecheck, then build ONLY the deployable single service (autocare web + api-server). Safe to use as a Render/CI build command. Web base path defaults to `/` when `BASE_PATH` is unset.
+- `pnpm run build:all` — typecheck + build every artifact (incl. mobile/expo + mockup-sandbox); for local/full CI, NOT for deploy.
+- `pnpm start` — start the single service (runs the api-server, which serves the built web app).
 - `pnpm run test` — run all workspace test suites
 - `pnpm --filter @workspace/api-spec run codegen` — regen hooks + Zod schemas from OpenAPI
 - `pnpm --filter @workspace/db run push` — push DB schema (dev only)

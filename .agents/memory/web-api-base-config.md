@@ -21,10 +21,15 @@ The web app supports two deploy shapes from one build: same-origin (Replit proxy
 ## Deploying off Replit (Render etc.)
 
 Two shapes — prefer **single-service**:
-- **Single Node service (recommended):** the API server serves the built web SPA from the same origin. `app.ts` `resolveWebDistDir()` locates `artifacts/autocare/dist/public` and adds `express.static` + an SPA fallback, gated off when `NODE_ENV==="development"` (Replit dev keeps web on the Vite server). Same origin → the cross-origin cookie gap above is moot. Build only the web + api (`--filter`), never the root `pnpm run build`.
+- **Single Node service (recommended):** the API server serves the built web SPA from the same origin. `app.ts` `resolveWebDistDir()` locates `artifacts/autocare/dist/public` and adds `express.static` + an SPA fallback, gated off when `NODE_ENV==="development"` (Replit dev keeps web on the Vite server). Same origin → the cross-origin cookie gap above is moot. Stock root `pnpm run build` + `pnpm start` now deploy this (see "Render gotchas" below); the explicit `--filter` web+api build is equivalent.
 - **Split-domain:** static web site + separate API service; requires the unfinished CORS + cookie work, so login won't persist.
 
 **Why these bite:**
-- The web `vite.config.ts` historically threw on missing `PORT` even for a static `vite build`; a Static-Site/CI build has no server and no `PORT`, so it failed. Fix: enforce `PORT` only when `command === "serve"`. `BASE_PATH` is still required at build (sets asset base; use `/`).
-- The **root** `pnpm run build` builds *every* artifact incl. mobile (expo) + mockup-sandbox; any one failing kills the deploy. A single service must use a targeted `--filter` build, not the root build.
+- The web `vite.config.ts` historically threw on missing `PORT` (and `BASE_PATH`) even for a static `vite build`; a Static-Site/CI build has no server and no env wiring, so it failed. Fix: enforce `PORT` only when `command === "serve"`, and require `BASE_PATH` only in `serve` (build defaults it to `/`). See the "Render gotchas" section below for the current rule.
+- The root build *used to* build *every* artifact incl. mobile (expo) + mockup-sandbox, so any one failing killed the deploy. That is why root `pnpm run build` was rescoped to web+api only (`build:all` keeps the build-everything behavior) — see "Render gotchas" below.
 - SPA fallback must skip the API: guard with segment-aware, case-insensitive `^/api(?:/|$)` (not `startsWith("/api")`, which false-matches `/apiary`) and mount it AFTER the `/api` router.
+
+**Render gotchas learned the hard way:**
+- Committing a `render.yaml` does NOT reconfigure an already-existing manually-created Render service — it only applies to Blueprint-created services. A manual service keeps whatever build/start command was set in its dashboard. So the fix must either be applied in the dashboard OR baked into the repo's own root scripts.
+- Because the user's manual service was pinned to root `pnpm run build`, the durable fix was to make the ROOT scripts deploy-safe: `pnpm run build` now full-typechecks then builds ONLY autocare web + api-server (mobile/expo + mockup-sandbox are typechecked but not built); `pnpm run build:all` keeps the build-everything behavior; root `pnpm start` runs the api-server. So a stock `pnpm run build` + `pnpm start` deploys the single service with zero dashboard edits.
+- `vite.config.ts` defaults `BASE_PATH` to `/` for `command !== "serve"` (build) so a production build needs no env wiring; `serve` (Replit dev) still requires it.

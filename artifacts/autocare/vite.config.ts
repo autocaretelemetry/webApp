@@ -4,20 +4,24 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
-const basePath = process.env.BASE_PATH;
-
-if (!basePath) {
-  throw new Error(
-    "BASE_PATH environment variable is required but was not provided.",
-  );
-}
-
 export default defineConfig(async ({ command }) => {
+  // BASE_PATH governs the asset base. In dev/preview (`serve`) the Replit
+  // workflow always provides it, so it is required there. For a static
+  // `vite build` (Render / CI) we default to "/" so a production deploy works
+  // out of the box without extra env wiring.
+  let basePath = process.env.BASE_PATH;
+
   // PORT only governs the dev/preview server. A static `vite build` (e.g. on
   // Render or any CI) has no server, so it must not require PORT.
   let port = 5173;
 
   if (command === "serve") {
+    if (!basePath) {
+      throw new Error(
+        "BASE_PATH environment variable is required but was not provided.",
+      );
+    }
+
     const rawPort = process.env.PORT;
 
     if (!rawPort) {
@@ -31,6 +35,9 @@ export default defineConfig(async ({ command }) => {
     if (Number.isNaN(port) || port <= 0) {
       throw new Error(`Invalid PORT value: "${rawPort}"`);
     }
+  } else if (!basePath) {
+    // Production build with no BASE_PATH set → deploy at the domain root.
+    basePath = "/";
   }
 
   return {
