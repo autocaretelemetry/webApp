@@ -19,6 +19,13 @@ export const paymentTransactionsTable = pgTable("payment_transactions", {
   failureRedirect: text("failure_redirect").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   completedAt: timestamp("completed_at", { withTimezone: true }),
+  // Audit trail for an operator-forced terminal failure (super-admin "Mark
+  // failed"). Distinguishes a manual fail from a provider-reported one and
+  // replaces parsing the legacy `manual_fail:` prefix off `providerReason`.
+  manualFailById: uuid("manual_fail_by_id"),
+  manualFailByEmail: text("manual_fail_by_email"),
+  manualFailNote: text("manual_fail_note"),
+  manualFailAt: timestamp("manual_fail_at", { withTimezone: true }),
 });
 
 export type PaymentTransaction = typeof paymentTransactionsTable.$inferSelect;

@@ -23,7 +23,39 @@ type Payment = {
   providerReason: string | null;
   createdAt: string;
   completedAt: string | null;
+  manualFailById: string | null;
+  manualFailByEmail: string | null;
+  manualFailNote: string | null;
+  manualFailAt: string | null;
 };
+
+/**
+ * Resolve the operator-forced-failure audit for a payment. Prefers the
+ * dedicated `manualFail*` columns; falls back to parsing the legacy
+ * `manual_fail:` marker out of `providerReason` for rows failed before the
+ * columns existed.
+ */
+function manualFailInfo(
+  p: Payment,
+): { by: string | null; at: string | null; note: string | null } | null {
+  if (p.manualFailAt || p.manualFailByEmail || p.manualFailById) {
+    return {
+      by: p.manualFailByEmail ?? p.manualFailById,
+      at: p.manualFailAt,
+      note: p.manualFailNote,
+    };
+  }
+  const reason = p.providerReason ?? "";
+  if (p.status === "failed" && reason.startsWith("manual_fail:")) {
+    // Legacy format: "manual_fail: <note> (by <operator>)"
+    const body = reason.slice("manual_fail:".length).trim();
+    const byMatch = body.match(/\(by ([^)]+)\)\s*$/);
+    const by = byMatch ? byMatch[1].trim() : null;
+    const note = byMatch ? body.slice(0, byMatch.index).trim() : body;
+    return { by, at: p.completedAt, note: note || null };
+  }
+  return null;
+}
 
 type FilterKey = "" | "pending" | "successful" | "failed" | "amount_mismatch";
 
@@ -261,6 +293,7 @@ export default function PaymentsAdminPage() {
           const isAmountMismatch =
             p.status === "failed" &&
             (p.providerReason ?? "").startsWith("amount_mismatch:");
+          const manualFail = manualFailInfo(p);
           const stale = isStale(p);
           return (
             <Card
@@ -293,6 +326,11 @@ export default function PaymentsAdminPage() {
                         Amount mismatch
                       </Badge>
                     )}
+                    {manualFail && (
+                      <Badge className="bg-orange-100 text-orange-900">
+                        Manually failed
+                      </Badge>
+                    )}
                     <Badge className={tone}>{p.status}</Badge>
                   </div>
                 </div>
@@ -307,13 +345,30 @@ export default function PaymentsAdminPage() {
                   {p.phone && <div>Phone: {p.phone}</div>}
                 </div>
                 <p className="text-xs text-muted-foreground">{p.description}</p>
-                {(p.providerCode || p.providerReason) && (
-                  <p className="text-xs">
-                    <span className="text-muted-foreground">Provider: </span>
-                    <span className="font-mono">
-                      {p.providerCode ?? "—"} · {p.providerReason ?? "—"}
-                    </span>
-                  </p>
+                {manualFail ? (
+                  <div className="rounded-md border border-orange-200 bg-orange-50 px-2.5 py-2 text-xs text-orange-900">
+                    <p className="font-medium">
+                      Manually failed by {manualFail.by ?? "unknown operator"}
+                      {manualFail.at
+                        ? ` · ${formatDateTime(manualFail.at)}`
+                        : ""}
+                    </p>
+                    <p className="mt-0.5">
+                      <span className="text-orange-800/80">Audit note: </span>
+                      {manualFail.note?.trim()
+                        ? manualFail.note
+                        : "Marked failed by operator (no note)"}
+                    </p>
+                  </div>
+                ) : (
+                  (p.providerCode || p.providerReason) && (
+                    <p className="text-xs">
+                      <span className="text-muted-foreground">Provider: </span>
+                      <span className="font-mono">
+                        {p.providerCode ?? "—"} · {p.providerReason ?? "—"}
+                      </span>
+                    </p>
+                  )
                 )}
                 {p.completedAt && (
                   <p className="text-xs text-muted-foreground">

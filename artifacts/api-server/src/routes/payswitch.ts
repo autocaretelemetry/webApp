@@ -760,10 +760,18 @@ const NON_TERMINAL_STATUSES = new Set([
  * and domain handlers short-circuit when the sale is already in its post-
  * payment state.
  */
+type ManualFailAudit = {
+  byId: string;
+  byEmail: string | null;
+  note: string | null;
+  at: Date;
+};
+
 export async function settleVerifiedTransaction(
   txn: typeof paymentTransactionsTable.$inferSelect,
   verified: StatusCheckResult,
   log: Logger,
+  manualFail?: ManualFailAudit,
 ): Promise<SettleOutcome> {
   if (txn.status === "successful" || txn.status === "failed") {
     return { kind: "already_settled", status: txn.status };
@@ -798,7 +806,7 @@ export async function settleVerifiedTransaction(
       { txn: txn.id, providerStatus: verified.status, providerCode: verified.code },
       "payswitch verification reports terminal failure",
     );
-    await handleFailure(txn, verified.code, reason);
+    await handleFailure(txn, verified.code, reason, manualFail);
     return { kind: "failed", code: verified.code, reason };
   }
   // (3) Verified paid. Defence-in-depth amount check.
@@ -953,11 +961,15 @@ async function handleFailure(
   txn: typeof paymentTransactionsTable.$inferSelect,
   code: string,
   reason: string,
+  manualFail?: ManualFailAudit,
 ): Promise<void> {
   // CAS the flip on `status='pending'` so a manual mark-failed (or a slow
   // terminal-failure verification) can never clobber a charge a concurrent
   // worker already settled as `successful`. If the CAS loses we skip the
-  // downstream subscription cancellation too.
+  // downstream subscription cancellation too. When the fail is operator-forced
+  // we stamp the audit columns in the SAME CAS, so the who/when/note is only
+  // recorded when THIS call actually won the flip (perfectly idempotent against
+  // a concurrent real settlement).
   const flipped = await db
     .update(paymentTransactionsTable)
     .set({
@@ -965,6 +977,14 @@ async function handleFailure(
       providerCode: code || null,
       providerReason: reason,
       completedAt: new Date(),
+      ...(manualFail
+        ? {
+            manualFailById: manualFail.byId,
+            manualFailByEmail: manualFail.byEmail,
+            manualFailNote: manualFail.note,
+            manualFailAt: manualFail.at,
+          }
+        : {}),
     })
     .where(
       and(
@@ -1283,8 +1303,14 @@ router.post("/admin/payments/:txnId/mark-failed", requireAuth, async (req, res):
     return;
   }
   const user = req.user!;
-  const note = parsed.data.note?.trim();
+  const note = parsed.data.note?.trim() || null;
   const reason = `manual_fail: ${note || "Marked failed by operator"} (by ${user.email ?? user.id})`;
+  const manualFail: ManualFailAudit = {
+    byId: user.id,
+    byEmail: user.email ?? null,
+    note,
+    at: new Date(),
+  };
   const verified: StatusCheckResult = {
     ok: false,
     reachable: true,
@@ -1300,7 +1326,7 @@ router.post("/admin/payments/:txnId/mark-failed", requireAuth, async (req, res):
     { txn: txn.id, by: user.id, note: note ?? null },
     "admin manually marking payment transaction failed",
   );
-  const outcome = await settleVerifiedTransaction(txn, verified, req.log);
+  const outcome = await settleVerifiedTransaction(txn, verified, req.log, manualFail);
   const [fresh] = await db
     .select()
     .from(paymentTransactionsTable)
