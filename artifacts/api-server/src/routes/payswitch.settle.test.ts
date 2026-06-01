@@ -8,6 +8,7 @@ import {
   subscriptionsTable,
   subscriptionPaymentsTable,
   paymentTransactionsTable,
+  notificationsTable,
 } from "@workspace/db";
 import { hashPassword } from "../lib/auth";
 
@@ -53,7 +54,12 @@ async function loginCookie(email: string): Promise<string> {
   return Array.isArray(set) ? set.join("; ") : String(set ?? "");
 }
 
+const BUYER_PHONE = `${TAG}-buyer-0241112222`;
+
 async function cleanup(): Promise<void> {
+  await db
+    .delete(notificationsTable)
+    .where(eq(notificationsTable.ownerPhone, BUYER_PHONE));
   // Bare (non-subscription) txns this suite seeds carry our TAG prefix in
   // transactionId and have no sale link, so the subscription-scoped sweep below
   // never reaches them. Delete by prefix first or the unique transactionId
@@ -203,6 +209,7 @@ async function seedPendingTxn(opts: {
 async function seedBarePendingTxn(opts: {
   txnSuffix: string;
   status?: string;
+  phone?: string | null;
 }): Promise<{ txnRowId: string; transactionId: string }> {
   const transactionId = `${TAG}-${opts.txnSuffix}`.slice(0, 24);
   const [txn] = await db
@@ -214,11 +221,12 @@ async function seedBarePendingTxn(opts: {
       purposeRef: null,
       amount: 5000,
       email: SUPER_EMAIL.toLowerCase(),
+      phone: opts.phone ?? null,
       description: "bare test charge",
       status: opts.status ?? "pending",
       initiatedByUserId: superUserId,
       successRedirect: "/billing/result?status=success",
-      failureRedirect: "/billing/result?status=failed",
+      failureRedirect: "/billing/result?status=failed&purpose=service_invoice",
     })
     .returning({ id: paymentTransactionsTable.id });
   return { txnRowId: txn!.id, transactionId };
@@ -259,6 +267,44 @@ describe("admin mark-failed — operator terminally fails a stuck charge", () =>
       outcome: { kind: "already_settled", status: "failed" },
     });
     void transactionId;
+  });
+
+  it("notifies the buyer (in-app) that the cancelled charge can be retried, once", async () => {
+    const superCookie = await loginCookie(SUPER_EMAIL);
+    const { txnRowId } = await seedBarePendingTxn({
+      txnSuffix: "mf-notify",
+      phone: BUYER_PHONE,
+    });
+
+    const res = await request(app)
+      .post(`/api/admin/payments/${txnRowId}/mark-failed`)
+      .set("Cookie", superCookie)
+      .send({ note: "Stuck — provider unreachable" });
+    expect(res.status, res.text).toBe(200);
+    expect(res.body).toMatchObject({ outcome: { kind: "failed" } });
+
+    const notifs = await db
+      .select()
+      .from(notificationsTable)
+      .where(eq(notificationsTable.dedupeKey, `payment_given_up:${txnRowId}`));
+    expect(notifs).toHaveLength(1);
+    expect(notifs[0]?.ownerPhone).toBe(BUYER_PHONE);
+    expect(notifs[0]?.kind).toBe("payment_cancelled");
+    expect(notifs[0]?.body ?? "").toMatch(/retry/i);
+
+    // Replay is an already-settled no-op: no duplicate buyer notification.
+    const replay = await request(app)
+      .post(`/api/admin/payments/${txnRowId}/mark-failed`)
+      .set("Cookie", superCookie)
+      .send({});
+    expect(replay.body).toMatchObject({
+      outcome: { kind: "already_settled", status: "failed" },
+    });
+    const after = await db
+      .select()
+      .from(notificationsTable)
+      .where(eq(notificationsTable.dedupeKey, `payment_given_up:${txnRowId}`));
+    expect(after).toHaveLength(1);
   });
 
   it("refuses to fail an already-successful charge (409)", async () => {

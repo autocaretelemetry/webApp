@@ -213,6 +213,22 @@ export function paymentStuckAlertEmail(args: {
   };
 }
 
+export function paymentGivenUpEmail(args: {
+  saleLabel: string;
+  amount: number;
+  retryUrl: string;
+}): Omit<EmailMessage, "to"> {
+  const { saleLabel, amount, retryUrl } = args;
+  const amountStr = `GHS ${amount.toFixed(2)}`;
+  return {
+    subject: `Your AutoCare ${saleLabel} payment was cancelled`,
+    text: `Hi,\n\nWe cancelled a payment of ${amountStr} for your ${saleLabel} that was stuck and never completed. No money was taken. You can safely retry the payment whenever you're ready.\n\nRetry your payment: ${retryUrl}\n\n— The AutoCare team`,
+    html: wrap(
+      `<h2 style="margin:0 0 16px;">Payment cancelled</h2><p>We cancelled a payment of <strong>${escape(amountStr)}</strong> for your <strong>${escape(saleLabel)}</strong> that was stuck and never completed. No money was taken — you can safely retry the payment whenever you're ready.</p><p><a href="${escape(retryUrl)}" style="color:#b45309;font-weight:600;">Retry your payment →</a></p>`,
+    ),
+  };
+}
+
 export function kycRejectedEmail(
   name: string,
   note: string | null | undefined,

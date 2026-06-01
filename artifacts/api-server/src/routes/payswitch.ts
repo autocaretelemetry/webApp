@@ -32,6 +32,8 @@ import {
   type StatusCheckResult,
 } from "../lib/payswitch";
 import { recordCommission } from "../lib/commissions";
+import { createOwnerNotification } from "../lib/notify";
+import { sendEmail, paymentGivenUpEmail } from "../lib/email";
 import {
   createPayoutForSale,
   resolveServiceInvoiceSeller,
@@ -806,7 +808,14 @@ export async function settleVerifiedTransaction(
       { txn: txn.id, providerStatus: verified.status, providerCode: verified.code },
       "payswitch verification reports terminal failure",
     );
-    await handleFailure(txn, verified.code, reason, manualFail);
+    // Only operator-forced fails (the admin mark-failed queue) notify the
+    // buyer: a real PaySwitch decline already bounced them to the failure page
+    // in real time, but an operator giving up on a stuck charge happens out of
+    // band so the buyer would otherwise never learn they can retry. The
+    // presence of the audit object is the canonical operator-forced marker.
+    await handleFailure(txn, verified.code, reason, manualFail, {
+      notifyBuyer: !!manualFail,
+    });
     return { kind: "failed", code: verified.code, reason };
   }
   // (3) Verified paid. Defence-in-depth amount check.
@@ -957,11 +966,83 @@ router.post("/payments/payswitch/webhook", async (req, res): Promise<void> => {
   res.status(200).json({ ok: true, outcome: outcome.kind });
 });
 
+/** Human-friendly label for the kind of sale a charge was paying for. */
+function saleLabelForPurpose(purpose: string): string {
+  switch (purpose) {
+    case "subscription":
+      return "subscription";
+    case "service_invoice":
+      return "service invoice";
+    case "rental_booking":
+      return "rental booking";
+    case "parts_order_approve":
+    case "parts_order_direct_buy":
+    case "parts_order_center_pay":
+      return "parts order";
+    default:
+      return "payment";
+  }
+}
+
+/**
+ * Tell the buyer that a stuck charge was given up on (terminally failed by an
+ * operator) so they know they can retry. Best-effort: an in-app notification
+ * keyed on the buyer's phone plus an email to the address captured at checkout.
+ * Never throws — a notification failure must not break settlement.
+ */
+async function notifyBuyerPaymentGivenUp(
+  txn: typeof paymentTransactionsTable.$inferSelect,
+): Promise<void> {
+  const label = saleLabelForPurpose(txn.purpose);
+  const retryUrl = `${publicOrigin()}${txn.failureRedirect}`;
+  const title = "Payment cancelled";
+  const body = `Your ${label} payment of GHS ${(txn.amount / 100).toFixed(
+    2,
+  )} was cancelled because it never completed. No money was taken — you can retry it.`;
+
+  if (txn.phone) {
+    try {
+      await createOwnerNotification({
+        ownerPhone: txn.phone,
+        kind: "payment_cancelled",
+        title,
+        body,
+        dedupeKey: `payment_given_up:${txn.id}`,
+        url: txn.failureRedirect,
+      });
+    } catch (err) {
+      logger.warn(
+        { err, txn: txn.id },
+        "failed to create payment-cancelled in-app notification for buyer",
+      );
+    }
+  }
+
+  if (txn.email) {
+    try {
+      await sendEmail({
+        to: txn.email,
+        ...paymentGivenUpEmail({
+          saleLabel: label,
+          amount: txn.amount / 100,
+          retryUrl,
+        }),
+      });
+    } catch (err) {
+      logger.warn(
+        { err, txn: txn.id },
+        "failed to send payment-cancelled email to buyer",
+      );
+    }
+  }
+}
+
 async function handleFailure(
   txn: typeof paymentTransactionsTable.$inferSelect,
   code: string,
   reason: string,
   manualFail?: ManualFailAudit,
+  opts?: { notifyBuyer?: boolean },
 ): Promise<void> {
   // CAS the flip on `status='pending'` so a manual mark-failed (or a slow
   // terminal-failure verification) can never clobber a charge a concurrent
@@ -1001,7 +1082,13 @@ async function handleFailure(
       .where(eq(subscriptionsTable.id, txn.purposeRef));
   }
   // Sale records (invoice, order, rental booking) intentionally stay in
-  // their pre-payment state so the buyer can retry.
+  // their pre-payment state so the buyer can retry. When an operator gives up
+  // on a stuck charge the buyer would otherwise never learn the checkout was
+  // abandoned, so tell them they can retry. Only fires once: the CAS above
+  // guarantees we got here exactly once per txn (idempotent on replay).
+  if (opts?.notifyBuyer) {
+    await notifyBuyerPaymentGivenUp(txn);
+  }
 }
 
 async function handleSuccess(
